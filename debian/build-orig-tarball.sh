@@ -32,6 +32,7 @@ tar -x -z --directory "${PKG}-${TARVERSION}" --strip-components=1 -f ${TEMPDIR}/
 echo ${OPENBSD_CHANGELOG} > "${PKG}-${TARVERSION}/ChangeLog-openbsd-${OPENBSD_COMMIT}"
 echo ${PORTABLE_CHANGELOG} > "${PKG}-${TARVERSION}/ChangeLog-portable-${PORTABLE_COMMIT}"
 cp "${TEMPDIR}/${PKG}/VERSION" "${PKG}-${TARVERSION}"
+cp "${TEMPDIR}/${PKG}/OPENBSD_BRANCH" "${PKG}-${TARVERSION}"
 find -L "${PKG}-${TARVERSION}" -xdev -type f -print | sort \
     | XZ_OPT="-6v" tar -caf "${DESTFILENAME}" -T- --owner=root --group=root --mode=a+rX
 rm -rf "${PKG}-${TARVERSION}"
