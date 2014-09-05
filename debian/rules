@@ -1,0 +1,12 @@
+#!/usr/bin/make -f
+#export DH_VERBOSE=1
+
+%:
+	dh $@ --parallel
+
+override_dh_auto_install:
+	dh_auto_install
+
+override_dh_strip:
+	dh_strip -plibressl-0 --dbg-package=libressl-dbg
+	dh_strip --remaining-packages

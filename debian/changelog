@@ -1,0 +1,5 @@
+libressl (2.1.0+git20140905151332+3a44b6f+3f944e8-1) precise; urgency=low
+
+  * Initial release.
+
+ -- Joachim Bauch <bauch@struktur.de>  Fri, 05 Sep 2014 14:12:11 +0200

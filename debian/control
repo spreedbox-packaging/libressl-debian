@@ -1,0 +1,80 @@
+Source: libressl
+Section: libs
+Priority: optional
+Maintainer: Joachim Bauch <bauch@struktur.de>
+Build-Depends:
+ debhelper (>= 9~),
+ libtool
+Standards-Version: 3.9.5
+Homepage: http://www.libressl.org/
+Vcs-Git: http://git.intranet.struktur.de/debian/libressl.git
+Vcs-Browser: http://git.intranet.struktur.de/debian/libressl
+
+Package: libressl-0
+Architecture: any
+Multi-Arch: same
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends}
+Description: SSL library, forked from OpenSSL
+ LibreSSL strives to maintain API compatibility with OpenSSL, but
+ do away with all the cruft.
+
+Package: libressl-apps
+Section: utils
+Architecture: any
+Multi-Arch: same
+Depends:
+ libressl-0 (= ${binary:Version}),
+ ${misc:Depends},
+ ${shlibs:Depends}
+Conflicts:
+ openssl
+Description: SSL library, forked from OpenSSL - applications
+ LibreSSL strives to maintain API compatibility with OpenSSL, but
+ do away with all the cruft.
+ .
+ The commandline tools that use libressl are provided by this package.
+
+Package: libressl-dev
+Section: libdevel
+Multi-Arch: same
+Architecture: any
+Depends:
+ libressl-0 (= ${binary:Version}),
+ ${misc:Depends}
+Conflicts:
+ libssl-dev
+Description: SSL library, forked from OpenSSL - development files
+ LibreSSL strives to maintain API compatibility with OpenSSL, but
+ do away with all the cruft.
+ .
+ The development headers for compiling programs that use libressl
+ are provided by this package.
+
+Package: libressl-doc
+Section: doc
+Architecture: all
+Depends:
+ ${misc:Depends}
+Description: SSL library, forked from OpenSSL - development files
+ LibreSSL strives to maintain API compatibility with OpenSSL, but
+ do away with all the cruft.
+ .
+ The documentation for libressl is provided by this package.
+
+Package: libressl-dbg
+Section: debug
+Priority: extra
+Architecture: any
+Multi-Arch: same
+Pre-Depends: ${misc:Pre-Depends}
+Depends:
+ libressl-0 (= ${binary:Version}),
+ ${misc:Depends}
+Description: SSL library, forked from OpenSSL - debug symbols
+ LibreSSL strives to maintain API compatibility with OpenSSL, but
+ do away with all the cruft.
+ .
+ The debugging symbols for tracking down bugs in applications that
+ use libressl are provided by this package.
