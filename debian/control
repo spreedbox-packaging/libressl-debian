@@ -9,7 +9,7 @@ Build-Depends:
  dh-autoreconf,
  libtool,
  quilt
-Standards-Version: 3.9.5
+Standards-Version: 3.9.3
 Homepage: http://www.libressl.org/
 Vcs-Git: http://git.intranet.struktur.de/debian/libressl.git
 Vcs-Browser: http://git.intranet.struktur.de/debian/libressl
