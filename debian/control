@@ -3,8 +3,12 @@ Section: libs
 Priority: optional
 Maintainer: Joachim Bauch <bauch@struktur.de>
 Build-Depends:
+ autoconf,
+ automake,
  debhelper (>= 9~),
- libtool
+ dh-autoreconf,
+ libtool,
+ quilt
 Standards-Version: 3.9.5
 Homepage: http://www.libressl.org/
 Vcs-Git: http://git.intranet.struktur.de/debian/libressl.git
