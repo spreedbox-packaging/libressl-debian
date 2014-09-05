@@ -29,8 +29,8 @@ echo "# Repacking version ${TARVERSION}"
 DESTFILENAME=$(readlink -f "${CWD}/../${PKG}_${TARVERSION}.orig.tar.xz")
 mkdir -p "${PKG}-${TARVERSION}"
 tar -x -z --directory "${PKG}-${TARVERSION}" --strip-components=1 -f ${TEMPDIR}/${PKG}/${PKG}-${VERSION}.tar.gz
-echo ${OPENBSD_CHANGELOG} > "${PKG}-${TARVERSION}/ChangeLog-openbsd-${OPENBSD_COMMIT}"
-echo ${PORTABLE_CHANGELOG} > "${PKG}-${TARVERSION}/ChangeLog-portable-${PORTABLE_COMMIT}"
+echo ${OPENBSD_CHANGELOG} > "${PKG}-${TARVERSION}/ChangeLog-openbsd"
+echo ${PORTABLE_CHANGELOG} > "${PKG}-${TARVERSION}/ChangeLog-portable"
 cp "${TEMPDIR}/${PKG}/VERSION" "${PKG}-${TARVERSION}"
 cp "${TEMPDIR}/${PKG}/OPENBSD_BRANCH" "${PKG}-${TARVERSION}"
 find -L "${PKG}-${TARVERSION}" -xdev -type f -print | sort \
