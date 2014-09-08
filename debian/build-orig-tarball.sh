@@ -21,16 +21,15 @@ cd ${TEMPDIR}/${PKG} && ./dist.sh
 VERSION=$(cat ${TEMPDIR}/${PKG}/VERSION)
 OPENBSD_COMMIT=$(cd ${TEMPDIR}/${PKG}/openbsd && git log -1 --format=%h)
 PORTABLE_COMMIT=$(cd ${TEMPDIR}/${PKG} && git log -1 --format=%h)
-OPENBSD_CHANGELOG=$(cd ${TEMPDIR}/${PKG}/openbsd && git log --pretty="format:%ad  %aN%n%n%x09* %s%n%n%w(72,8,8)%b%n")
-PORTABLE_CHANGELOG=$(cd ${TEMPDIR}/${PKG} && git log --pretty="format:%ad  %aN%n%n%x09* %s%n%n%w(72,8,8)%b%n")
 TARVERSION=${VERSION}+git${TIMESTAMP}+${OPENBSD_COMMIT}+${PORTABLE_COMMIT}
 
 echo "# Repacking version ${TARVERSION}"
 DESTFILENAME=$(readlink -f "${CWD}/../${PKG}_${TARVERSION}.orig.tar.xz")
 mkdir -p "${PKG}-${TARVERSION}"
 tar -x -z --directory "${PKG}-${TARVERSION}" --strip-components=1 -f ${TEMPDIR}/${PKG}/${PKG}-${VERSION}.tar.gz
-echo ${OPENBSD_CHANGELOG} > "${PKG}-${TARVERSION}/ChangeLog-openbsd"
-echo ${PORTABLE_CHANGELOG} > "${PKG}-${TARVERSION}/ChangeLog-portable"
+DIR=$(readlink -f "${PKG}-${TARVERSION}")
+cd ${TEMPDIR}/${PKG}/openbsd && git log --pretty="format:%ad  %aN%n%n%x09* %s%n%n%w(72,8,8)%b%n" > "${DIR}/ChangeLog-openbsd"
+cd ${TEMPDIR}/${PKG} && git log --pretty="format:%ad  %aN%n%n%x09* %s%n%n%w(72,8,8)%b%n" > "${DIR}/ChangeLog-portable"
 cp "${TEMPDIR}/${PKG}/VERSION" "${PKG}-${TARVERSION}"
 cp "${TEMPDIR}/${PKG}/OPENBSD_BRANCH" "${PKG}-${TARVERSION}"
 find -L "${PKG}-${TARVERSION}" -xdev -type f -print | sort \
