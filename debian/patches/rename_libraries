@@ -1,7 +1,7 @@
 Index: libressl/Makefile.am
 ===================================================================
---- libressl.orig/Makefile.am	2014-09-08 17:17:24.000000000 +0200
-+++ libressl/Makefile.am	2014-09-08 17:21:37.000000000 +0200
+--- libressl.orig/Makefile.am	2014-09-08 18:01:41.000000000 +0200
++++ libressl/Makefile.am	2014-09-08 18:06:01.000000000 +0200
 @@ -2,4 +2,4 @@
  ACLOCAL_AMFLAGS = -I m4
  
@@ -10,7 +10,7 @@ Index: libressl/Makefile.am
 +pkgconfig_DATA = libressl-crypto.pc libressl-ssl.pc libressl-openssl.pc
 Index: libressl/libcrypto.pc.in
 ===================================================================
---- libressl.orig/libcrypto.pc.in	2014-09-08 17:17:24.000000000 +0200
+--- libressl.orig/libcrypto.pc.in	2014-09-08 18:01:41.000000000 +0200
 +++ /dev/null	1970-01-01 00:00:00.000000000 +0000
 @@ -1,15 +0,0 @@
 -#libcrypto pkg-config source file
@@ -31,7 +31,7 @@ Index: libressl/libcrypto.pc.in
 Index: libressl/libressl-crypto.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-crypto.pc.in	2014-09-08 17:21:37.000000000 +0200
++++ libressl/libressl-crypto.pc.in	2014-09-08 18:06:01.000000000 +0200
 @@ -0,0 +1,15 @@
 +#libcrypto pkg-config source file
 +
@@ -51,7 +51,7 @@ Index: libressl/libressl-crypto.pc.in
 Index: libressl/libressl-openssl.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-openssl.pc.in	2014-09-08 17:21:37.000000000 +0200
++++ libressl/libressl-openssl.pc.in	2014-09-08 18:06:01.000000000 +0200
 @@ -0,0 +1,11 @@
 +#openssl pkg-config source file
 +
@@ -67,7 +67,7 @@ Index: libressl/libressl-openssl.pc.in
 Index: libressl/libressl-ssl.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-ssl.pc.in	2014-09-08 17:22:39.000000000 +0200
++++ libressl/libressl-ssl.pc.in	2014-09-08 18:06:01.000000000 +0200
 @@ -0,0 +1,16 @@
 +#libssl pkg-config source file
 +
@@ -87,7 +87,7 @@ Index: libressl/libressl-ssl.pc.in
 +Cflags: -I${includedir}
 Index: libressl/libssl.pc.in
 ===================================================================
---- libressl.orig/libssl.pc.in	2014-09-08 17:17:24.000000000 +0200
+--- libressl.orig/libssl.pc.in	2014-09-08 18:01:41.000000000 +0200
 +++ /dev/null	1970-01-01 00:00:00.000000000 +0000
 @@ -1,16 +0,0 @@
 -#libssl pkg-config source file
@@ -108,7 +108,7 @@ Index: libressl/libssl.pc.in
 -Cflags: -I${includedir}
 Index: libressl/openssl.pc.in
 ===================================================================
---- libressl.orig/openssl.pc.in	2014-09-08 17:17:24.000000000 +0200
+--- libressl.orig/openssl.pc.in	2014-09-08 18:01:41.000000000 +0200
 +++ /dev/null	1970-01-01 00:00:00.000000000 +0000
 @@ -1,11 +0,0 @@
 -#openssl pkg-config source file
@@ -124,8 +124,8 @@ Index: libressl/openssl.pc.in
 -Requires: libssl libcrypto
 Index: libressl/crypto/Makefile.am
 ===================================================================
---- libressl.orig/crypto/Makefile.am	2014-09-08 17:17:24.000000000 +0200
-+++ libressl/crypto/Makefile.am	2014-09-08 17:21:37.000000000 +0200
+--- libressl.orig/crypto/Makefile.am	2014-09-08 18:01:41.000000000 +0200
++++ libressl/crypto/Makefile.am	2014-09-08 18:06:01.000000000 +0200
 @@ -4,11 +4,11 @@
  AM_CPPFLAGS += -I$(top_srcdir)/crypto/evp
  AM_CPPFLAGS += -I$(top_srcdir)/crypto/modes
@@ -1238,8 +1238,8 @@ Index: libressl/crypto/Makefile.am
 +EXTRA_libressl_crypto_la_SOURCES += poly1305/poly1305-donna.c
 Index: libressl/ssl/Makefile.am
 ===================================================================
---- libressl.orig/ssl/Makefile.am	2014-09-08 17:17:24.000000000 +0200
-+++ libressl/ssl/Makefile.am	2014-09-08 17:21:37.000000000 +0200
+--- libressl.orig/ssl/Makefile.am	2014-09-08 18:01:41.000000000 +0200
++++ libressl/ssl/Makefile.am	2014-09-08 18:06:01.000000000 +0200
 @@ -1,51 +1,51 @@
  include $(top_srcdir)/Makefile.am.common
  
@@ -1338,8 +1338,8 @@ Index: libressl/ssl/Makefile.am
  noinst_HEADERS += ssl_locl.h
 Index: libressl/apps/Makefile.am
 ===================================================================
---- libressl.orig/apps/Makefile.am	2014-09-08 17:17:24.000000000 +0200
-+++ libressl/apps/Makefile.am	2014-09-08 17:21:37.000000000 +0200
+--- libressl.orig/apps/Makefile.am	2014-09-08 18:01:41.000000000 +0200
++++ libressl/apps/Makefile.am	2014-09-08 18:06:01.000000000 +0200
 @@ -1,67 +1,67 @@
  include $(top_srcdir)/Makefile.am.common
  
@@ -1466,8 +1466,8 @@ Index: libressl/apps/Makefile.am
  noinst_HEADERS += s_apps.h
 Index: libressl/configure.ac
 ===================================================================
---- libressl.orig/configure.ac	2014-09-08 17:17:24.000000000 +0200
-+++ libressl/configure.ac	2014-09-08 17:21:37.000000000 +0200
+--- libressl.orig/configure.ac	2014-09-08 18:01:41.000000000 +0200
++++ libressl/configure.ac	2014-09-08 18:06:01.000000000 +0200
 @@ -57,7 +57,7 @@
  )
  CFLAGS="$save_cflags $AM_CFLAGS"
@@ -1492,8 +1492,8 @@ Index: libressl/configure.ac
  AC_OUTPUT
 Index: libressl/tests/Makefile.am
 ===================================================================
---- libressl.orig/tests/Makefile.am	2014-09-08 17:17:24.000000000 +0200
-+++ libressl/tests/Makefile.am	2014-09-08 17:21:37.000000000 +0200
+--- libressl.orig/tests/Makefile.am	2014-09-08 18:01:41.000000000 +0200
++++ libressl/tests/Makefile.am	2014-09-08 18:06:01.000000000 +0200
 @@ -12,217 +12,217 @@
  endif
  check_PROGRAMS += aeadtest
@@ -1800,3 +1800,58 @@ Index: libressl/tests/Makefile.am
  explicit_bzero_SOURCES += memmem.c
  TESTS += aeadtest.sh
  EXTRA_DIST += aeadtest.sh
+Index: libressl/tests/testssl
+===================================================================
+--- libressl.orig/tests/testssl	2014-09-08 18:01:32.000000000 +0200
++++ libressl/tests/testssl	2014-09-08 18:06:49.000000000 +0200
+@@ -7,7 +7,7 @@
+ 
+ ssltest="./ssltest -key $key -cert $cert -c_key $key -c_cert $cert"
+ 
+-if openssl x509 -in $cert -text -noout | fgrep 'DSA Public Key' >/dev/null; then
++if libressl-openssl x509 -in $cert -text -noout | fgrep 'DSA Public Key' >/dev/null; then
+   dsa_cert=YES
+ else
+   dsa_cert=NO
+@@ -105,7 +105,7 @@
+ echo "Testing ciphersuites"
+ for protocol in TLSv1.2 SSLv3; do
+   echo "Testing ciphersuites for $protocol"
+-  for cipher in `openssl ciphers "RSA+$protocol" | tr ':' ' '`; do
++  for cipher in `libressl-openssl ciphers "RSA+$protocol" | tr ':' ' '`; do
+     echo "Testing $cipher"
+     prot=""
+     if [ $protocol = "SSLv3" ] ; then
+@@ -121,20 +121,20 @@
+ 
+ #############################################################################
+ 
+-if openssl no-dh; then
++if libressl-openssl no-dh; then
+   echo skipping anonymous DH tests
+ else
+   echo test tls1 with 1024bit anonymous DH, multiple handshakes
+   $ssltest -v -bio_pair -tls1 -cipher ADH -dhe1024dsa -num 10 -f -time $extra || exit 1
+ fi
+ 
+-#if openssl no-rsa; then
++#if libressl-openssl no-rsa; then
+ #  echo skipping RSA tests
+ #else
+ #  echo 'test tls1 with 1024bit RSA, no (EC)DHE, multiple handshakes'
+ #  ./ssltest -v -bio_pair -tls1 -cert ../apps/server2.pem -no_dhe -no_ecdhe -num 10 -f -time $extra || exit 1
+ #
+-#  if openssl no-dh; then
++#  if libressl-openssl no-dh; then
+ #    echo skipping RSA+DHE tests
+ #  else
+ #    echo test tls1 with 1024bit RSA, 1024bit DHE, multiple handshakes
+@@ -161,7 +161,7 @@
+ echo "Testing DTLS ciphersuites"
+ for protocol in SSLv3; do
+   echo "Testing ciphersuites for $protocol"
+-  for cipher in `openssl ciphers "RSA+$protocol" | tr ':' '\n' |
++  for cipher in `libressl-openssl ciphers "RSA+$protocol" | tr ':' '\n' |
+     grep -v RC4`; do
+     echo "Testing $cipher"
+     $ssltest -cipher $cipher -dtls1
