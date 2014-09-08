@@ -45,8 +45,6 @@ Architecture: any
 Depends:
  libressl-0 (= ${binary:Version}),
  ${misc:Depends}
-Conflicts:
- libssl-dev
 Description: SSL library, forked from OpenSSL - development files
  LibreSSL strives to maintain API compatibility with OpenSSL, but
  do away with all the cruft.
