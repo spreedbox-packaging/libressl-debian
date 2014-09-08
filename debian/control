@@ -57,6 +57,8 @@ Section: doc
 Architecture: all
 Depends:
  ${misc:Depends}
+Conflicts:
+ libssl-doc
 Description: SSL library, forked from OpenSSL - development files
  LibreSSL strives to maintain API compatibility with OpenSSL, but
  do away with all the cruft.

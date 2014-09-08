@@ -1,3 +1,9 @@
+libressl (2.1.0+git20140908143501+3a44b6f+3f944e8-3) precise; urgency=low
+
+  * Conflict "-doc" package with "libssl-doc".
+
+ -- Joachim Bauch <bauch@struktur.de>  Mon, 08 Sep 2014 18:18:00 +0200
+
 libressl (2.1.0+git20140908143501+3a44b6f+3f944e8-2) precise; urgency=low
 
   * Fixed running tests against libressl commandline tool.
