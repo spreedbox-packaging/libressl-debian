@@ -1,4 +1,4 @@
-/* $OpenBSD: s3_clnt.c,v 1.87 2014/08/11 01:10:42 jsing Exp $ */
+/* $OpenBSD: s3_clnt.c,v 1.84 2014/07/17 11:32:21 miod Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -183,6 +183,8 @@ const SSL_METHOD SSLv3_client_method_data = {
 	.ssl_dispatch_alert = ssl3_dispatch_alert,
 	.ssl_ctrl = ssl3_ctrl,
 	.ssl_ctx_ctrl = ssl3_ctx_ctrl,
+	.get_cipher_by_char = ssl3_get_cipher_by_char,
+	.put_cipher_by_char = ssl3_put_cipher_by_char,
 	.ssl_pending = ssl3_pending,
 	.num_ciphers = ssl3_num_ciphers,
 	.get_cipher = ssl3_get_cipher,
@@ -717,7 +719,7 @@ ssl3_client_hello(SSL *s)
 		}
 
 		/* Ciphers supported */
-		i = ssl_cipher_list_to_bytes(s, SSL_get_ciphers(s), &p[2]);
+		i = ssl_cipher_list_to_bytes(s, SSL_get_ciphers(s), &(p[2]), 0);
 		if (i == 0) {
 			SSLerr(SSL_F_SSL3_CLIENT_HELLO,
 			    SSL_R_NO_CIPHERS_AVAILABLE);
@@ -775,10 +777,9 @@ ssl3_get_server_hello(SSL *s)
 {
 	STACK_OF(SSL_CIPHER)	*sk;
 	const SSL_CIPHER	*c;
-	unsigned char		*p, *q, *d;
+	unsigned char		*p, *d;
 	int			 i, al, ok;
-	unsigned int		 j, cipher_id;
-	uint16_t		 cipher_value;
+	unsigned int		 j;
 	long			 n;
 
 	n = s->method->ssl_get_message(s, SSL3_ST_CR_SRVR_HELLO_A,
@@ -831,7 +832,7 @@ ssl3_get_server_hello(SSL *s)
 	p += SSL3_RANDOM_SIZE;
 
 	/* get the session-id */
-	j = *(p++);
+	j= *(p++);
 
 	if ((j > sizeof s->session->session_id) ||
 	    (j > SSL3_SESSION_ID_SIZE)) {
@@ -844,11 +845,6 @@ ssl3_get_server_hello(SSL *s)
 	if (p + j + 2 - d > n)
 		goto truncated;
 
-	/* Get the cipher value. */
-	q = p + j;
-	n2s(q, cipher_value);
-	cipher_id = SSL3_CK_ID | cipher_value;
-
 	/*
 	 * Check if we want to resume the session based on external
 	 * pre-shared secret
@@ -860,7 +856,7 @@ ssl3_get_server_hello(SSL *s)
 		    &s->session->master_key_length, NULL, &pref_cipher,
 		    s->tls_session_secret_cb_arg)) {
 			s->session->cipher = pref_cipher ?
-			    pref_cipher : ssl3_get_cipher_by_id(cipher_id);
+			    pref_cipher : ssl_get_cipher_by_char(s, p + j);
 			s->s3->flags |= SSL3_FLAGS_CCS_OK;
 		}
 	}
@@ -891,11 +887,10 @@ ssl3_get_server_hello(SSL *s)
 			}
 		}
 		s->session->session_id_length = j;
-		memcpy(s->session->session_id, p, j); /* j could be 0 */
+		memcpy(s->session->session_id,p,j); /* j could be 0 */
 	}
 	p += j;
-
-	c = ssl3_get_cipher_by_id(cipher_id);
+	c = ssl_get_cipher_by_char(s, p);
 	if (c == NULL) {
 		/* unknown cipher */
 		al = SSL_AD_ILLEGAL_PARAMETER;
@@ -903,7 +898,6 @@ ssl3_get_server_hello(SSL *s)
 		    SSL_R_UNKNOWN_CIPHER_RETURNED);
 		goto f_err;
 	}
-
 	/* TLS v1.2 only ciphersuites require v1.2 or later */
 	if ((c->algorithm_ssl & SSL_TLSV1_2) &&
 	    (TLS1_get_version(s) < TLS1_2_VERSION)) {
@@ -912,7 +906,7 @@ ssl3_get_server_hello(SSL *s)
 		    SSL_R_WRONG_CIPHER_RETURNED);
 		goto f_err;
 	}
-	p += SSL3_CIPHER_VALUE_SIZE;
+	p += ssl_put_cipher_by_char(s, NULL, NULL);
 
 	sk = ssl_get_ciphers_by_id(s);
 	i = sk_SSL_CIPHER_find(sk, c);

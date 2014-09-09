@@ -1,4 +1,4 @@
-/* $OpenBSD: s3_srvr.c,v 1.81 2014/08/11 04:46:42 miod Exp $ */
+/* $OpenBSD: s3_srvr.c,v 1.78 2014/07/12 22:33:39 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -184,6 +184,8 @@ const SSL_METHOD SSLv3_server_method_data = {
 	.ssl_dispatch_alert = ssl3_dispatch_alert,
 	.ssl_ctrl = ssl3_ctrl,
 	.ssl_ctx_ctrl = ssl3_ctx_ctrl,
+	.get_cipher_by_char = ssl3_get_cipher_by_char,
+	.put_cipher_by_char = ssl3_put_cipher_by_char,
 	.ssl_pending = ssl3_pending,
 	.num_ciphers = ssl3_num_ciphers,
 	.get_cipher = ssl3_get_cipher,
@@ -1250,8 +1252,8 @@ ssl3_send_server_hello(SSL *s)
 {
 	unsigned char *buf;
 	unsigned char *p, *d;
+	int i, sl;
 	unsigned long l;
-	int sl;
 
 	if (s->state == SSL3_ST_SW_SRVR_HELLO_A) {
 		buf = (unsigned char *)s->init_buf->data;
@@ -1298,7 +1300,8 @@ ssl3_send_server_hello(SSL *s)
 		p += sl;
 
 		/* put the cipher */
-		s2n(ssl3_cipher_get_value(s->s3->tmp.new_cipher), p);
+		i = ssl3_put_cipher_by_char(s->s3->tmp.new_cipher, p);
+		p += i;
 
 		/* put the compression method */
 		*(p++) = 0;
@@ -2443,24 +2446,17 @@ ssl3_get_cert_verify(SSL *s)
 	    pkey->type == NID_id_GostR3410_2001) {
 		unsigned char signature[64];
 		int idx;
-		EVP_PKEY_CTX *pctx;
-	       
+		EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new(pkey, NULL);
+		EVP_PKEY_verify_init(pctx);
 		if (i != 64) {
 			SSLerr(SSL_F_SSL3_GET_CERT_VERIFY,
 			    SSL_R_WRONG_SIGNATURE_SIZE);
 			al = SSL_AD_DECODE_ERROR;
 			goto f_err;
 		}
-		pctx = EVP_PKEY_CTX_new(pkey, NULL);
-		if (pctx == NULL) {
-			SSLerr(SSL_F_SSL3_GET_CERT_VERIFY,
-			    ERR_R_INTERNAL_ERROR);
-			al = SSL_AD_DECODE_ERROR;
-			goto f_err;
-		}
-		EVP_PKEY_verify_init(pctx);
-		for (idx = 0; idx < 64; idx++)
+		for (idx = 0; idx < 64; idx++) {
 			signature[63 - idx] = p[idx];
+		}
 		j = EVP_PKEY_verify(pctx, signature, 64,
 		    s->s3->tmp.cert_verify_md, 32);
 		EVP_PKEY_CTX_free(pctx);

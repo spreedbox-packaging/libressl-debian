@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_locl.h,v 1.66 2014/08/23 14:52:41 jsing Exp $ */
+/* $OpenBSD: ssl_locl.h,v 1.62 2014/07/12 22:33:39 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -325,9 +325,6 @@
  * make sure to update this constant too */
 #define SSL_MAX_DIGEST 6
 
-#define SSL3_CK_ID		0x03000000
-#define SSL3_CK_VALUE_MASK	0x0000ffff
-
 #define TLS1_PRF_DGST_MASK	(0xff << TLS1_PRF_DGST_SHIFT)
 
 #define TLS1_PRF_DGST_SHIFT 10
@@ -478,6 +475,11 @@ typedef struct sess_cert_st {
 /*#define SSL_DEBUG	*/
 /*#define RSA_DEBUG	*/ 
 
+#define ssl_put_cipher_by_char(ssl,ciph,ptr) \
+		((ssl)->method->put_cipher_by_char((ciph),(ptr)))
+#define ssl_get_cipher_by_char(ssl,ptr) \
+		((ssl)->method->get_cipher_by_char(ptr))
+
 /* This is for the SSLv3/TLSv1.0 differences in crypto/hash stuff
  * It is a bit of a mess of functions, but hell, think of it as
  * an opaque structure :-) */
@@ -574,7 +576,7 @@ int ssl_cipher_ptr_id_cmp(const SSL_CIPHER * const *ap,
 STACK_OF(SSL_CIPHER) *ssl_bytes_to_cipher_list(SSL *s, unsigned char *p,
     int num, STACK_OF(SSL_CIPHER) **skp);
 int ssl_cipher_list_to_bytes(SSL *s, STACK_OF(SSL_CIPHER) *sk,
-    unsigned char *p);
+    unsigned char *p, int (*put_cb)(const SSL_CIPHER *, unsigned char *));
 STACK_OF(SSL_CIPHER) *ssl_create_cipher_list(const SSL_METHOD *meth,
     STACK_OF(SSL_CIPHER) **pref, STACK_OF(SSL_CIPHER) **sorted,
     const char *rule_str);
@@ -597,6 +599,8 @@ STACK_OF(SSL_CIPHER) *ssl_get_ciphers_by_id(SSL *s);
 int ssl_verify_alarm_type(long type);
 void ssl_load_ciphers(void);
 
+const SSL_CIPHER *ssl3_get_cipher_by_char(const unsigned char *p);
+int ssl3_put_cipher_by_char(const SSL_CIPHER *c, unsigned char *p);
 void ssl3_init_finished_mac(SSL *s);
 int ssl3_send_server_certificate(SSL *s);
 int ssl3_send_newsession_ticket(SSL *s);
@@ -615,8 +619,6 @@ long ssl3_get_message(SSL *s, int st1, int stn, int mt, long max, int *ok);
 int ssl3_send_finished(SSL *s, int a, int b, const char *sender, int slen);
 int ssl3_num_ciphers(void);
 const SSL_CIPHER *ssl3_get_cipher(unsigned int u);
-const SSL_CIPHER *ssl3_get_cipher_by_id(unsigned int id);
-uint16_t ssl3_cipher_get_value(const SSL_CIPHER *c);
 int ssl3_renegotiate(SSL *ssl);
 
 int ssl3_renegotiate_check(SSL *ssl);
@@ -662,6 +664,7 @@ long ssl3_default_timeout(void);
 int ssl23_read(SSL *s, void *buf, int len);
 int ssl23_peek(SSL *s, void *buf, int len);
 int ssl23_write(SSL *s, const void *buf, int len);
+int ssl23_put_cipher_by_char(const SSL_CIPHER *c, unsigned char *p);
 long ssl23_default_timeout(void);
 
 long tls1_default_timeout(void);
