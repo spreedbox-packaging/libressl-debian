@@ -1,3 +1,9 @@
+libressl (2.0.5-1ppa1~precise1) precise; urgency=low
+
+  * Build as PPA version for Precise.
+
+ -- Joachim Bauch <bauch@struktur.de>  Tue, 09 Sep 2014 11:22:29 +0200
+
 libressl (2.0.5-1) precise; urgency=low
 
   * Initial release from upstream version 2.0.5.
