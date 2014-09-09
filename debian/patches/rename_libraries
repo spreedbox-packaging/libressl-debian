@@ -1,7 +1,7 @@
 Index: libressl/Makefile.am
 ===================================================================
---- libressl.orig/Makefile.am	2014-09-08 18:01:41.000000000 +0200
-+++ libressl/Makefile.am	2014-09-08 18:06:01.000000000 +0200
+--- libressl.orig/Makefile.am	2014-09-09 10:27:40.000000000 +0200
++++ libressl/Makefile.am	2014-09-09 10:32:17.000000000 +0200
 @@ -2,4 +2,4 @@
  ACLOCAL_AMFLAGS = -I m4
  
@@ -10,7 +10,7 @@ Index: libressl/Makefile.am
 +pkgconfig_DATA = libressl-crypto.pc libressl-ssl.pc libressl-openssl.pc
 Index: libressl/libcrypto.pc.in
 ===================================================================
---- libressl.orig/libcrypto.pc.in	2014-09-08 18:01:41.000000000 +0200
+--- libressl.orig/libcrypto.pc.in	2014-09-09 10:27:40.000000000 +0200
 +++ /dev/null	1970-01-01 00:00:00.000000000 +0000
 @@ -1,15 +0,0 @@
 -#libcrypto pkg-config source file
@@ -31,7 +31,7 @@ Index: libressl/libcrypto.pc.in
 Index: libressl/libressl-crypto.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-crypto.pc.in	2014-09-08 18:06:01.000000000 +0200
++++ libressl/libressl-crypto.pc.in	2014-09-09 10:32:17.000000000 +0200
 @@ -0,0 +1,15 @@
 +#libcrypto pkg-config source file
 +
@@ -51,7 +51,7 @@ Index: libressl/libressl-crypto.pc.in
 Index: libressl/libressl-openssl.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-openssl.pc.in	2014-09-08 18:06:01.000000000 +0200
++++ libressl/libressl-openssl.pc.in	2014-09-09 10:32:17.000000000 +0200
 @@ -0,0 +1,11 @@
 +#openssl pkg-config source file
 +
@@ -67,7 +67,7 @@ Index: libressl/libressl-openssl.pc.in
 Index: libressl/libressl-ssl.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-ssl.pc.in	2014-09-08 18:06:01.000000000 +0200
++++ libressl/libressl-ssl.pc.in	2014-09-09 10:32:17.000000000 +0200
 @@ -0,0 +1,16 @@
 +#libssl pkg-config source file
 +
@@ -87,7 +87,7 @@ Index: libressl/libressl-ssl.pc.in
 +Cflags: -I${includedir}
 Index: libressl/libssl.pc.in
 ===================================================================
---- libressl.orig/libssl.pc.in	2014-09-08 18:01:41.000000000 +0200
+--- libressl.orig/libssl.pc.in	2014-09-09 10:27:40.000000000 +0200
 +++ /dev/null	1970-01-01 00:00:00.000000000 +0000
 @@ -1,16 +0,0 @@
 -#libssl pkg-config source file
@@ -108,7 +108,7 @@ Index: libressl/libssl.pc.in
 -Cflags: -I${includedir}
 Index: libressl/openssl.pc.in
 ===================================================================
---- libressl.orig/openssl.pc.in	2014-09-08 18:01:41.000000000 +0200
+--- libressl.orig/openssl.pc.in	2014-09-09 10:27:40.000000000 +0200
 +++ /dev/null	1970-01-01 00:00:00.000000000 +0000
 @@ -1,11 +0,0 @@
 -#openssl pkg-config source file
@@ -124,8 +124,8 @@ Index: libressl/openssl.pc.in
 -Requires: libssl libcrypto
 Index: libressl/crypto/Makefile.am
 ===================================================================
---- libressl.orig/crypto/Makefile.am	2014-09-08 18:01:41.000000000 +0200
-+++ libressl/crypto/Makefile.am	2014-09-08 18:06:01.000000000 +0200
+--- libressl.orig/crypto/Makefile.am	2014-09-09 10:27:40.000000000 +0200
++++ libressl/crypto/Makefile.am	2014-09-09 10:32:17.000000000 +0200
 @@ -4,11 +4,11 @@
  AM_CPPFLAGS += -I$(top_srcdir)/crypto/evp
  AM_CPPFLAGS += -I$(top_srcdir)/crypto/modes
@@ -203,19 +203,11 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += asn1/a_i2d_fp.c
 -libcrypto_la_SOURCES += asn1/a_int.c
 -libcrypto_la_SOURCES += asn1/a_mbstr.c
--libcrypto_la_SOURCES += asn1/ameth_lib.c
 -libcrypto_la_SOURCES += asn1/a_object.c
 -libcrypto_la_SOURCES += asn1/a_octet.c
 -libcrypto_la_SOURCES += asn1/a_print.c
 -libcrypto_la_SOURCES += asn1/a_set.c
 -libcrypto_la_SOURCES += asn1/a_sign.c
--libcrypto_la_SOURCES += asn1/asn1_err.c
--libcrypto_la_SOURCES += asn1/asn1_gen.c
--libcrypto_la_SOURCES += asn1/asn1_lib.c
--libcrypto_la_SOURCES += asn1/asn1_par.c
--libcrypto_la_SOURCES += asn1/asn_mime.c
--libcrypto_la_SOURCES += asn1/asn_moid.c
--libcrypto_la_SOURCES += asn1/asn_pack.c
 -libcrypto_la_SOURCES += asn1/a_strex.c
 -libcrypto_la_SOURCES += asn1/a_strnid.c
 -libcrypto_la_SOURCES += asn1/a_time.c
@@ -223,6 +215,14 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += asn1/a_utctm.c
 -libcrypto_la_SOURCES += asn1/a_utf8.c
 -libcrypto_la_SOURCES += asn1/a_verify.c
+-libcrypto_la_SOURCES += asn1/ameth_lib.c
+-libcrypto_la_SOURCES += asn1/asn1_err.c
+-libcrypto_la_SOURCES += asn1/asn1_gen.c
+-libcrypto_la_SOURCES += asn1/asn1_lib.c
+-libcrypto_la_SOURCES += asn1/asn1_par.c
+-libcrypto_la_SOURCES += asn1/asn_mime.c
+-libcrypto_la_SOURCES += asn1/asn_moid.c
+-libcrypto_la_SOURCES += asn1/asn_pack.c
 -libcrypto_la_SOURCES += asn1/bio_asn1.c
 -libcrypto_la_SOURCES += asn1/bio_ndef.c
 -libcrypto_la_SOURCES += asn1/d2i_pr.c
@@ -238,6 +238,13 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += asn1/p5_pbe.c
 -libcrypto_la_SOURCES += asn1/p5_pbev2.c
 -libcrypto_la_SOURCES += asn1/p8_pkey.c
+-libcrypto_la_SOURCES += asn1/t_bitst.c
+-libcrypto_la_SOURCES += asn1/t_crl.c
+-libcrypto_la_SOURCES += asn1/t_pkey.c
+-libcrypto_la_SOURCES += asn1/t_req.c
+-libcrypto_la_SOURCES += asn1/t_spki.c
+-libcrypto_la_SOURCES += asn1/t_x509.c
+-libcrypto_la_SOURCES += asn1/t_x509a.c
 -libcrypto_la_SOURCES += asn1/tasn_dec.c
 -libcrypto_la_SOURCES += asn1/tasn_enc.c
 -libcrypto_la_SOURCES += asn1/tasn_fre.c
@@ -245,13 +252,6 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += asn1/tasn_prn.c
 -libcrypto_la_SOURCES += asn1/tasn_typ.c
 -libcrypto_la_SOURCES += asn1/tasn_utl.c
--libcrypto_la_SOURCES += asn1/t_bitst.c
--libcrypto_la_SOURCES += asn1/t_crl.c
--libcrypto_la_SOURCES += asn1/t_pkey.c
--libcrypto_la_SOURCES += asn1/t_req.c
--libcrypto_la_SOURCES += asn1/t_spki.c
--libcrypto_la_SOURCES += asn1/t_x509a.c
--libcrypto_la_SOURCES += asn1/t_x509.c
 -libcrypto_la_SOURCES += asn1/x_algor.c
 -libcrypto_la_SOURCES += asn1/x_attrib.c
 -libcrypto_la_SOURCES += asn1/x_bignum.c
@@ -267,8 +267,8 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += asn1/x_sig.c
 -libcrypto_la_SOURCES += asn1/x_spki.c
 -libcrypto_la_SOURCES += asn1/x_val.c
--libcrypto_la_SOURCES += asn1/x_x509a.c
 -libcrypto_la_SOURCES += asn1/x_x509.c
+-libcrypto_la_SOURCES += asn1/x_x509a.c
 +libressl_crypto_la_SOURCES += asn1/a_bitstr.c
 +libressl_crypto_la_SOURCES += asn1/a_bool.c
 +libressl_crypto_la_SOURCES += asn1/a_bytes.c
@@ -280,19 +280,11 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += asn1/a_i2d_fp.c
 +libressl_crypto_la_SOURCES += asn1/a_int.c
 +libressl_crypto_la_SOURCES += asn1/a_mbstr.c
-+libressl_crypto_la_SOURCES += asn1/ameth_lib.c
 +libressl_crypto_la_SOURCES += asn1/a_object.c
 +libressl_crypto_la_SOURCES += asn1/a_octet.c
 +libressl_crypto_la_SOURCES += asn1/a_print.c
 +libressl_crypto_la_SOURCES += asn1/a_set.c
 +libressl_crypto_la_SOURCES += asn1/a_sign.c
-+libressl_crypto_la_SOURCES += asn1/asn1_err.c
-+libressl_crypto_la_SOURCES += asn1/asn1_gen.c
-+libressl_crypto_la_SOURCES += asn1/asn1_lib.c
-+libressl_crypto_la_SOURCES += asn1/asn1_par.c
-+libressl_crypto_la_SOURCES += asn1/asn_mime.c
-+libressl_crypto_la_SOURCES += asn1/asn_moid.c
-+libressl_crypto_la_SOURCES += asn1/asn_pack.c
 +libressl_crypto_la_SOURCES += asn1/a_strex.c
 +libressl_crypto_la_SOURCES += asn1/a_strnid.c
 +libressl_crypto_la_SOURCES += asn1/a_time.c
@@ -300,6 +292,14 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += asn1/a_utctm.c
 +libressl_crypto_la_SOURCES += asn1/a_utf8.c
 +libressl_crypto_la_SOURCES += asn1/a_verify.c
++libressl_crypto_la_SOURCES += asn1/ameth_lib.c
++libressl_crypto_la_SOURCES += asn1/asn1_err.c
++libressl_crypto_la_SOURCES += asn1/asn1_gen.c
++libressl_crypto_la_SOURCES += asn1/asn1_lib.c
++libressl_crypto_la_SOURCES += asn1/asn1_par.c
++libressl_crypto_la_SOURCES += asn1/asn_mime.c
++libressl_crypto_la_SOURCES += asn1/asn_moid.c
++libressl_crypto_la_SOURCES += asn1/asn_pack.c
 +libressl_crypto_la_SOURCES += asn1/bio_asn1.c
 +libressl_crypto_la_SOURCES += asn1/bio_ndef.c
 +libressl_crypto_la_SOURCES += asn1/d2i_pr.c
@@ -315,6 +315,13 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += asn1/p5_pbe.c
 +libressl_crypto_la_SOURCES += asn1/p5_pbev2.c
 +libressl_crypto_la_SOURCES += asn1/p8_pkey.c
++libressl_crypto_la_SOURCES += asn1/t_bitst.c
++libressl_crypto_la_SOURCES += asn1/t_crl.c
++libressl_crypto_la_SOURCES += asn1/t_pkey.c
++libressl_crypto_la_SOURCES += asn1/t_req.c
++libressl_crypto_la_SOURCES += asn1/t_spki.c
++libressl_crypto_la_SOURCES += asn1/t_x509.c
++libressl_crypto_la_SOURCES += asn1/t_x509a.c
 +libressl_crypto_la_SOURCES += asn1/tasn_dec.c
 +libressl_crypto_la_SOURCES += asn1/tasn_enc.c
 +libressl_crypto_la_SOURCES += asn1/tasn_fre.c
@@ -322,13 +329,6 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += asn1/tasn_prn.c
 +libressl_crypto_la_SOURCES += asn1/tasn_typ.c
 +libressl_crypto_la_SOURCES += asn1/tasn_utl.c
-+libressl_crypto_la_SOURCES += asn1/t_bitst.c
-+libressl_crypto_la_SOURCES += asn1/t_crl.c
-+libressl_crypto_la_SOURCES += asn1/t_pkey.c
-+libressl_crypto_la_SOURCES += asn1/t_req.c
-+libressl_crypto_la_SOURCES += asn1/t_spki.c
-+libressl_crypto_la_SOURCES += asn1/t_x509a.c
-+libressl_crypto_la_SOURCES += asn1/t_x509.c
 +libressl_crypto_la_SOURCES += asn1/x_algor.c
 +libressl_crypto_la_SOURCES += asn1/x_attrib.c
 +libressl_crypto_la_SOURCES += asn1/x_bignum.c
@@ -344,8 +344,8 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += asn1/x_sig.c
 +libressl_crypto_la_SOURCES += asn1/x_spki.c
 +libressl_crypto_la_SOURCES += asn1/x_val.c
-+libressl_crypto_la_SOURCES += asn1/x_x509a.c
 +libressl_crypto_la_SOURCES += asn1/x_x509.c
++libressl_crypto_la_SOURCES += asn1/x_x509a.c
  noinst_HEADERS += asn1/asn1_locl.h
  noinst_HEADERS += asn1/charmap.h
 -libcrypto_la_SOURCES += bf/bf_cfb64.c
@@ -361,14 +361,14 @@ Index: libressl/crypto/Makefile.am
  noinst_HEADERS += bf/bf_locl.h
  noinst_HEADERS += bf/bf_pi.h
 -libcrypto_la_SOURCES += bio/b_dump.c
+-libcrypto_la_SOURCES += bio/b_print.c
+-libcrypto_la_SOURCES += bio/b_sock.c
 -libcrypto_la_SOURCES += bio/bf_buff.c
 -libcrypto_la_SOURCES += bio/bf_nbio.c
 -libcrypto_la_SOURCES += bio/bf_null.c
 -libcrypto_la_SOURCES += bio/bio_cb.c
 -libcrypto_la_SOURCES += bio/bio_err.c
 -libcrypto_la_SOURCES += bio/bio_lib.c
--libcrypto_la_SOURCES += bio/b_print.c
--libcrypto_la_SOURCES += bio/b_sock.c
 -libcrypto_la_SOURCES += bio/bss_acpt.c
 -libcrypto_la_SOURCES += bio/bss_bio.c
 -libcrypto_la_SOURCES += bio/bss_conn.c
@@ -387,8 +387,8 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += bn/bn_depr.c
 -libcrypto_la_SOURCES += bn/bn_div.c
 -libcrypto_la_SOURCES += bn/bn_err.c
--libcrypto_la_SOURCES += bn/bn_exp2.c
 -libcrypto_la_SOURCES += bn/bn_exp.c
+-libcrypto_la_SOURCES += bn/bn_exp2.c
 -libcrypto_la_SOURCES += bn/bn_gcd.c
 -libcrypto_la_SOURCES += bn/bn_gf2m.c
 -libcrypto_la_SOURCES += bn/bn_kron.c
@@ -408,14 +408,14 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += bn/bn_word.c
 -libcrypto_la_SOURCES += bn/bn_x931p.c
 +libressl_crypto_la_SOURCES += bio/b_dump.c
++libressl_crypto_la_SOURCES += bio/b_print.c
++libressl_crypto_la_SOURCES += bio/b_sock.c
 +libressl_crypto_la_SOURCES += bio/bf_buff.c
 +libressl_crypto_la_SOURCES += bio/bf_nbio.c
 +libressl_crypto_la_SOURCES += bio/bf_null.c
 +libressl_crypto_la_SOURCES += bio/bio_cb.c
 +libressl_crypto_la_SOURCES += bio/bio_err.c
 +libressl_crypto_la_SOURCES += bio/bio_lib.c
-+libressl_crypto_la_SOURCES += bio/b_print.c
-+libressl_crypto_la_SOURCES += bio/b_sock.c
 +libressl_crypto_la_SOURCES += bio/bss_acpt.c
 +libressl_crypto_la_SOURCES += bio/bss_bio.c
 +libressl_crypto_la_SOURCES += bio/bss_conn.c
@@ -434,8 +434,8 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += bn/bn_depr.c
 +libressl_crypto_la_SOURCES += bn/bn_div.c
 +libressl_crypto_la_SOURCES += bn/bn_err.c
-+libressl_crypto_la_SOURCES += bn/bn_exp2.c
 +libressl_crypto_la_SOURCES += bn/bn_exp.c
++libressl_crypto_la_SOURCES += bn/bn_exp2.c
 +libressl_crypto_la_SOURCES += bn/bn_gcd.c
 +libressl_crypto_la_SOURCES += bn/bn_gf2m.c
 +libressl_crypto_la_SOURCES += bn/bn_kron.c
@@ -457,16 +457,16 @@ Index: libressl/crypto/Makefile.am
  noinst_HEADERS += bn/bn_lcl.h
  noinst_HEADERS += bn/bn_prime.h
 -libcrypto_la_SOURCES += buffer/buf_err.c
--libcrypto_la_SOURCES += buffer/buffer.c
 -libcrypto_la_SOURCES += buffer/buf_str.c
+-libcrypto_la_SOURCES += buffer/buffer.c
 -libcrypto_la_SOURCES += cast/c_cfb64.c
 -libcrypto_la_SOURCES += cast/c_ecb.c
 -libcrypto_la_SOURCES += cast/c_enc.c
 -libcrypto_la_SOURCES += cast/c_ofb64.c
 -libcrypto_la_SOURCES += cast/c_skey.c
 +libressl_crypto_la_SOURCES += buffer/buf_err.c
-+libressl_crypto_la_SOURCES += buffer/buffer.c
 +libressl_crypto_la_SOURCES += buffer/buf_str.c
++libressl_crypto_la_SOURCES += buffer/buffer.c
 +libressl_crypto_la_SOURCES += cast/c_cfb64.c
 +libressl_crypto_la_SOURCES += cast/c_ecb.c
 +libressl_crypto_la_SOURCES += cast/c_enc.c
@@ -475,13 +475,13 @@ Index: libressl/crypto/Makefile.am
  noinst_HEADERS += cast/cast_lcl.h
  noinst_HEADERS += cast/cast_s.h
 -libcrypto_la_SOURCES += chacha/chacha.c
--libcrypto_la_SOURCES += cmac/cmac.c
 -libcrypto_la_SOURCES += cmac/cm_ameth.c
 -libcrypto_la_SOURCES += cmac/cm_pmeth.c
--libcrypto_la_SOURCES += comp/comp_err.c
--libcrypto_la_SOURCES += comp/comp_lib.c
+-libcrypto_la_SOURCES += cmac/cmac.c
 -libcrypto_la_SOURCES += comp/c_rle.c
 -libcrypto_la_SOURCES += comp/c_zlib.c
+-libcrypto_la_SOURCES += comp/comp_err.c
+-libcrypto_la_SOURCES += comp/comp_lib.c
 -libcrypto_la_SOURCES += conf/conf_api.c
 -libcrypto_la_SOURCES += conf/conf_def.c
 -libcrypto_la_SOURCES += conf/conf_err.c
@@ -490,13 +490,13 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += conf/conf_mod.c
 -libcrypto_la_SOURCES += conf/conf_sap.c
 +libressl_crypto_la_SOURCES += chacha/chacha.c
-+libressl_crypto_la_SOURCES += cmac/cmac.c
 +libressl_crypto_la_SOURCES += cmac/cm_ameth.c
 +libressl_crypto_la_SOURCES += cmac/cm_pmeth.c
-+libressl_crypto_la_SOURCES += comp/comp_err.c
-+libressl_crypto_la_SOURCES += comp/comp_lib.c
++libressl_crypto_la_SOURCES += cmac/cmac.c
 +libressl_crypto_la_SOURCES += comp/c_rle.c
 +libressl_crypto_la_SOURCES += comp/c_zlib.c
++libressl_crypto_la_SOURCES += comp/comp_err.c
++libressl_crypto_la_SOURCES += comp/comp_lib.c
 +libressl_crypto_la_SOURCES += conf/conf_api.c
 +libressl_crypto_la_SOURCES += conf/conf_def.c
 +libressl_crypto_la_SOURCES += conf/conf_err.c
@@ -516,8 +516,8 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += des/ede_cbcm_enc.c
 -libcrypto_la_SOURCES += des/enc_read.c
 -libcrypto_la_SOURCES += des/enc_writ.c
--libcrypto_la_SOURCES += des/fcrypt_b.c
 -libcrypto_la_SOURCES += des/fcrypt.c
+-libcrypto_la_SOURCES += des/fcrypt_b.c
 -libcrypto_la_SOURCES += des/ofb64ede.c
 -libcrypto_la_SOURCES += des/ofb64enc.c
 -libcrypto_la_SOURCES += des/ofb_enc.c
@@ -538,8 +538,8 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += des/ede_cbcm_enc.c
 +libressl_crypto_la_SOURCES += des/enc_read.c
 +libressl_crypto_la_SOURCES += des/enc_writ.c
-+libressl_crypto_la_SOURCES += des/fcrypt_b.c
 +libressl_crypto_la_SOURCES += des/fcrypt.c
++libressl_crypto_la_SOURCES += des/fcrypt_b.c
 +libressl_crypto_la_SOURCES += des/ofb64ede.c
 +libressl_crypto_la_SOURCES += des/ofb64enc.c
 +libressl_crypto_la_SOURCES += des/ofb_enc.c
@@ -611,15 +611,15 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += ec/ec_cvt.c
 -libcrypto_la_SOURCES += ec/ec_err.c
 -libcrypto_la_SOURCES += ec/ec_key.c
--libcrypto_la_SOURCES += ec/eck_prn.c
 -libcrypto_la_SOURCES += ec/ec_lib.c
 -libcrypto_la_SOURCES += ec/ec_mult.c
 -libcrypto_la_SOURCES += ec/ec_oct.c
 -libcrypto_la_SOURCES += ec/ec_pmeth.c
+-libcrypto_la_SOURCES += ec/ec_print.c
+-libcrypto_la_SOURCES += ec/eck_prn.c
 -libcrypto_la_SOURCES += ec/ecp_mont.c
 -libcrypto_la_SOURCES += ec/ecp_nist.c
 -libcrypto_la_SOURCES += ec/ecp_oct.c
--libcrypto_la_SOURCES += ec/ec_print.c
 -libcrypto_la_SOURCES += ec/ecp_smpl.c
 +libressl_crypto_la_SOURCES += dso/dso_dlfcn.c
 +libressl_crypto_la_SOURCES += dso/dso_err.c
@@ -636,15 +636,15 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += ec/ec_cvt.c
 +libressl_crypto_la_SOURCES += ec/ec_err.c
 +libressl_crypto_la_SOURCES += ec/ec_key.c
-+libressl_crypto_la_SOURCES += ec/eck_prn.c
 +libressl_crypto_la_SOURCES += ec/ec_lib.c
 +libressl_crypto_la_SOURCES += ec/ec_mult.c
 +libressl_crypto_la_SOURCES += ec/ec_oct.c
 +libressl_crypto_la_SOURCES += ec/ec_pmeth.c
++libressl_crypto_la_SOURCES += ec/ec_print.c
++libressl_crypto_la_SOURCES += ec/eck_prn.c
 +libressl_crypto_la_SOURCES += ec/ecp_mont.c
 +libressl_crypto_la_SOURCES += ec/ecp_nist.c
 +libressl_crypto_la_SOURCES += ec/ecp_oct.c
-+libressl_crypto_la_SOURCES += ec/ec_print.c
 +libressl_crypto_la_SOURCES += ec/ecp_smpl.c
  noinst_HEADERS += ec/ec_lcl.h
 -libcrypto_la_SOURCES += ecdh/ech_err.c
@@ -718,8 +718,8 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += engine/tb_rsa.c
 +libressl_crypto_la_SOURCES += engine/tb_store.c
  noinst_HEADERS += engine/eng_int.h
--libcrypto_la_SOURCES += err/err_all.c
 -libcrypto_la_SOURCES += err/err.c
+-libcrypto_la_SOURCES += err/err_all.c
 -libcrypto_la_SOURCES += err/err_prn.c
 -libcrypto_la_SOURCES += evp/bio_b64.c
 -libcrypto_la_SOURCES += evp/bio_enc.c
@@ -732,17 +732,18 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += evp/e_aes_cbc_hmac_sha1.c
 -libcrypto_la_SOURCES += evp/e_bf.c
 -libcrypto_la_SOURCES += evp/e_cast.c
--libcrypto_la_SOURCES += evp/e_chacha20poly1305.c
 -libcrypto_la_SOURCES += evp/e_chacha.c
--libcrypto_la_SOURCES += evp/e_des3.c
+-libcrypto_la_SOURCES += evp/e_chacha20poly1305.c
 -libcrypto_la_SOURCES += evp/e_des.c
+-libcrypto_la_SOURCES += evp/e_des3.c
 -libcrypto_la_SOURCES += evp/e_idea.c
--libcrypto_la_SOURCES += evp/encode.c
 -libcrypto_la_SOURCES += evp/e_null.c
 -libcrypto_la_SOURCES += evp/e_old.c
 -libcrypto_la_SOURCES += evp/e_rc2.c
 -libcrypto_la_SOURCES += evp/e_rc4.c
 -libcrypto_la_SOURCES += evp/e_rc4_hmac_md5.c
+-libcrypto_la_SOURCES += evp/e_xcbc_d.c
+-libcrypto_la_SOURCES += evp/encode.c
 -libcrypto_la_SOURCES += evp/evp_aead.c
 -libcrypto_la_SOURCES += evp/evp_enc.c
 -libcrypto_la_SOURCES += evp/evp_err.c
@@ -750,34 +751,33 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += evp/evp_lib.c
 -libcrypto_la_SOURCES += evp/evp_pbe.c
 -libcrypto_la_SOURCES += evp/evp_pkey.c
--libcrypto_la_SOURCES += evp/e_xcbc_d.c
--libcrypto_la_SOURCES += evp/m_dss1.c
 -libcrypto_la_SOURCES += evp/m_dss.c
+-libcrypto_la_SOURCES += evp/m_dss1.c
 -libcrypto_la_SOURCES += evp/m_ecdsa.c
 -libcrypto_la_SOURCES += evp/m_md4.c
 -libcrypto_la_SOURCES += evp/m_md5.c
 -libcrypto_la_SOURCES += evp/m_mdc2.c
 -libcrypto_la_SOURCES += evp/m_null.c
 -libcrypto_la_SOURCES += evp/m_ripemd.c
--libcrypto_la_SOURCES += evp/m_sha1.c
 -libcrypto_la_SOURCES += evp/m_sha.c
+-libcrypto_la_SOURCES += evp/m_sha1.c
 -libcrypto_la_SOURCES += evp/m_sigver.c
 -libcrypto_la_SOURCES += evp/m_wp.c
 -libcrypto_la_SOURCES += evp/names.c
--libcrypto_la_SOURCES += evp/p5_crpt2.c
 -libcrypto_la_SOURCES += evp/p5_crpt.c
+-libcrypto_la_SOURCES += evp/p5_crpt2.c
 -libcrypto_la_SOURCES += evp/p_dec.c
 -libcrypto_la_SOURCES += evp/p_enc.c
 -libcrypto_la_SOURCES += evp/p_lib.c
--libcrypto_la_SOURCES += evp/pmeth_fn.c
--libcrypto_la_SOURCES += evp/pmeth_gn.c
--libcrypto_la_SOURCES += evp/pmeth_lib.c
 -libcrypto_la_SOURCES += evp/p_open.c
 -libcrypto_la_SOURCES += evp/p_seal.c
 -libcrypto_la_SOURCES += evp/p_sign.c
 -libcrypto_la_SOURCES += evp/p_verify.c
-+libressl_crypto_la_SOURCES += err/err_all.c
+-libcrypto_la_SOURCES += evp/pmeth_fn.c
+-libcrypto_la_SOURCES += evp/pmeth_gn.c
+-libcrypto_la_SOURCES += evp/pmeth_lib.c
 +libressl_crypto_la_SOURCES += err/err.c
++libressl_crypto_la_SOURCES += err/err_all.c
 +libressl_crypto_la_SOURCES += err/err_prn.c
 +libressl_crypto_la_SOURCES += evp/bio_b64.c
 +libressl_crypto_la_SOURCES += evp/bio_enc.c
@@ -790,17 +790,18 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += evp/e_aes_cbc_hmac_sha1.c
 +libressl_crypto_la_SOURCES += evp/e_bf.c
 +libressl_crypto_la_SOURCES += evp/e_cast.c
-+libressl_crypto_la_SOURCES += evp/e_chacha20poly1305.c
 +libressl_crypto_la_SOURCES += evp/e_chacha.c
-+libressl_crypto_la_SOURCES += evp/e_des3.c
++libressl_crypto_la_SOURCES += evp/e_chacha20poly1305.c
 +libressl_crypto_la_SOURCES += evp/e_des.c
++libressl_crypto_la_SOURCES += evp/e_des3.c
 +libressl_crypto_la_SOURCES += evp/e_idea.c
-+libressl_crypto_la_SOURCES += evp/encode.c
 +libressl_crypto_la_SOURCES += evp/e_null.c
 +libressl_crypto_la_SOURCES += evp/e_old.c
 +libressl_crypto_la_SOURCES += evp/e_rc2.c
 +libressl_crypto_la_SOURCES += evp/e_rc4.c
 +libressl_crypto_la_SOURCES += evp/e_rc4_hmac_md5.c
++libressl_crypto_la_SOURCES += evp/e_xcbc_d.c
++libressl_crypto_la_SOURCES += evp/encode.c
 +libressl_crypto_la_SOURCES += evp/evp_aead.c
 +libressl_crypto_la_SOURCES += evp/evp_enc.c
 +libressl_crypto_la_SOURCES += evp/evp_err.c
@@ -808,44 +809,43 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += evp/evp_lib.c
 +libressl_crypto_la_SOURCES += evp/evp_pbe.c
 +libressl_crypto_la_SOURCES += evp/evp_pkey.c
-+libressl_crypto_la_SOURCES += evp/e_xcbc_d.c
-+libressl_crypto_la_SOURCES += evp/m_dss1.c
 +libressl_crypto_la_SOURCES += evp/m_dss.c
++libressl_crypto_la_SOURCES += evp/m_dss1.c
 +libressl_crypto_la_SOURCES += evp/m_ecdsa.c
 +libressl_crypto_la_SOURCES += evp/m_md4.c
 +libressl_crypto_la_SOURCES += evp/m_md5.c
 +libressl_crypto_la_SOURCES += evp/m_mdc2.c
 +libressl_crypto_la_SOURCES += evp/m_null.c
 +libressl_crypto_la_SOURCES += evp/m_ripemd.c
-+libressl_crypto_la_SOURCES += evp/m_sha1.c
 +libressl_crypto_la_SOURCES += evp/m_sha.c
++libressl_crypto_la_SOURCES += evp/m_sha1.c
 +libressl_crypto_la_SOURCES += evp/m_sigver.c
 +libressl_crypto_la_SOURCES += evp/m_wp.c
 +libressl_crypto_la_SOURCES += evp/names.c
-+libressl_crypto_la_SOURCES += evp/p5_crpt2.c
 +libressl_crypto_la_SOURCES += evp/p5_crpt.c
++libressl_crypto_la_SOURCES += evp/p5_crpt2.c
 +libressl_crypto_la_SOURCES += evp/p_dec.c
 +libressl_crypto_la_SOURCES += evp/p_enc.c
 +libressl_crypto_la_SOURCES += evp/p_lib.c
-+libressl_crypto_la_SOURCES += evp/pmeth_fn.c
-+libressl_crypto_la_SOURCES += evp/pmeth_gn.c
-+libressl_crypto_la_SOURCES += evp/pmeth_lib.c
 +libressl_crypto_la_SOURCES += evp/p_open.c
 +libressl_crypto_la_SOURCES += evp/p_seal.c
 +libressl_crypto_la_SOURCES += evp/p_sign.c
 +libressl_crypto_la_SOURCES += evp/p_verify.c
++libressl_crypto_la_SOURCES += evp/pmeth_fn.c
++libressl_crypto_la_SOURCES += evp/pmeth_gn.c
++libressl_crypto_la_SOURCES += evp/pmeth_lib.c
  noinst_HEADERS += evp/evp_locl.h
--libcrypto_la_SOURCES += hmac/hmac.c
 -libcrypto_la_SOURCES += hmac/hm_ameth.c
 -libcrypto_la_SOURCES += hmac/hm_pmeth.c
+-libcrypto_la_SOURCES += hmac/hmac.c
 -libcrypto_la_SOURCES += idea/i_cbc.c
 -libcrypto_la_SOURCES += idea/i_cfb64.c
 -libcrypto_la_SOURCES += idea/i_ecb.c
 -libcrypto_la_SOURCES += idea/i_ofb64.c
 -libcrypto_la_SOURCES += idea/i_skey.c
-+libressl_crypto_la_SOURCES += hmac/hmac.c
 +libressl_crypto_la_SOURCES += hmac/hm_ameth.c
 +libressl_crypto_la_SOURCES += hmac/hm_pmeth.c
++libressl_crypto_la_SOURCES += hmac/hmac.c
 +libressl_crypto_la_SOURCES += idea/i_cbc.c
 +libressl_crypto_la_SOURCES += idea/i_cfb64.c
 +libressl_crypto_la_SOURCES += idea/i_ecb.c
@@ -853,13 +853,13 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += idea/i_skey.c
  noinst_HEADERS += idea/idea_lcl.h
 -libcrypto_la_SOURCES += krb5/krb5_asn.c
--libcrypto_la_SOURCES += lhash/lhash.c
 -libcrypto_la_SOURCES += lhash/lh_stats.c
+-libcrypto_la_SOURCES += lhash/lhash.c
 -libcrypto_la_SOURCES += md4/md4_dgst.c
 -libcrypto_la_SOURCES += md4/md4_one.c
 +libressl_crypto_la_SOURCES += krb5/krb5_asn.c
-+libressl_crypto_la_SOURCES += lhash/lhash.c
 +libressl_crypto_la_SOURCES += lhash/lh_stats.c
++libressl_crypto_la_SOURCES += lhash/lhash.c
 +libressl_crypto_la_SOURCES += md4/md4_dgst.c
 +libressl_crypto_la_SOURCES += md4/md4_one.c
  noinst_HEADERS += md4/md4_locl.h
@@ -868,8 +868,8 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += md5/md5_dgst.c
 +libressl_crypto_la_SOURCES += md5/md5_one.c
  noinst_HEADERS += md5/md5_locl.h
--libcrypto_la_SOURCES += mdc2/mdc2dgst.c
 -libcrypto_la_SOURCES += mdc2/mdc2_one.c
+-libcrypto_la_SOURCES += mdc2/mdc2dgst.c
 -libcrypto_la_SOURCES += modes/cbc128.c
 -libcrypto_la_SOURCES += modes/ccm128.c
 -libcrypto_la_SOURCES += modes/cfb128.c
@@ -878,8 +878,8 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += modes/gcm128.c
 -libcrypto_la_SOURCES += modes/ofb128.c
 -libcrypto_la_SOURCES += modes/xts128.c
-+libressl_crypto_la_SOURCES += mdc2/mdc2dgst.c
 +libressl_crypto_la_SOURCES += mdc2/mdc2_one.c
++libressl_crypto_la_SOURCES += mdc2/mdc2dgst.c
 +libressl_crypto_la_SOURCES += modes/cbc128.c
 +libressl_crypto_la_SOURCES += modes/ccm128.c
 +libressl_crypto_la_SOURCES += modes/cfb128.c
@@ -889,16 +889,16 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += modes/ofb128.c
 +libressl_crypto_la_SOURCES += modes/xts128.c
  noinst_HEADERS += modes/modes_lcl.h
+-libcrypto_la_SOURCES += objects/o_names.c
 -libcrypto_la_SOURCES += objects/obj_dat.c
 -libcrypto_la_SOURCES += objects/obj_err.c
 -libcrypto_la_SOURCES += objects/obj_lib.c
 -libcrypto_la_SOURCES += objects/obj_xref.c
--libcrypto_la_SOURCES += objects/o_names.c
++libressl_crypto_la_SOURCES += objects/o_names.c
 +libressl_crypto_la_SOURCES += objects/obj_dat.c
 +libressl_crypto_la_SOURCES += objects/obj_err.c
 +libressl_crypto_la_SOURCES += objects/obj_lib.c
 +libressl_crypto_la_SOURCES += objects/obj_xref.c
-+libressl_crypto_la_SOURCES += objects/o_names.c
  noinst_HEADERS += objects/obj_dat.h
  noinst_HEADERS += objects/obj_xref.h
 -libcrypto_la_SOURCES += ocsp/ocsp_asn.c
@@ -947,13 +947,13 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += pkcs7/pkcs7err.c
 -libcrypto_la_SOURCES += poly1305/poly1305.c
 -libcrypto_la_SOURCES += rand/rand_err.c
--libcrypto_la_SOURCES += rand/randfile.c
 -libcrypto_la_SOURCES += rand/rand_lib.c
+-libcrypto_la_SOURCES += rand/randfile.c
 -libcrypto_la_SOURCES += rc2/rc2_cbc.c
--libcrypto_la_SOURCES += rc2/rc2cfb64.c
 -libcrypto_la_SOURCES += rc2/rc2_ecb.c
--libcrypto_la_SOURCES += rc2/rc2ofb64.c
 -libcrypto_la_SOURCES += rc2/rc2_skey.c
+-libcrypto_la_SOURCES += rc2/rc2cfb64.c
+-libcrypto_la_SOURCES += rc2/rc2ofb64.c
 +libressl_crypto_la_SOURCES += ocsp/ocsp_asn.c
 +libressl_crypto_la_SOURCES += ocsp/ocsp_cl.c
 +libressl_crypto_la_SOURCES += ocsp/ocsp_err.c
@@ -1000,13 +1000,13 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += pkcs7/pkcs7err.c
 +libressl_crypto_la_SOURCES += poly1305/poly1305.c
 +libressl_crypto_la_SOURCES += rand/rand_err.c
-+libressl_crypto_la_SOURCES += rand/randfile.c
 +libressl_crypto_la_SOURCES += rand/rand_lib.c
++libressl_crypto_la_SOURCES += rand/randfile.c
 +libressl_crypto_la_SOURCES += rc2/rc2_cbc.c
-+libressl_crypto_la_SOURCES += rc2/rc2cfb64.c
 +libressl_crypto_la_SOURCES += rc2/rc2_ecb.c
-+libressl_crypto_la_SOURCES += rc2/rc2ofb64.c
 +libressl_crypto_la_SOURCES += rc2/rc2_skey.c
++libressl_crypto_la_SOURCES += rc2/rc2cfb64.c
++libressl_crypto_la_SOURCES += rc2/rc2ofb64.c
  noinst_HEADERS += rc2/rc2_locl.h
 -libcrypto_la_SOURCES += rc4/rc4_enc.c
 -libcrypto_la_SOURCES += rc4/rc4_skey.c
@@ -1017,8 +1017,8 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += ripemd/rmd_one.c
 +libressl_crypto_la_SOURCES += ripemd/rmd_dgst.c
 +libressl_crypto_la_SOURCES += ripemd/rmd_one.c
- noinst_HEADERS += ripemd/rmdconst.h
  noinst_HEADERS += ripemd/rmd_locl.h
+ noinst_HEADERS += ripemd/rmdconst.h
 -libcrypto_la_SOURCES += rsa/rsa_ameth.c
 -libcrypto_la_SOURCES += rsa/rsa_asn1.c
 -libcrypto_la_SOURCES += rsa/rsa_chk.c
@@ -1058,14 +1058,14 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += rsa/rsa_ssl.c
 +libressl_crypto_la_SOURCES += rsa/rsa_x931.c
  noinst_HEADERS += rsa/rsa_locl.h
--libcrypto_la_SOURCES += sha/sha1dgst.c
 -libcrypto_la_SOURCES += sha/sha1_one.c
+-libcrypto_la_SOURCES += sha/sha1dgst.c
 -libcrypto_la_SOURCES += sha/sha256.c
 -libcrypto_la_SOURCES += sha/sha512.c
 -libcrypto_la_SOURCES += sha/sha_dgst.c
 -libcrypto_la_SOURCES += sha/sha_one.c
-+libressl_crypto_la_SOURCES += sha/sha1dgst.c
 +libressl_crypto_la_SOURCES += sha/sha1_one.c
++libressl_crypto_la_SOURCES += sha/sha1dgst.c
 +libressl_crypto_la_SOURCES += sha/sha256.c
 +libressl_crypto_la_SOURCES += sha/sha512.c
 +libressl_crypto_la_SOURCES += sha/sha_dgst.c
@@ -1115,49 +1115,49 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += x509/by_file.c
 -libcrypto_la_SOURCES += x509/x509_att.c
 -libcrypto_la_SOURCES += x509/x509_cmp.c
--libcrypto_la_SOURCES += x509/x509cset.c
 -libcrypto_la_SOURCES += x509/x509_d2.c
 -libcrypto_la_SOURCES += x509/x509_def.c
 -libcrypto_la_SOURCES += x509/x509_err.c
 -libcrypto_la_SOURCES += x509/x509_ext.c
 -libcrypto_la_SOURCES += x509/x509_lu.c
--libcrypto_la_SOURCES += x509/x509name.c
 -libcrypto_la_SOURCES += x509/x509_obj.c
 -libcrypto_la_SOURCES += x509/x509_r2x.c
 -libcrypto_la_SOURCES += x509/x509_req.c
--libcrypto_la_SOURCES += x509/x509rset.c
 -libcrypto_la_SOURCES += x509/x509_set.c
--libcrypto_la_SOURCES += x509/x509spki.c
 -libcrypto_la_SOURCES += x509/x509_trs.c
 -libcrypto_la_SOURCES += x509/x509_txt.c
--libcrypto_la_SOURCES += x509/x509type.c
 -libcrypto_la_SOURCES += x509/x509_v3.c
 -libcrypto_la_SOURCES += x509/x509_vfy.c
 -libcrypto_la_SOURCES += x509/x509_vpm.c
+-libcrypto_la_SOURCES += x509/x509cset.c
+-libcrypto_la_SOURCES += x509/x509name.c
+-libcrypto_la_SOURCES += x509/x509rset.c
+-libcrypto_la_SOURCES += x509/x509spki.c
+-libcrypto_la_SOURCES += x509/x509type.c
 -libcrypto_la_SOURCES += x509/x_all.c
 +libressl_crypto_la_SOURCES += x509/by_dir.c
 +libressl_crypto_la_SOURCES += x509/by_file.c
 +libressl_crypto_la_SOURCES += x509/x509_att.c
 +libressl_crypto_la_SOURCES += x509/x509_cmp.c
-+libressl_crypto_la_SOURCES += x509/x509cset.c
 +libressl_crypto_la_SOURCES += x509/x509_d2.c
 +libressl_crypto_la_SOURCES += x509/x509_def.c
 +libressl_crypto_la_SOURCES += x509/x509_err.c
 +libressl_crypto_la_SOURCES += x509/x509_ext.c
 +libressl_crypto_la_SOURCES += x509/x509_lu.c
-+libressl_crypto_la_SOURCES += x509/x509name.c
 +libressl_crypto_la_SOURCES += x509/x509_obj.c
 +libressl_crypto_la_SOURCES += x509/x509_r2x.c
 +libressl_crypto_la_SOURCES += x509/x509_req.c
-+libressl_crypto_la_SOURCES += x509/x509rset.c
 +libressl_crypto_la_SOURCES += x509/x509_set.c
-+libressl_crypto_la_SOURCES += x509/x509spki.c
 +libressl_crypto_la_SOURCES += x509/x509_trs.c
 +libressl_crypto_la_SOURCES += x509/x509_txt.c
-+libressl_crypto_la_SOURCES += x509/x509type.c
 +libressl_crypto_la_SOURCES += x509/x509_v3.c
 +libressl_crypto_la_SOURCES += x509/x509_vfy.c
 +libressl_crypto_la_SOURCES += x509/x509_vpm.c
++libressl_crypto_la_SOURCES += x509/x509cset.c
++libressl_crypto_la_SOURCES += x509/x509name.c
++libressl_crypto_la_SOURCES += x509/x509rset.c
++libressl_crypto_la_SOURCES += x509/x509spki.c
++libressl_crypto_la_SOURCES += x509/x509type.c
 +libressl_crypto_la_SOURCES += x509/x_all.c
  noinst_HEADERS += x509/x509_lcl.h
 -libcrypto_la_SOURCES += x509v3/pcy_cache.c
@@ -1166,8 +1166,8 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += x509v3/pcy_map.c
 -libcrypto_la_SOURCES += x509v3/pcy_node.c
 -libcrypto_la_SOURCES += x509v3/pcy_tree.c
--libcrypto_la_SOURCES += x509v3/v3_akeya.c
 -libcrypto_la_SOURCES += x509v3/v3_akey.c
+-libcrypto_la_SOURCES += x509v3/v3_akeya.c
 -libcrypto_la_SOURCES += x509v3/v3_alt.c
 -libcrypto_la_SOURCES += x509v3/v3_bcons.c
 -libcrypto_la_SOURCES += x509v3/v3_bitst.c
@@ -1175,7 +1175,6 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += x509v3/v3_cpols.c
 -libcrypto_la_SOURCES += x509v3/v3_crld.c
 -libcrypto_la_SOURCES += x509v3/v3_enum.c
--libcrypto_la_SOURCES += x509v3/v3err.c
 -libcrypto_la_SOURCES += x509v3/v3_extku.c
 -libcrypto_la_SOURCES += x509v3/v3_genn.c
 -libcrypto_la_SOURCES += x509v3/v3_ia5.c
@@ -1184,8 +1183,8 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += x509v3/v3_lib.c
 -libcrypto_la_SOURCES += x509v3/v3_ncons.c
 -libcrypto_la_SOURCES += x509v3/v3_ocsp.c
--libcrypto_la_SOURCES += x509v3/v3_pcia.c
 -libcrypto_la_SOURCES += x509v3/v3_pci.c
+-libcrypto_la_SOURCES += x509v3/v3_pcia.c
 -libcrypto_la_SOURCES += x509v3/v3_pcons.c
 -libcrypto_la_SOURCES += x509v3/v3_pku.c
 -libcrypto_la_SOURCES += x509v3/v3_pmaps.c
@@ -1194,14 +1193,15 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += x509v3/v3_skey.c
 -libcrypto_la_SOURCES += x509v3/v3_sxnet.c
 -libcrypto_la_SOURCES += x509v3/v3_utl.c
+-libcrypto_la_SOURCES += x509v3/v3err.c
 +libressl_crypto_la_SOURCES += x509v3/pcy_cache.c
 +libressl_crypto_la_SOURCES += x509v3/pcy_data.c
 +libressl_crypto_la_SOURCES += x509v3/pcy_lib.c
 +libressl_crypto_la_SOURCES += x509v3/pcy_map.c
 +libressl_crypto_la_SOURCES += x509v3/pcy_node.c
 +libressl_crypto_la_SOURCES += x509v3/pcy_tree.c
-+libressl_crypto_la_SOURCES += x509v3/v3_akeya.c
 +libressl_crypto_la_SOURCES += x509v3/v3_akey.c
++libressl_crypto_la_SOURCES += x509v3/v3_akeya.c
 +libressl_crypto_la_SOURCES += x509v3/v3_alt.c
 +libressl_crypto_la_SOURCES += x509v3/v3_bcons.c
 +libressl_crypto_la_SOURCES += x509v3/v3_bitst.c
@@ -1209,7 +1209,6 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += x509v3/v3_cpols.c
 +libressl_crypto_la_SOURCES += x509v3/v3_crld.c
 +libressl_crypto_la_SOURCES += x509v3/v3_enum.c
-+libressl_crypto_la_SOURCES += x509v3/v3err.c
 +libressl_crypto_la_SOURCES += x509v3/v3_extku.c
 +libressl_crypto_la_SOURCES += x509v3/v3_genn.c
 +libressl_crypto_la_SOURCES += x509v3/v3_ia5.c
@@ -1218,8 +1217,8 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += x509v3/v3_lib.c
 +libressl_crypto_la_SOURCES += x509v3/v3_ncons.c
 +libressl_crypto_la_SOURCES += x509v3/v3_ocsp.c
-+libressl_crypto_la_SOURCES += x509v3/v3_pcia.c
 +libressl_crypto_la_SOURCES += x509v3/v3_pci.c
++libressl_crypto_la_SOURCES += x509v3/v3_pcia.c
 +libressl_crypto_la_SOURCES += x509v3/v3_pcons.c
 +libressl_crypto_la_SOURCES += x509v3/v3_pku.c
 +libressl_crypto_la_SOURCES += x509v3/v3_pmaps.c
@@ -1228,6 +1227,7 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += x509v3/v3_skey.c
 +libressl_crypto_la_SOURCES += x509v3/v3_sxnet.c
 +libressl_crypto_la_SOURCES += x509v3/v3_utl.c
++libressl_crypto_la_SOURCES += x509v3/v3err.c
  noinst_HEADERS += x509v3/ext_dat.h
  noinst_HEADERS += x509v3/pcy_int.h
 -EXTRA_libcrypto_la_SOURCES += des/ncbc_enc.c
@@ -1238,8 +1238,8 @@ Index: libressl/crypto/Makefile.am
 +EXTRA_libressl_crypto_la_SOURCES += poly1305/poly1305-donna.c
 Index: libressl/ssl/Makefile.am
 ===================================================================
---- libressl.orig/ssl/Makefile.am	2014-09-08 18:01:41.000000000 +0200
-+++ libressl/ssl/Makefile.am	2014-09-08 18:06:01.000000000 +0200
+--- libressl.orig/ssl/Makefile.am	2014-09-09 10:27:40.000000000 +0200
++++ libressl/ssl/Makefile.am	2014-09-09 10:32:17.000000000 +0200
 @@ -1,51 +1,51 @@
  include $(top_srcdir)/Makefile.am.common
  
@@ -1281,8 +1281,8 @@ Index: libressl/ssl/Makefile.am
 -libssl_la_SOURCES += ssl_asn1.c
 -libssl_la_SOURCES += ssl_cert.c
 -libssl_la_SOURCES += ssl_ciph.c
--libssl_la_SOURCES += ssl_err2.c
 -libssl_la_SOURCES += ssl_err.c
+-libssl_la_SOURCES += ssl_err2.c
 -libssl_la_SOURCES += ssl_lib.c
 -libssl_la_SOURCES += ssl_rsa.c
 -libssl_la_SOURCES += ssl_sess.c
@@ -1321,8 +1321,8 @@ Index: libressl/ssl/Makefile.am
 +libressl_ssl_la_SOURCES += ssl_asn1.c
 +libressl_ssl_la_SOURCES += ssl_cert.c
 +libressl_ssl_la_SOURCES += ssl_ciph.c
-+libressl_ssl_la_SOURCES += ssl_err2.c
 +libressl_ssl_la_SOURCES += ssl_err.c
++libressl_ssl_la_SOURCES += ssl_err2.c
 +libressl_ssl_la_SOURCES += ssl_lib.c
 +libressl_ssl_la_SOURCES += ssl_rsa.c
 +libressl_ssl_la_SOURCES += ssl_sess.c
@@ -1338,8 +1338,8 @@ Index: libressl/ssl/Makefile.am
  noinst_HEADERS += ssl_locl.h
 Index: libressl/apps/Makefile.am
 ===================================================================
---- libressl.orig/apps/Makefile.am	2014-09-08 18:01:41.000000000 +0200
-+++ libressl/apps/Makefile.am	2014-09-08 18:06:01.000000000 +0200
+--- libressl.orig/apps/Makefile.am	2014-09-09 10:27:40.000000000 +0200
++++ libressl/apps/Makefile.am	2014-09-09 10:32:35.000000000 +0200
 @@ -1,67 +1,67 @@
  include $(top_srcdir)/Makefile.am.common
  
@@ -1368,8 +1368,8 @@ Index: libressl/apps/Makefile.am
 -openssl_SOURCES += ca.c
 -openssl_SOURCES += ciphers.c
 -openssl_SOURCES += cms.c
--openssl_SOURCES += crl2p7.c
 -openssl_SOURCES += crl.c
+-openssl_SOURCES += crl2p7.c
 -openssl_SOURCES += dgst.c
 -openssl_SOURCES += dh.c
 -openssl_SOURCES += dhparam.c
@@ -1401,13 +1401,13 @@ Index: libressl/apps/Makefile.am
 -openssl_SOURCES += rsautl.c
 -openssl_SOURCES += s_cb.c
 -openssl_SOURCES += s_client.c
+-openssl_SOURCES += s_server.c
+-openssl_SOURCES += s_socket.c
+-openssl_SOURCES += s_time.c
 -openssl_SOURCES += sess_id.c
 -openssl_SOURCES += smime.c
 -openssl_SOURCES += speed.c
 -openssl_SOURCES += spkac.c
--openssl_SOURCES += s_server.c
--openssl_SOURCES += s_socket.c
--openssl_SOURCES += s_time.c
 -openssl_SOURCES += ts.c
 -openssl_SOURCES += verify.c
 -openssl_SOURCES += version.c
@@ -1417,8 +1417,8 @@ Index: libressl/apps/Makefile.am
 +libressl_openssl_SOURCES += ca.c
 +libressl_openssl_SOURCES += ciphers.c
 +libressl_openssl_SOURCES += cms.c
-+libressl_openssl_SOURCES += crl2p7.c
 +libressl_openssl_SOURCES += crl.c
++libressl_openssl_SOURCES += crl2p7.c
 +libressl_openssl_SOURCES += dgst.c
 +libressl_openssl_SOURCES += dh.c
 +libressl_openssl_SOURCES += dhparam.c
@@ -1450,13 +1450,13 @@ Index: libressl/apps/Makefile.am
 +libressl_openssl_SOURCES += rsautl.c
 +libressl_openssl_SOURCES += s_cb.c
 +libressl_openssl_SOURCES += s_client.c
++libressl_openssl_SOURCES += s_server.c
++libressl_openssl_SOURCES += s_socket.c
++libressl_openssl_SOURCES += s_time.c
 +libressl_openssl_SOURCES += sess_id.c
 +libressl_openssl_SOURCES += smime.c
 +libressl_openssl_SOURCES += speed.c
 +libressl_openssl_SOURCES += spkac.c
-+libressl_openssl_SOURCES += s_server.c
-+libressl_openssl_SOURCES += s_socket.c
-+libressl_openssl_SOURCES += s_time.c
 +libressl_openssl_SOURCES += ts.c
 +libressl_openssl_SOURCES += verify.c
 +libressl_openssl_SOURCES += version.c
@@ -1466,8 +1466,8 @@ Index: libressl/apps/Makefile.am
  noinst_HEADERS += s_apps.h
 Index: libressl/configure.ac
 ===================================================================
---- libressl.orig/configure.ac	2014-09-08 18:01:41.000000000 +0200
-+++ libressl/configure.ac	2014-09-08 18:06:01.000000000 +0200
+--- libressl.orig/configure.ac	2014-09-09 10:27:40.000000000 +0200
++++ libressl/configure.ac	2014-09-09 10:32:17.000000000 +0200
 @@ -57,7 +57,7 @@
  )
  CFLAGS="$save_cflags $AM_CFLAGS"
@@ -1477,7 +1477,7 @@ Index: libressl/configure.ac
  	AM_CONDITIONAL(NO_STRLCPY, false),
  	AC_DEFINE(NO_STRLCPY)
  	AM_CONDITIONAL(NO_STRLCPY, true))
-@@ -180,9 +180,9 @@
+@@ -176,9 +176,9 @@
  	tests/Makefile
  	apps/Makefile
  	man/Makefile
@@ -1492,8 +1492,8 @@ Index: libressl/configure.ac
  AC_OUTPUT
 Index: libressl/tests/Makefile.am
 ===================================================================
---- libressl.orig/tests/Makefile.am	2014-09-08 18:01:41.000000000 +0200
-+++ libressl/tests/Makefile.am	2014-09-08 18:06:01.000000000 +0200
+--- libressl.orig/tests/Makefile.am	2014-09-09 10:27:40.000000000 +0200
++++ libressl/tests/Makefile.am	2014-09-09 10:32:17.000000000 +0200
 @@ -12,217 +12,217 @@
  endif
  check_PROGRAMS += aeadtest
@@ -1802,8 +1802,8 @@ Index: libressl/tests/Makefile.am
  EXTRA_DIST += aeadtest.sh
 Index: libressl/tests/testssl
 ===================================================================
---- libressl.orig/tests/testssl	2014-09-08 18:01:32.000000000 +0200
-+++ libressl/tests/testssl	2014-09-08 18:06:49.000000000 +0200
+--- libressl.orig/tests/testssl	2014-09-09 10:27:40.000000000 +0200
++++ libressl/tests/testssl	2014-09-09 10:32:17.000000000 +0200
 @@ -7,7 +7,7 @@
  
  ssltest="./ssltest -key $key -cert $cert -c_key $key -c_cert $cert"
