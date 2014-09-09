@@ -1,4 +1,4 @@
-/* $OpenBSD: s_client.c,v 1.1 2014/08/26 17:47:25 jsing Exp $ */
+/* $OpenBSD: s_client.c,v 1.68 2014/07/12 19:31:21 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -137,7 +137,6 @@
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 
 #include <netinet/in.h>
@@ -632,6 +631,8 @@ s_client_main(int argc, char **argv)
 				goto bad;
 			keymatexportlabel = *(++argv);
 		} else if (strcmp(*argv, "-keymatexportlen") == 0) {
+			const char *errstr;
+
 			if (--argc < 1)
 				goto bad;
 			keymatexportlen = strtonum(*(++argv), 1, INT_MAX, &errstr);

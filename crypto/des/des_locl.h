@@ -1,4 +1,4 @@
-/* $OpenBSD: des_locl.h,v 1.16 2014/07/10 22:45:56 jsing Exp $ */
+/* $OpenBSD: des_locl.h,v 1.15 2014/06/12 15:49:28 deraadt Exp $ */
 /* Copyright (C) 1995-1997 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -60,7 +60,6 @@
 #define HEADER_DES_LOCL_H
 
 #include <math.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -132,10 +131,20 @@
 				} \
 			}
 
-static inline uint32_t ROTATE(uint32_t a, uint32_t n)
-{
-	return (a>>n)+(a<<(32-n));
-}
+#if defined(__GNUC__) && __GNUC__>=2 && !defined(__STRICT_ANSI__) && !defined(OPENSSL_NO_ASM) && !defined(OPENSSL_NO_INLINE_ASM)
+# if defined(__i386) || defined(__i386__) || defined(__x86_64) || defined(__x86_64__)
+#  define ROTATE(a,n)	({ register unsigned int ret;	\
+				asm ("rorl %1,%0"	\
+					: "=r"(ret)	\
+					: "I"(n),"0"(a)	\
+					: "cc");	\
+			   ret;				\
+			})
+# endif
+#endif
+#ifndef ROTATE
+#define	ROTATE(a,n)	(((a)>>(n))+((a)<<(32-(n))))
+#endif
 
 /* Don't worry about the LOAD_DATA() stuff, that is used by
  * fcrypt() to add it's little bit to the front */

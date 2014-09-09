@@ -95,7 +95,8 @@ static void display_engine_list(void)
 int main(int argc, char *argv[])
 	{
 	ENGINE *block[512];
-	char *id, *name;
+	char buf[256];
+	const char *id, *name;
 	ENGINE *ptr;
 	int loop;
 	int to_return = 1;
@@ -206,11 +207,13 @@ int main(int argc, char *argv[])
 	printf("About to beef up the engine-type list\n");
 	for(loop = 0; loop < 512; loop++)
 		{
-		asprintf(&id, "id%i", loop);
-		asprintf(&name, "Fake engine type %i", loop);
+		sprintf(buf, "id%i", loop);
+		id = BUF_strdup(buf);
+		sprintf(buf, "Fake engine type %i", loop);
+		name = BUF_strdup(buf);
 		if(((block[loop] = ENGINE_new()) == NULL) ||
-				!id || !ENGINE_set_id(block[loop], id) ||
-				!name || !ENGINE_set_name(block[loop], name))
+				!ENGINE_set_id(block[loop], id) ||
+				!ENGINE_set_name(block[loop], name))
 			{
 			printf("Couldn't create block of ENGINE structures.\n"
 				"I'll probably also core-dump now, damn.\n");
