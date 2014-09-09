@@ -1,2 +1,2 @@
-rename_libraries
-change_include_path
+rename_libraries.patch
+change_include_path.patch
