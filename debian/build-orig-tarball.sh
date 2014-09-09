@@ -21,7 +21,7 @@ cd ${TEMPDIR}/${PKG} && ./dist.sh
 VERSION=$(cat ${TEMPDIR}/${PKG}/VERSION)
 OPENBSD_COMMIT=$(cd ${TEMPDIR}/${PKG}/openbsd && git log -1 --format=%h)
 PORTABLE_COMMIT=$(cd ${TEMPDIR}/${PKG} && git log -1 --format=%h)
-TARVERSION=${VERSION}+git${TIMESTAMP}+${OPENBSD_COMMIT}+${PORTABLE_COMMIT}
+TARVERSION=${VERSION}~git${TIMESTAMP}+${OPENBSD_COMMIT}+${PORTABLE_COMMIT}
 
 echo "# Repacking version ${TARVERSION}"
 DESTFILENAME=$(readlink -f "${CWD}/../${PKG}_${TARVERSION}.orig.tar.xz")
