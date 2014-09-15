@@ -1,3 +1,9 @@
+libressl (2.0.5-1ppa1~trusty2) trusty; urgency=low
+
+  * First build for Trusty.
+
+ -- Joachim Bauch <bauch@struktur.de>  Mon, 15 Sep 2014 16:30:38 +0200
+
 libressl (2.0.5-1ppa1~precise2) precise; urgency=low
 
   * Rebuild for armhf.
