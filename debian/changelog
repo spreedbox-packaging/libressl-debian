@@ -1,3 +1,9 @@
+libressl (2.1.1-1ppa1~precise1) precise; urgency=low
+
+  * Imported Upstream version 2.1.1
+
+ -- Joachim Bauch <bauch@struktur.de>  Thu, 23 Oct 2014 10:22:41 +0200
+
 libressl (2.0.5-1ppa1~precise2) precise; urgency=low
 
   * Rebuild for armhf.
