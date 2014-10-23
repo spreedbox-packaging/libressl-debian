@@ -1,7 +1,7 @@
 Index: libressl/Makefile.am
 ===================================================================
---- libressl.orig/Makefile.am	2014-09-09 10:27:40.000000000 +0200
-+++ libressl/Makefile.am	2014-09-09 10:32:17.000000000 +0200
+--- libressl.orig/Makefile.am	2014-09-15 16:32:48.000000000 +0200
++++ libressl/Makefile.am	2014-10-23 10:28:08.000000000 +0200
 @@ -2,4 +2,4 @@
  ACLOCAL_AMFLAGS = -I m4
  
@@ -10,7 +10,7 @@ Index: libressl/Makefile.am
 +pkgconfig_DATA = libressl-crypto.pc libressl-ssl.pc libressl-openssl.pc
 Index: libressl/libcrypto.pc.in
 ===================================================================
---- libressl.orig/libcrypto.pc.in	2014-09-09 10:27:40.000000000 +0200
+--- libressl.orig/libcrypto.pc.in	2014-09-15 16:32:48.000000000 +0200
 +++ /dev/null	1970-01-01 00:00:00.000000000 +0000
 @@ -1,15 +0,0 @@
 -#libcrypto pkg-config source file
@@ -31,7 +31,7 @@ Index: libressl/libcrypto.pc.in
 Index: libressl/libressl-crypto.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-crypto.pc.in	2014-09-09 10:32:17.000000000 +0200
++++ libressl/libressl-crypto.pc.in	2014-10-23 10:28:08.000000000 +0200
 @@ -0,0 +1,15 @@
 +#libcrypto pkg-config source file
 +
@@ -51,7 +51,7 @@ Index: libressl/libressl-crypto.pc.in
 Index: libressl/libressl-openssl.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-openssl.pc.in	2014-09-09 10:32:17.000000000 +0200
++++ libressl/libressl-openssl.pc.in	2014-10-23 10:28:08.000000000 +0200
 @@ -0,0 +1,11 @@
 +#openssl pkg-config source file
 +
@@ -67,7 +67,7 @@ Index: libressl/libressl-openssl.pc.in
 Index: libressl/libressl-ssl.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-ssl.pc.in	2014-09-09 10:32:17.000000000 +0200
++++ libressl/libressl-ssl.pc.in	2014-10-23 10:28:08.000000000 +0200
 @@ -0,0 +1,16 @@
 +#libssl pkg-config source file
 +
@@ -87,7 +87,7 @@ Index: libressl/libressl-ssl.pc.in
 +Cflags: -I${includedir}
 Index: libressl/libssl.pc.in
 ===================================================================
---- libressl.orig/libssl.pc.in	2014-09-09 10:27:40.000000000 +0200
+--- libressl.orig/libssl.pc.in	2014-09-15 16:32:48.000000000 +0200
 +++ /dev/null	1970-01-01 00:00:00.000000000 +0000
 @@ -1,16 +0,0 @@
 -#libssl pkg-config source file
@@ -108,7 +108,7 @@ Index: libressl/libssl.pc.in
 -Cflags: -I${includedir}
 Index: libressl/openssl.pc.in
 ===================================================================
---- libressl.orig/openssl.pc.in	2014-09-09 10:27:40.000000000 +0200
+--- libressl.orig/openssl.pc.in	2014-09-15 16:32:48.000000000 +0200
 +++ /dev/null	1970-01-01 00:00:00.000000000 +0000
 @@ -1,11 +0,0 @@
 -#openssl pkg-config source file
@@ -124,8 +124,8 @@ Index: libressl/openssl.pc.in
 -Requires: libssl libcrypto
 Index: libressl/crypto/Makefile.am
 ===================================================================
---- libressl.orig/crypto/Makefile.am	2014-09-09 10:27:40.000000000 +0200
-+++ libressl/crypto/Makefile.am	2014-09-09 10:32:17.000000000 +0200
+--- libressl.orig/crypto/Makefile.am	2014-10-23 10:21:17.000000000 +0200
++++ libressl/crypto/Makefile.am	2014-10-23 10:28:56.000000000 +0200
 @@ -4,11 +4,11 @@
  AM_CPPFLAGS += -I$(top_srcdir)/crypto/evp
  AM_CPPFLAGS += -I$(top_srcdir)/crypto/modes
@@ -134,10 +134,10 @@ Index: libressl/crypto/Makefile.am
 +lib_LTLIBRARIES = libressl-crypto.la
  
 -libcrypto_la_LIBADD = libcompat.la libcompatnoopt.la
--libcrypto_la_LDFLAGS = -version-info 30:0:0
+-libcrypto_la_LDFLAGS = -version-info 30:1:0
 -libcrypto_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS) -DOPENSSL_NO_HW_PADLOCK
 +libressl_crypto_la_LIBADD = libcompat.la libcompatnoopt.la
-+libressl_crypto_la_LDFLAGS = -version-info 30:0:0
++libressl_crypto_la_LDFLAGS = -version-info 30:1:0
 +libressl_crypto_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS) -DOPENSSL_NO_HW_PADLOCK
  
  noinst_LTLIBRARIES = libcompat.la libcompatnoopt.la
@@ -1238,16 +1238,16 @@ Index: libressl/crypto/Makefile.am
 +EXTRA_libressl_crypto_la_SOURCES += poly1305/poly1305-donna.c
 Index: libressl/ssl/Makefile.am
 ===================================================================
---- libressl.orig/ssl/Makefile.am	2014-09-09 10:27:40.000000000 +0200
-+++ libressl/ssl/Makefile.am	2014-09-09 10:32:17.000000000 +0200
+--- libressl.orig/ssl/Makefile.am	2014-10-23 10:21:17.000000000 +0200
++++ libressl/ssl/Makefile.am	2014-10-23 10:30:05.000000000 +0200
 @@ -1,51 +1,51 @@
  include $(top_srcdir)/Makefile.am.common
  
 -lib_LTLIBRARIES = libssl.la
 +lib_LTLIBRARIES = libressl-ssl.la
  
--libssl_la_LDFLAGS = -version-info 27:0:0
-+libressl_ssl_la_LDFLAGS = -version-info 27:0:0
+-libssl_la_LDFLAGS = -version-info 27:2:0
++libressl_ssl_la_LDFLAGS = -version-info 27:2:0
  
 -libssl_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
 -libssl_la_SOURCES =
@@ -1338,8 +1338,8 @@ Index: libressl/ssl/Makefile.am
  noinst_HEADERS += ssl_locl.h
 Index: libressl/apps/Makefile.am
 ===================================================================
---- libressl.orig/apps/Makefile.am	2014-09-09 10:27:40.000000000 +0200
-+++ libressl/apps/Makefile.am	2014-09-09 10:32:35.000000000 +0200
+--- libressl.orig/apps/Makefile.am	2014-09-15 16:32:48.000000000 +0200
++++ libressl/apps/Makefile.am	2014-10-23 10:28:08.000000000 +0200
 @@ -1,67 +1,67 @@
  include $(top_srcdir)/Makefile.am.common
  
@@ -1466,8 +1466,8 @@ Index: libressl/apps/Makefile.am
  noinst_HEADERS += s_apps.h
 Index: libressl/configure.ac
 ===================================================================
---- libressl.orig/configure.ac	2014-09-09 10:27:40.000000000 +0200
-+++ libressl/configure.ac	2014-09-09 10:32:17.000000000 +0200
+--- libressl.orig/configure.ac	2014-10-23 10:21:17.000000000 +0200
++++ libressl/configure.ac	2014-10-23 10:28:08.000000000 +0200
 @@ -57,7 +57,7 @@
  )
  CFLAGS="$save_cflags $AM_CFLAGS"
@@ -1477,7 +1477,7 @@ Index: libressl/configure.ac
  	AM_CONDITIONAL(NO_STRLCPY, false),
  	AC_DEFINE(NO_STRLCPY)
  	AM_CONDITIONAL(NO_STRLCPY, true))
-@@ -176,9 +176,9 @@
+@@ -180,9 +180,9 @@
  	tests/Makefile
  	apps/Makefile
  	man/Makefile
@@ -1492,8 +1492,8 @@ Index: libressl/configure.ac
  AC_OUTPUT
 Index: libressl/tests/Makefile.am
 ===================================================================
---- libressl.orig/tests/Makefile.am	2014-09-09 10:27:40.000000000 +0200
-+++ libressl/tests/Makefile.am	2014-09-09 10:32:17.000000000 +0200
+--- libressl.orig/tests/Makefile.am	2014-09-15 16:32:48.000000000 +0200
++++ libressl/tests/Makefile.am	2014-10-23 10:28:08.000000000 +0200
 @@ -12,217 +12,217 @@
  endif
  check_PROGRAMS += aeadtest
@@ -1802,8 +1802,8 @@ Index: libressl/tests/Makefile.am
  EXTRA_DIST += aeadtest.sh
 Index: libressl/tests/testssl
 ===================================================================
---- libressl.orig/tests/testssl	2014-09-09 10:27:40.000000000 +0200
-+++ libressl/tests/testssl	2014-09-09 10:32:17.000000000 +0200
+--- libressl.orig/tests/testssl	2014-10-23 10:21:17.000000000 +0200
++++ libressl/tests/testssl	2014-10-23 10:28:08.000000000 +0200
 @@ -7,7 +7,7 @@
  
  ssltest="./ssltest -key $key -cert $cert -c_key $key -c_cert $cert"
