@@ -1,4 +1,4 @@
-/* $OpenBSD: x509_att.c,v 1.10 2014/07/03 21:21:11 miod Exp $ */
+/* $OpenBSD: x509_att.c,v 1.12 2014/09/26 19:30:38 miod Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -73,8 +73,7 @@ X509at_get_attr_count(const STACK_OF(X509_ATTRIBUTE) *x)
 }
 
 int
-X509at_get_attr_by_NID(const STACK_OF(X509_ATTRIBUTE) *x, int nid,
-    int lastpos)
+X509at_get_attr_by_NID(const STACK_OF(X509_ATTRIBUTE) *x, int nid, int lastpos)
 {
 	ASN1_OBJECT *obj;
 
@@ -133,14 +132,14 @@ X509at_add1_attr(STACK_OF(X509_ATTRIBUTE) **x, X509_ATTRIBUTE *attr)
 
 	if (x == NULL) {
 		X509err(X509_F_X509AT_ADD1_ATTR, ERR_R_PASSED_NULL_PARAMETER);
-		goto err2;
+		return (NULL);
 	}
 
 	if (*x == NULL) {
 		if ((sk = sk_X509_ATTRIBUTE_new_null()) == NULL)
 			goto err;
 	} else
-		sk= *x;
+		sk = *x;
 
 	if ((new_attr = X509_ATTRIBUTE_dup(attr)) == NULL)
 		goto err2;
@@ -155,7 +154,7 @@ err:
 err2:
 	if (new_attr != NULL)
 		X509_ATTRIBUTE_free(new_attr);
-	if (sk != NULL)
+	if (sk != NULL && sk != *x)
 		sk_X509_ATTRIBUTE_free(sk);
 	return (NULL);
 }

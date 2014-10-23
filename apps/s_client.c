@@ -1,4 +1,4 @@
-/* $OpenBSD: s_client.c,v 1.68 2014/07/12 19:31:21 jsing Exp $ */
+/* $OpenBSD: s_client.c,v 1.2 2014/09/01 20:54:37 doug Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -137,6 +137,7 @@
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 
 #include <netinet/in.h>
@@ -631,8 +632,6 @@ s_client_main(int argc, char **argv)
 				goto bad;
 			keymatexportlabel = *(++argv);
 		} else if (strcmp(*argv, "-keymatexportlen") == 0) {
-			const char *errstr;
-
 			if (--argc < 1)
 				goto bad;
 			keymatexportlen = strtonum(*(++argv), 1, INT_MAX, &errstr);
@@ -830,9 +829,9 @@ re_start:
 	BIO_printf(bio_c_out, "CONNECTED(%08X)\n", s);
 
 	if (c_nbio) {
-		unsigned long l = 1;
-		BIO_printf(bio_c_out, "turning on non blocking io\n");
-		if (BIO_socket_ioctl(s, FIONBIO, &l) < 0) {
+		if (!c_quiet)
+			BIO_printf(bio_c_out, "turning on non blocking io\n");
+		if (!BIO_socket_nbio(s, 1)) {
 			ERR_print_errors(bio_err);
 			goto end;
 		}

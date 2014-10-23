@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_locl.h,v 1.62 2014/07/12 22:33:39 jsing Exp $ */
+/* $OpenBSD: ssl_locl.h,v 1.69 2014/09/27 11:01:06 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -254,8 +254,6 @@
 
 /* Bits for algorithm_mkey (key exchange algorithm) */
 #define SSL_kRSA		0x00000001L /* RSA key exchange */
-#define SSL_kDHr		0x00000002L /* DH cert, RSA CA cert */ /* no such ciphersuites supported! */
-#define SSL_kDHd		0x00000004L /* DH cert, DSA CA cert */ /* no such ciphersuite supported! */
 #define SSL_kDHE		0x00000008L /* tmp DH key no DH cert */
 #define SSL_kECDHr		0x00000020L /* ECDH cert, RSA CA cert */
 #define SSL_kECDHe		0x00000040L /* ECDH cert, ECDSA CA cert */
@@ -266,11 +264,10 @@
 #define SSL_aRSA		0x00000001L /* RSA auth */
 #define SSL_aDSS 		0x00000002L /* DSS auth */
 #define SSL_aNULL 		0x00000004L /* no auth (i.e. use ADH or AECDH) */
-#define SSL_aDH 		0x00000008L /* Fixed DH auth (kDHd or kDHr) */ /* no such ciphersuites supported! */
 #define SSL_aECDH 		0x00000010L /* Fixed ECDH auth (kECDHe or kECDHr) */
 #define SSL_aECDSA              0x00000040L /* ECDSA auth*/
-#define SSL_aGOST94				0x00000100L /* GOST R 34.10-94 signature auth */
-#define SSL_aGOST01 			0x00000200L /* GOST R 34.10-2001 signature auth */
+#define SSL_aGOST94		0x00000100L /* GOST R 34.10-94 signature auth */
+#define SSL_aGOST01 		0x00000200L /* GOST R 34.10-2001 signature auth */
 
 
 /* Bits for algorithm_enc (symmetric encryption) */
@@ -324,6 +321,9 @@
 /* When adding new digest in the ssl_ciph.c and increment SSM_MD_NUM_IDX
  * make sure to update this constant too */
 #define SSL_MAX_DIGEST 6
+
+#define SSL3_CK_ID		0x03000000
+#define SSL3_CK_VALUE_MASK	0x0000ffff
 
 #define TLS1_PRF_DGST_MASK	(0xff << TLS1_PRF_DGST_SHIFT)
 
@@ -439,13 +439,16 @@ typedef struct cert_st {
 	int valid;
 	unsigned long mask_k;
 	unsigned long mask_a;
+
 	RSA *rsa_tmp;
 	RSA *(*rsa_tmp_cb)(SSL *ssl, int is_export, int keysize);
+
 	DH *dh_tmp;
 	DH *(*dh_tmp_cb)(SSL *ssl, int is_export, int keysize);
+
 	EC_KEY *ecdh_tmp;
-	/* Callback for generating ephemeral ECDH keys */
 	EC_KEY *(*ecdh_tmp_cb)(SSL *ssl, int is_export, int keysize);
+	int ecdh_tmp_auto;
 
 	CERT_PKEY pkeys[SSL_PKEY_NUM];
 
@@ -474,11 +477,6 @@ typedef struct sess_cert_st {
 
 /*#define SSL_DEBUG	*/
 /*#define RSA_DEBUG	*/ 
-
-#define ssl_put_cipher_by_char(ssl,ciph,ptr) \
-		((ssl)->method->put_cipher_by_char((ciph),(ptr)))
-#define ssl_get_cipher_by_char(ssl,ptr) \
-		((ssl)->method->get_cipher_by_char(ptr))
 
 /* This is for the SSLv3/TLSv1.0 differences in crypto/hash stuff
  * It is a bit of a mess of functions, but hell, think of it as
@@ -576,7 +574,7 @@ int ssl_cipher_ptr_id_cmp(const SSL_CIPHER * const *ap,
 STACK_OF(SSL_CIPHER) *ssl_bytes_to_cipher_list(SSL *s, unsigned char *p,
     int num, STACK_OF(SSL_CIPHER) **skp);
 int ssl_cipher_list_to_bytes(SSL *s, STACK_OF(SSL_CIPHER) *sk,
-    unsigned char *p, int (*put_cb)(const SSL_CIPHER *, unsigned char *));
+    unsigned char *p);
 STACK_OF(SSL_CIPHER) *ssl_create_cipher_list(const SSL_METHOD *meth,
     STACK_OF(SSL_CIPHER) **pref, STACK_OF(SSL_CIPHER) **sorted,
     const char *rule_str);
@@ -599,8 +597,6 @@ STACK_OF(SSL_CIPHER) *ssl_get_ciphers_by_id(SSL *s);
 int ssl_verify_alarm_type(long type);
 void ssl_load_ciphers(void);
 
-const SSL_CIPHER *ssl3_get_cipher_by_char(const unsigned char *p);
-int ssl3_put_cipher_by_char(const SSL_CIPHER *c, unsigned char *p);
 void ssl3_init_finished_mac(SSL *s);
 int ssl3_send_server_certificate(SSL *s);
 int ssl3_send_newsession_ticket(SSL *s);
@@ -619,6 +615,8 @@ long ssl3_get_message(SSL *s, int st1, int stn, int mt, long max, int *ok);
 int ssl3_send_finished(SSL *s, int a, int b, const char *sender, int slen);
 int ssl3_num_ciphers(void);
 const SSL_CIPHER *ssl3_get_cipher(unsigned int u);
+const SSL_CIPHER *ssl3_get_cipher_by_id(unsigned int id);
+uint16_t ssl3_cipher_get_value(const SSL_CIPHER *c);
 int ssl3_renegotiate(SSL *ssl);
 
 int ssl3_renegotiate_check(SSL *ssl);
@@ -664,7 +662,6 @@ long ssl3_default_timeout(void);
 int ssl23_read(SSL *s, void *buf, int len);
 int ssl23_peek(SSL *s, void *buf, int len);
 int ssl23_write(SSL *s, const void *buf, int len);
-int ssl23_put_cipher_by_char(const SSL_CIPHER *c, unsigned char *p);
 long ssl23_default_timeout(void);
 
 long tls1_default_timeout(void);
@@ -804,6 +801,8 @@ SSL_COMP *ssl3_comp_find(STACK_OF(SSL_COMP) *sk, int n);
 
 int tls1_ec_curve_id2nid(int curve_id);
 int tls1_ec_nid2curve_id(int nid);
+int tls1_check_curve(SSL *s, const unsigned char *p, size_t len);
+int tls1_get_shared_curve(SSL *s);
 
 unsigned char *ssl_add_clienthello_tlsext(SSL *s, unsigned char *p,
     unsigned char *limit);
@@ -843,6 +842,9 @@ int ssl_parse_clienthello_renegotiate_ext(SSL *s, unsigned char *d,
 long ssl_get_algorithm2(SSL *s);
 int tls1_process_sigalgs(SSL *s, const unsigned char *data, int dsize);
 int tls12_get_req_sig_algs(SSL *s, unsigned char *p);
+
+int tls1_check_ec_server_key(SSL *s);
+int tls1_check_ec_tmp_key(SSL *s);
 
 int ssl_add_clienthello_use_srtp_ext(SSL *s, unsigned char *p,
     int *len, int maxlen);

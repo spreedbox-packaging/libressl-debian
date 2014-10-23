@@ -1,4 +1,4 @@
-/*	$OpenBSD: getentropy_linux.c,v 1.31 2014/07/21 23:34:54 deraadt Exp $	*/
+/*	$OpenBSD: getentropy_linux.c,v 1.35 2014/08/28 01:00:57 bcook Exp $	*/
 
 /*
  * Copyright (c) 2014 Theo de Raadt <deraadt@openbsd.org>
@@ -49,6 +49,7 @@
 #include <time.h>
 #include <openssl/sha.h>
 
+#include <linux/types.h>
 #include <linux/random.h>
 #include <linux/sysctl.h>
 #ifdef HAVE_GETAUXVAL
@@ -74,7 +75,9 @@
 int	getentropy(void *buf, size_t len);
 
 static int gotdata(char *buf, size_t len);
+#ifdef SYS_getrandom
 static int getentropy_getrandom(void *buf, size_t len);
+#endif
 static int getentropy_urandom(void *buf, size_t len);
 #ifdef SYS__sysctl
 static int getentropy_sysctl(void *buf, size_t len);
@@ -92,12 +95,16 @@ getentropy(void *buf, size_t len)
 		return -1;
 	}
 
+#ifdef SYS_getrandom
 	/*
 	 * Try descriptor-less getrandom()
 	 */
 	ret = getentropy_getrandom(buf, len);
 	if (ret != -1)
 		return (ret);
+	if (errno != ENOSYS)
+		return (-1);
+#endif
 
 	/*
 	 * Try to get entropy with /dev/urandom
@@ -184,27 +191,24 @@ gotdata(char *buf, size_t len)
 	return 0;
 }
 
+#ifdef SYS_getrandom
 static int
 getentropy_getrandom(void *buf, size_t len)
 {
-#if 0
-
-/* Hand-definitions until the API becomes commonplace */
-#ifndef SYS__getrandom
-#ifdef __LP64__
-#define SYS__getrandom 317
-#else
-#define SYS__getrandom 354
-#endif
-#endif
+	int pre_errno = errno;
+	int ret;
 	if (len > 256)
 		return (-1);
-	ret = syscall(SYS__getrandom, buf, len, 0);
-	if (ret == len)
-		return (0);
-#endif
-	return -1;
+	do {
+		ret = syscall(SYS_getrandom, buf, len, 0);
+	} while (ret == -1 && errno == EINTR);
+
+	if (ret != len)
+		return (-1);
+	errno = pre_errno;
+	return (0);
 }
+#endif
 
 static int
 getentropy_urandom(void *buf, size_t len)

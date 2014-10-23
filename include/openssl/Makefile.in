@@ -275,8 +275,8 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CPPFLAGS = -I$(top_srcdir)/include -DOPENSSL_NO_ASM \
-	-DHAVE_CRYPTODEV -DLIBRESSL_INTERNAL
+AM_CPPFLAGS = -I$(top_srcdir)/include -DHAVE_CRYPTODEV \
+	-DLIBRESSL_INTERNAL
 opensslincludedir = $(includedir)/openssl
 opensslinclude_HEADERS = aes.h asn1.h asn1_mac.h asn1t.h bio.h \
 	blowfish.h bn.h buffer.h cast.h chacha.h cmac.h cms.h comp.h \

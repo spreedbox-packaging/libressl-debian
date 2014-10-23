@@ -1,4 +1,19 @@
-/* $OpenBSD: apps.c,v 1.68 2014/07/19 03:40:26 lteo Exp $ */
+/* $OpenBSD: apps.c,v 1.9 2014/08/30 15:14:03 jsing Exp $ */
+/*
+ * Copyright (c) 2014 Joel Sing <jsing@openbsd.org>
+ *
+ * Permission to use, copy, modify, and distribute this software for any
+ * purpose with or without fee is hereby granted, provided that the above
+ * copyright notice and this permission notice appear in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
+ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
+ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
+ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -2217,4 +2232,143 @@ app_isdir(const char *name)
 	if (stat(name, &st) == 0)
 		return S_ISDIR(st.st_mode);
 	return -1;
+}
+
+#define OPTION_WIDTH 18
+
+void
+options_usage(struct option *opts)
+{
+	const char *p, *q;
+	char optstr[32];
+	int i;
+
+	for (i = 0; opts[i].name != NULL; i++) {
+		if (opts[i].desc == NULL)
+			continue;
+
+		snprintf(optstr, sizeof(optstr), "-%s %s", opts[i].name,
+		    (opts[i].argname != NULL) ? opts[i].argname : "");
+		fprintf(stderr, " %-*s", OPTION_WIDTH, optstr);
+		if (strlen(optstr) > OPTION_WIDTH)
+			fprintf(stderr, "\n %-*s", OPTION_WIDTH, "");
+
+		p = opts[i].desc;
+		while ((q = strchr(p, '\n')) != NULL) {
+			fprintf(stderr, " %.*s", (int)(q - p), p);
+			fprintf(stderr, "\n %-*s", OPTION_WIDTH, "");
+			p = q + 1;
+		}
+		fprintf(stderr, " %s\n", p);
+	}
+}
+
+int
+options_parse(int argc, char **argv, struct option *opts, char **unnamed)
+{
+	const char *errstr;
+	struct option *opt;
+	long long val;
+	char *arg, *p;
+	int ord = 0;
+	int i, j;
+	int fmt;
+
+	for (i = 1; i < argc; i++) {
+		p = arg = argv[i];
+
+		if (*p++ != '-') {
+			if (unnamed == NULL)
+				goto unknown;
+			*unnamed = arg;
+			continue;
+		}
+		if (*p == '\0') /* XXX - end of named options. */
+			goto unknown;
+
+		for (j = 0; opts[j].name != NULL; j++) {
+			opt = &opts[j];
+			if (strcmp(p, opt->name) != 0)
+				continue;
+
+			if (opt->type == OPTION_ARG ||
+			    opt->type == OPTION_ARG_FORMAT ||
+			    opt->type == OPTION_ARG_FUNC ||
+			    opt->type == OPTION_ARG_INT) {
+				if (++i >= argc) {
+					fprintf(stderr,
+					    "missing %s argument for -%s\n",
+					    opt->argname, opt->name);
+					return (1);
+				}
+			}
+
+			switch (opt->type) {
+			case OPTION_ARG:
+				*opt->opt.arg = argv[i];
+				break;
+
+			case OPTION_ARG_FORMAT:
+				fmt = str2fmt(argv[i]);
+				if (fmt == FORMAT_UNDEF) {
+					fprintf(stderr,
+					    "unknown %s '%s' for -%s\n",
+					    opt->argname, argv[i], opt->name);
+					return (1);
+				}
+				*opt->opt.value = fmt;
+				break;
+
+			case OPTION_ARG_FUNC:
+				if (opt->func(opt, argv[i]) != 0)
+					return (1);
+				break;
+
+			case OPTION_ARG_INT:
+				val = strtonum(argv[i], 0, INT_MAX, &errstr);
+				if (errstr != NULL) {
+					fprintf(stderr,
+					    "%s %s argument for -%s\n",
+					    errstr, opt->argname, opt->name);
+					return (1);
+				}
+				*opt->opt.value = (int)val;
+				break;
+
+			case OPTION_FUNC:
+				if (opt->func(opt, NULL) != 0)
+					return (1);
+				break;
+				
+			case OPTION_FLAG:
+				*opt->opt.flag = 1;
+				break;
+
+			case OPTION_FLAG_ORD:
+				*opt->opt.flag = ++ord;
+				break;
+
+			case OPTION_VALUE:
+				*opt->opt.value = opt->value;
+				break;
+
+			default:
+				fprintf(stderr,
+				    "option %s - unknown type %i\n",
+				    opt->name, opt->type);
+				return (1);
+			}
+
+			break;
+		}
+
+		if (opts[j].name == NULL)
+			goto unknown;
+	}
+
+	return (0);
+
+unknown:
+	fprintf(stderr, "unknown option '%s'\n", arg);
+	return (1);
 }

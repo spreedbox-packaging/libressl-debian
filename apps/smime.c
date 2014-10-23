@@ -1,4 +1,4 @@
-/* $OpenBSD: smime.c,v 1.27 2014/07/12 17:54:31 jsing Exp $ */
+/* $OpenBSD: smime.c,v 1.28 2014/07/14 00:35:10 deraadt Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
  */

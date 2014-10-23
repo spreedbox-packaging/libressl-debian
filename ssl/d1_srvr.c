@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_srvr.c,v 1.34 2014/07/28 04:23:12 guenther Exp $ */
+/* $OpenBSD: d1_srvr.c,v 1.38 2014/09/07 12:16:23 jsing Exp $ */
 /* 
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.  
@@ -146,8 +146,6 @@ const SSL_METHOD DTLSv1_server_method_data = {
 	.ssl_dispatch_alert = dtls1_dispatch_alert,
 	.ssl_ctrl = dtls1_ctrl,
 	.ssl_ctx_ctrl = ssl3_ctx_ctrl,
-	.get_cipher_by_char = ssl3_get_cipher_by_char,
-	.put_cipher_by_char = ssl3_put_cipher_by_char,
 	.ssl_pending = ssl3_pending,
 	.num_ciphers = ssl3_num_ciphers,
 	.get_cipher = dtls1_get_cipher,
@@ -464,8 +462,7 @@ dtls1_accept(SSL *s)
 			/* only send if a DH key exchange or
 			 * RSA but we have a sign only certificate */
 			if (s->s3->tmp.use_rsa_tmp
-			|| (alg_k & (SSL_kDHE|SSL_kDHr|SSL_kDHd))
-			|| (alg_k & SSL_kECDHE)
+			|| (alg_k & (SSL_kDHE|SSL_kECDHE))
 			|| ((alg_k & SSL_kRSA)
 			&& (s->cert->pkeys[SSL_PKEY_RSA_ENC].privatekey == NULL
 			)
@@ -900,7 +897,6 @@ dtls1_send_server_hello(SSL *s)
 {
 	unsigned char *buf;
 	unsigned char *p, *d;
-	int i;
 	unsigned int sl;
 	unsigned long l;
 
@@ -942,8 +938,7 @@ dtls1_send_server_hello(SSL *s)
 		/* put the cipher */
 		if (s->s3->tmp.new_cipher == NULL)
 			return -1;
-		i = ssl3_put_cipher_by_char(s->s3->tmp.new_cipher, p);
-		p += i;
+		s2n(ssl3_cipher_get_value(s->s3->tmp.new_cipher), p);
 
 		/* put the compression method */
 		*(p++) = 0;
@@ -1114,16 +1109,12 @@ dtls1_send_server_key_exchange(SSL *s)
 			}
 
 			/* Duplicate the ECDH structure. */
-			if (ecdhp == NULL) {
-				SSLerr(SSL_F_DTLS1_SEND_SERVER_KEY_EXCHANGE, ERR_R_ECDH_LIB);
-				goto err;
-			}
 			if ((ecdh = EC_KEY_dup(ecdhp)) == NULL) {
 				SSLerr(SSL_F_DTLS1_SEND_SERVER_KEY_EXCHANGE, ERR_R_ECDH_LIB);
 				goto err;
 			}
-
 			s->s3->tmp.ecdh = ecdh;
+
 			if ((EC_KEY_get0_public_key(ecdh) == NULL) ||
 			    (EC_KEY_get0_private_key(ecdh) == NULL) ||
 			    (s->options & SSL_OP_SINGLE_ECDH_USE)) {
