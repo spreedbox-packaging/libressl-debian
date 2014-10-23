@@ -325,10 +325,10 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CPPFLAGS = -I$(top_srcdir)/include -DOPENSSL_NO_ASM \
-	-DHAVE_CRYPTODEV -DLIBRESSL_INTERNAL
+AM_CPPFLAGS = -I$(top_srcdir)/include -DHAVE_CRYPTODEV \
+	-DLIBRESSL_INTERNAL
 lib_LTLIBRARIES = libssl.la
-libssl_la_LDFLAGS = -version-info 27:0:0
+libssl_la_LDFLAGS = -version-info 27:2:0
 libssl_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
 libssl_la_SOURCES = bio_ssl.c d1_both.c d1_clnt.c d1_enc.c d1_lib.c \
 	d1_meth.c d1_pkt.c d1_srtp.c d1_srvr.c pqueue.c s23_clnt.c \

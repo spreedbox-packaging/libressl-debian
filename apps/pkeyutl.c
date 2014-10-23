@@ -1,4 +1,4 @@
-/* $OpenBSD: pkeyutl.c,v 1.13 2014/07/12 17:54:31 jsing Exp $ */
+/* $OpenBSD: pkeyutl.c,v 1.3 2014/08/28 14:25:48 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */
@@ -105,9 +105,6 @@ pkeyutl_main(int argc, char **argv)
 
 	argc--;
 	argv++;
-
-	ERR_load_crypto_strings();
-	OpenSSL_add_all_algorithms();
 
 	while (argc >= 1) {
 		if (!strcmp(*argv, "-in")) {
@@ -288,7 +285,7 @@ pkeyutl_main(int argc, char **argv)
 		if (rv >= 0)
 			goto end;
 	} else {
-		rv = do_keyop(ctx, pkey_op, NULL, (size_t *) & buf_outlen,
+		rv = do_keyop(ctx, pkey_op, NULL, (size_t *)&buf_outlen,
 		    buf_in, (size_t) buf_inlen);
 		if (rv > 0) {
 			buf_out = malloc(buf_outlen);

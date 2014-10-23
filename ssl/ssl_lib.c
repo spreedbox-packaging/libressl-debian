@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_lib.c,v 1.77 2014/07/12 19:45:53 jsing Exp $ */
+/* $OpenBSD: ssl_lib.c,v 1.85 2014/10/03 13:58:18 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -1367,10 +1367,9 @@ SSL_get_shared_ciphers(const SSL *s, char *buf, int len)
 }
 
 int
-ssl_cipher_list_to_bytes(SSL *s, STACK_OF(SSL_CIPHER) *sk, unsigned char *p,
-    int (*put_cb)(const SSL_CIPHER *, unsigned char *))
+ssl_cipher_list_to_bytes(SSL *s, STACK_OF(SSL_CIPHER) *sk, unsigned char *p)
 {
-	int		 i, j = 0;
+	int		 i;
 	SSL_CIPHER	*c;
 	unsigned char	*q;
 
@@ -1380,13 +1379,15 @@ ssl_cipher_list_to_bytes(SSL *s, STACK_OF(SSL_CIPHER) *sk, unsigned char *p,
 
 	for (i = 0; i < sk_SSL_CIPHER_num(sk); i++) {
 		c = sk_SSL_CIPHER_value(sk, i);
+
 		/* Skip TLS v1.2 only ciphersuites if lower than v1.2 */
 		if ((c->algorithm_ssl & SSL_TLSV1_2) &&
 		    (TLS1_get_client_version(s) < TLS1_2_VERSION))
 			continue;
-		j = put_cb ? put_cb(c, p) : ssl_put_cipher_by_char(s, c, p);
-		p += j;
+
+		s2n(ssl3_cipher_get_value(c), p);
 	}
+
 	/*
 	 * If p == q, no ciphers and caller indicates an error. Otherwise
 	 * add SCSV if not renegotiating.
@@ -1395,9 +1396,7 @@ ssl_cipher_list_to_bytes(SSL *s, STACK_OF(SSL_CIPHER) *sk, unsigned char *p,
 		static SSL_CIPHER scsv = {
 			0, NULL, SSL3_CK_SCSV, 0, 0, 0, 0, 0, 0, 0, 0, 0
 		};
-		j = put_cb ? put_cb(&scsv, p) :
-		    ssl_put_cipher_by_char(s, &scsv, p);
-		p += j;
+		s2n(ssl3_cipher_get_value(&scsv), p);
 	}
 
 	return (p - q);
@@ -1409,30 +1408,34 @@ ssl_bytes_to_cipher_list(SSL *s, unsigned char *p, int num,
 {
 	const SSL_CIPHER	*c;
 	STACK_OF(SSL_CIPHER)	*sk;
-	int			 i, n;
+	int			 i;
+	unsigned int		 cipher_id;
+	uint16_t		 cipher_value;
 
 	if (s->s3)
 		s->s3->send_connection_binding = 0;
 
-	n = ssl_put_cipher_by_char(s, NULL, NULL);
-	if ((num % n) != 0) {
+	if ((num % SSL3_CIPHER_VALUE_SIZE) != 0) {
 		SSLerr(SSL_F_SSL_BYTES_TO_CIPHER_LIST,
 		    SSL_R_ERROR_IN_RECEIVED_CIPHER_LIST);
 		return (NULL);
 	}
-	if ((skp == NULL) || (*skp == NULL))
-		sk=sk_SSL_CIPHER_new_null(); /* change perhaps later */
-	else {
-		sk= *skp;
+	if (skp == NULL || *skp == NULL) {
+		sk = sk_SSL_CIPHER_new_null(); /* change perhaps later */
+		if (sk == NULL)
+			goto err;
+	} else {
+		sk = *skp;
 		sk_SSL_CIPHER_zero(sk);
 	}
 
-	for (i = 0; i < num; i += n) {
+	for (i = 0; i < num; i += SSL3_CIPHER_VALUE_SIZE) {
+		n2s(p, cipher_value);
+		cipher_id = SSL3_CK_ID | cipher_value;
+
 		/* Check for SCSV */
-		if (s->s3 && (n != 3 || !p[0]) &&
-		    (p[n - 2] == ((SSL3_CK_SCSV >> 8) & 0xff)) &&
-		    (p[n - 1] == (SSL3_CK_SCSV & 0xff))) {
-			/* SCSV fatal if renegotiating */
+		if (s->s3 && cipher_id == SSL3_CK_SCSV) {
+			/* SCSV is fatal if renegotiating. */
 			if (s->renegotiate) {
 				SSLerr(SSL_F_SSL_BYTES_TO_CIPHER_LIST,
 				    SSL_R_SCSV_RECEIVED_WHEN_RENEGOTIATING);
@@ -1442,12 +1445,10 @@ ssl_bytes_to_cipher_list(SSL *s, unsigned char *p, int num,
 				goto err;
 			}
 			s->s3->send_connection_binding = 1;
-			p += n;
 			continue;
 		}
 
-		c = ssl_get_cipher_by_char(s, p);
-		p += n;
+		c = ssl3_get_cipher_by_id(cipher_id);
 		if (c != NULL) {
 			if (!sk_SSL_CIPHER_push(sk, c)) {
 				SSLerr(SSL_F_SSL_BYTES_TO_CIPHER_LIST,
@@ -1460,8 +1461,9 @@ ssl_bytes_to_cipher_list(SSL *s, unsigned char *p, int num,
 	if (skp != NULL)
 		*skp = sk;
 	return (sk);
+
 err:
-	if ((skp == NULL) || (*skp == NULL))
+	if (skp == NULL || *skp == NULL)
 		sk_SSL_CIPHER_free(sk);
 	return (NULL);
 }
@@ -1823,6 +1825,9 @@ SSL_CTX_new(const SSL_METHOD *meth)
 	 */
 	ret->options |= SSL_OP_LEGACY_SERVER_CONNECT;
 
+	/* Disable SSLv3 by default. */
+	ret->options |= SSL_OP_NO_SSLv3;
+
 	return (ret);
 err:
 	SSLerr(SSL_F_SSL_CTX_NEW,
@@ -1927,7 +1932,7 @@ void
 ssl_set_cert_masks(CERT *c, const SSL_CIPHER *cipher)
 {
 	CERT_PKEY	*cpk;
-	int		 rsa_enc, rsa_tmp, rsa_sign, dh_tmp, dh_rsa, dh_dsa, dsa_sign;
+	int		 rsa_enc, rsa_tmp, rsa_sign, dh_tmp, dsa_sign;
 	unsigned long	 mask_k, mask_a;
 	int		 have_ecc_cert, ecdh_ok, ecdsa_ok;
 	int		 have_ecdh_tmp;
@@ -1941,18 +1946,15 @@ ssl_set_cert_masks(CERT *c, const SSL_CIPHER *cipher)
 	rsa_tmp = (c->rsa_tmp != NULL || c->rsa_tmp_cb != NULL);
 	dh_tmp = (c->dh_tmp != NULL || c->dh_tmp_cb != NULL);
 
-	have_ecdh_tmp = (c->ecdh_tmp != NULL || c->ecdh_tmp_cb != NULL);
+	have_ecdh_tmp = (c->ecdh_tmp != NULL || c->ecdh_tmp_cb != NULL ||
+	    c->ecdh_tmp_auto != 0);
 	cpk = &(c->pkeys[SSL_PKEY_RSA_ENC]);
 	rsa_enc = (cpk->x509 != NULL && cpk->privatekey != NULL);
 	cpk = &(c->pkeys[SSL_PKEY_RSA_SIGN]);
 	rsa_sign = (cpk->x509 != NULL && cpk->privatekey != NULL);
 	cpk = &(c->pkeys[SSL_PKEY_DSA_SIGN]);
 	dsa_sign = (cpk->x509 != NULL && cpk->privatekey != NULL);
-	cpk = &(c->pkeys[SSL_PKEY_DH_RSA]);
-	dh_rsa = (cpk->x509 != NULL && cpk->privatekey != NULL);
-	cpk = &(c->pkeys[SSL_PKEY_DH_DSA]);
 /* FIX THIS EAY EAY EAY */
-	dh_dsa = (cpk->x509 != NULL && cpk->privatekey != NULL);
 	cpk = &(c->pkeys[SSL_PKEY_ECC]);
 	have_ecc_cert = (cpk->x509 != NULL && cpk->privatekey != NULL);
 	mask_k = 0;
@@ -1974,12 +1976,6 @@ ssl_set_cert_masks(CERT *c, const SSL_CIPHER *cipher)
 
 	if (dh_tmp)
 		mask_k|=SSL_kDHE;
-
-	if (dh_rsa)
-		mask_k|=SSL_kDHr;
-
-	if (dh_dsa)
-		mask_k|=SSL_kDHd;
 
 	if (rsa_enc || rsa_sign)
 		mask_a|=SSL_aRSA;
@@ -2122,10 +2118,6 @@ ssl_get_server_send_pkey(const SSL *s)
 		i = SSL_PKEY_ECC;
 	} else if (alg_a & SSL_aECDSA) {
 		i = SSL_PKEY_ECC;
-	} else if (alg_k & SSL_kDHr) {
-		i = SSL_PKEY_DH_RSA;
-	} else if (alg_k & SSL_kDHd) {
-		i = SSL_PKEY_DH_DSA;
 	} else if (alg_a & SSL_aDSS) {
 		i = SSL_PKEY_DSA_SIGN;
 	} else if (alg_a & SSL_aRSA) {

@@ -1,4 +1,4 @@
-/* $OpenBSD: pkcs7.c,v 1.20 2014/07/12 17:54:31 jsing Exp $ */
+/* $OpenBSD: pkcs7.c,v 1.1 2014/08/26 17:47:25 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -159,7 +159,6 @@ bad:
 		ret = 1;
 		goto end;
 	}
-	ERR_load_crypto_strings();
 
 #ifndef OPENSSL_NO_ENGINE
 	setup_engine(bio_err, engine, 0);

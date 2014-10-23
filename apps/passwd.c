@@ -1,4 +1,4 @@
-/* $OpenBSD: passwd.c,v 1.23 2014/07/14 00:35:10 deraadt Exp $ */
+/* $OpenBSD: passwd.c,v 1.24 2014/07/25 06:05:32 doug Exp $ */
 
 #if defined OPENSSL_NO_MD5
 #define NO_MD5CRYPT_1

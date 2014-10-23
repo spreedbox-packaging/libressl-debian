@@ -1,4 +1,4 @@
-/* $OpenBSD: s_socket.c,v 1.41 2014/06/12 15:49:27 deraadt Exp $ */
+/* $OpenBSD: s_socket.c,v 1.42 2014/06/28 04:39:41 deraadt Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *

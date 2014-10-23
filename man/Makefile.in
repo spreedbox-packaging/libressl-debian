@@ -259,15 +259,50 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CPPFLAGS = -I$(top_srcdir)/include -DOPENSSL_NO_ASM \
-	-DHAVE_CRYPTODEV -DLIBRESSL_INTERNAL
-dist_man_MANS = ASN1_OBJECT_new.3 ASN1_STRING_length.3 \
-	ASN1_STRING_new.3 ASN1_STRING_print_ex.3 ASN1_generate_nconf.3 \
-	BF_set_key.3 BIO.3 BIO_ctrl.3 BIO_f_base64.3 BIO_f_buffer.3 \
-	BIO_f_cipher.3 BIO_f_md.3 BIO_f_null.3 BIO_find_type.3 \
-	BIO_new.3 BIO_new_CMS.3 BIO_push.3 BIO_read.3 BIO_s_accept.3 \
-	BIO_s_bio.3 BIO_s_connect.3 BIO_s_fd.3 BIO_s_file.3 \
-	BIO_s_mem.3 BIO_s_null.3 BIO_s_socket.3 BIO_set_callback.3 \
+AM_CPPFLAGS = -I$(top_srcdir)/include -DHAVE_CRYPTODEV \
+	-DLIBRESSL_INTERNAL
+dist_man_MANS = BIO_f_ssl.3 SSL_CIPHER_get_name.3 \
+	SSL_COMP_add_compression_method.3 \
+	SSL_CTX_add_extra_chain_cert.3 SSL_CTX_add_session.3 \
+	SSL_CTX_ctrl.3 SSL_CTX_flush_sessions.3 SSL_CTX_free.3 \
+	SSL_CTX_get_ex_new_index.3 SSL_CTX_get_verify_mode.3 \
+	SSL_CTX_load_verify_locations.3 SSL_CTX_new.3 \
+	SSL_CTX_sess_number.3 SSL_CTX_sess_set_cache_size.3 \
+	SSL_CTX_sess_set_get_cb.3 SSL_CTX_sessions.3 \
+	SSL_CTX_set_cert_store.3 SSL_CTX_set_cert_verify_callback.3 \
+	SSL_CTX_set_cipher_list.3 SSL_CTX_set_client_CA_list.3 \
+	SSL_CTX_set_client_cert_cb.3 SSL_CTX_set_default_passwd_cb.3 \
+	SSL_CTX_set_generate_session_id.3 SSL_CTX_set_info_callback.3 \
+	SSL_CTX_set_max_cert_list.3 SSL_CTX_set_mode.3 \
+	SSL_CTX_set_msg_callback.3 SSL_CTX_set_options.3 \
+	SSL_CTX_set_psk_client_callback.3 SSL_CTX_set_quiet_shutdown.3 \
+	SSL_CTX_set_session_cache_mode.3 \
+	SSL_CTX_set_session_id_context.3 SSL_CTX_set_ssl_version.3 \
+	SSL_CTX_set_timeout.3 SSL_CTX_set_tmp_dh_callback.3 \
+	SSL_CTX_set_tmp_rsa_callback.3 SSL_CTX_set_verify.3 \
+	SSL_CTX_use_certificate.3 SSL_CTX_use_psk_identity_hint.3 \
+	SSL_SESSION_free.3 SSL_SESSION_get_ex_new_index.3 \
+	SSL_SESSION_get_time.3 SSL_accept.3 SSL_alert_type_string.3 \
+	SSL_clear.3 SSL_connect.3 SSL_do_handshake.3 SSL_free.3 \
+	SSL_get_SSL_CTX.3 SSL_get_ciphers.3 SSL_get_client_CA_list.3 \
+	SSL_get_current_cipher.3 SSL_get_default_timeout.3 \
+	SSL_get_error.3 SSL_get_ex_data_X509_STORE_CTX_idx.3 \
+	SSL_get_ex_new_index.3 SSL_get_fd.3 SSL_get_peer_cert_chain.3 \
+	SSL_get_peer_certificate.3 SSL_get_psk_identity.3 \
+	SSL_get_rbio.3 SSL_get_session.3 SSL_get_verify_result.3 \
+	SSL_get_version.3 SSL_library_init.3 SSL_load_client_CA_file.3 \
+	SSL_new.3 SSL_pending.3 SSL_read.3 SSL_rstate_string.3 \
+	SSL_session_reused.3 SSL_set_bio.3 SSL_set_connect_state.3 \
+	SSL_set_fd.3 SSL_set_session.3 SSL_set_shutdown.3 \
+	SSL_set_verify_result.3 SSL_shutdown.3 SSL_state_string.3 \
+	SSL_want.3 SSL_write.3 d2i_SSL_SESSION.3 ssl.3 \
+	ASN1_OBJECT_new.3 ASN1_STRING_length.3 ASN1_STRING_new.3 \
+	ASN1_STRING_print_ex.3 ASN1_generate_nconf.3 BF_set_key.3 \
+	BIO.3 BIO_ctrl.3 BIO_f_base64.3 BIO_f_buffer.3 BIO_f_cipher.3 \
+	BIO_f_md.3 BIO_f_null.3 BIO_find_type.3 BIO_new.3 \
+	BIO_new_CMS.3 BIO_push.3 BIO_read.3 BIO_s_accept.3 BIO_s_bio.3 \
+	BIO_s_connect.3 BIO_s_fd.3 BIO_s_file.3 BIO_s_mem.3 \
+	BIO_s_null.3 BIO_s_socket.3 BIO_set_callback.3 \
 	BIO_should_retry.3 BN_BLINDING_new.3 BN_CTX_new.3 \
 	BN_CTX_start.3 BN_add.3 BN_add_word.3 BN_bn2bin.3 BN_cmp.3 \
 	BN_copy.3 BN_generate_prime.3 BN_mod_inverse.3 \
@@ -324,48 +359,13 @@ dist_man_MANS = ASN1_OBJECT_new.3 ASN1_STRING_length.3 \
 	d2i_X509_NAME.3 d2i_X509_REQ.3 d2i_X509_SIG.3 dh.3 dsa.3 ec.3 \
 	ecdsa.3 engine.3 evp.3 i2d_CMS_bio_stream.3 \
 	i2d_PKCS7_bio_stream.3 lh_stats.3 lhash.3 rsa.3 ui.3 \
-	ui_compat.3 x509.3 BIO_f_ssl.3 SSL_CIPHER_get_name.3 \
-	SSL_COMP_add_compression_method.3 \
-	SSL_CTX_add_extra_chain_cert.3 SSL_CTX_add_session.3 \
-	SSL_CTX_ctrl.3 SSL_CTX_flush_sessions.3 SSL_CTX_free.3 \
-	SSL_CTX_get_ex_new_index.3 SSL_CTX_get_verify_mode.3 \
-	SSL_CTX_load_verify_locations.3 SSL_CTX_new.3 \
-	SSL_CTX_sess_number.3 SSL_CTX_sess_set_cache_size.3 \
-	SSL_CTX_sess_set_get_cb.3 SSL_CTX_sessions.3 \
-	SSL_CTX_set_cert_store.3 SSL_CTX_set_cert_verify_callback.3 \
-	SSL_CTX_set_cipher_list.3 SSL_CTX_set_client_CA_list.3 \
-	SSL_CTX_set_client_cert_cb.3 SSL_CTX_set_default_passwd_cb.3 \
-	SSL_CTX_set_generate_session_id.3 SSL_CTX_set_info_callback.3 \
-	SSL_CTX_set_max_cert_list.3 SSL_CTX_set_mode.3 \
-	SSL_CTX_set_msg_callback.3 SSL_CTX_set_options.3 \
-	SSL_CTX_set_psk_client_callback.3 SSL_CTX_set_quiet_shutdown.3 \
-	SSL_CTX_set_session_cache_mode.3 \
-	SSL_CTX_set_session_id_context.3 SSL_CTX_set_ssl_version.3 \
-	SSL_CTX_set_timeout.3 SSL_CTX_set_tmp_dh_callback.3 \
-	SSL_CTX_set_tmp_rsa_callback.3 SSL_CTX_set_verify.3 \
-	SSL_CTX_use_certificate.3 SSL_CTX_use_psk_identity_hint.3 \
-	SSL_SESSION_free.3 SSL_SESSION_get_ex_new_index.3 \
-	SSL_SESSION_get_time.3 SSL_accept.3 SSL_alert_type_string.3 \
-	SSL_clear.3 SSL_connect.3 SSL_do_handshake.3 SSL_free.3 \
-	SSL_get_SSL_CTX.3 SSL_get_ciphers.3 SSL_get_client_CA_list.3 \
-	SSL_get_current_cipher.3 SSL_get_default_timeout.3 \
-	SSL_get_error.3 SSL_get_ex_data_X509_STORE_CTX_idx.3 \
-	SSL_get_ex_new_index.3 SSL_get_fd.3 SSL_get_peer_cert_chain.3 \
-	SSL_get_peer_certificate.3 SSL_get_psk_identity.3 \
-	SSL_get_rbio.3 SSL_get_session.3 SSL_get_verify_result.3 \
-	SSL_get_version.3 SSL_library_init.3 SSL_load_client_CA_file.3 \
-	SSL_new.3 SSL_pending.3 SSL_read.3 SSL_rstate_string.3 \
-	SSL_session_reused.3 SSL_set_bio.3 SSL_set_connect_state.3 \
-	SSL_set_fd.3 SSL_set_session.3 SSL_set_shutdown.3 \
-	SSL_set_verify_result.3 SSL_shutdown.3 SSL_state_string.3 \
-	SSL_want.3 SSL_write.3 d2i_SSL_SESSION.3 ssl.3 asn1parse.1 \
-	ca.1 ciphers.1 cms.1 config.1 crl.1 crl2pkcs7.1 dgst.1 \
-	dhparam.1 dsa.1 dsaparam.1 ec.1 ecparam.1 enc.1 errstr.1 \
-	gendsa.1 genpkey.1 genrsa.1 nseq.1 ocsp.1 openssl.1 passwd.1 \
-	pkcs12.1 pkcs7.1 pkcs8.1 pkey.1 pkeyparam.1 pkeyutl.1 rand.1 \
-	req.1 rsa.1 rsautl.1 s_client.1 s_server.1 s_time.1 sess_id.1 \
-	smime.1 speed.1 spkac.1 ts.1 verify.1 version.1 x509.1 \
-	x509v3_config.1 openssl.1
+	ui_compat.3 x509.3 asn1parse.1 ca.1 ciphers.1 cms.1 config.1 \
+	crl.1 crl2pkcs7.1 dgst.1 dhparam.1 dsa.1 dsaparam.1 ec.1 \
+	ecparam.1 enc.1 errstr.1 gendsa.1 genpkey.1 genrsa.1 nseq.1 \
+	ocsp.1 openssl.1 passwd.1 pkcs12.1 pkcs7.1 pkcs8.1 pkey.1 \
+	pkeyparam.1 pkeyutl.1 rand.1 req.1 rsa.1 rsautl.1 s_client.1 \
+	s_server.1 s_time.1 sess_id.1 smime.1 speed.1 spkac.1 ts.1 \
+	verify.1 version.1 x509.1 x509v3_config.1 openssl.1
 all: all-am
 
 .SUFFIXES:
@@ -1047,12 +1047,18 @@ install-data-hook:
 	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_CIPHER_param_to_asn1.3
 	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_CIPHER_type.3
 	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_CipherFinal.3
+	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_CipherFinal_ex.3
 	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_CipherInit.3
+	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_CipherInit_ex.3
 	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_CipherUpdate.3
 	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_DecryptFinal.3
+	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_DecryptFinal_ex.3
 	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_DecryptInit.3
+	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_DecryptInit_ex.3
 	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_DecryptUpdate.3
 	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_EncryptFinal.3
+	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_EncryptFinal_ex.3
+	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_EncryptInit_ex.3
 	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_EncryptUpdate.3
 	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_aes_128_ccm.3
 	ln -f $(DESTDIR)$(mandir)/man3/EVP_EncryptInit.3 $(DESTDIR)$(mandir)/man3/EVP_aes_128_gcm.3

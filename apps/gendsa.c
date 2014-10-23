@@ -1,4 +1,4 @@
-/* $OpenBSD: gendsa.c,v 1.30 2014/07/14 00:35:10 deraadt Exp $ */
+/* $OpenBSD: gendsa.c,v 1.31 2014/07/25 06:05:32 doug Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *

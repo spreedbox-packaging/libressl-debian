@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_clnt.c,v 1.31 2014/07/12 22:33:39 jsing Exp $ */
+/* $OpenBSD: d1_clnt.c,v 1.34 2014/08/10 14:42:55 jsing Exp $ */
 /*
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
@@ -145,8 +145,6 @@ const SSL_METHOD DTLSv1_client_method_data = {
 	.ssl_dispatch_alert = dtls1_dispatch_alert,
 	.ssl_ctrl = dtls1_ctrl,
 	.ssl_ctx_ctrl = ssl3_ctx_ctrl,
-	.get_cipher_by_char = ssl3_get_cipher_by_char,
-	.put_cipher_by_char = ssl3_put_cipher_by_char,
 	.ssl_pending = ssl3_pending,
 	.num_ciphers = ssl3_num_ciphers,
 	.get_cipher = dtls1_get_cipher,
@@ -820,7 +818,7 @@ dtls1_client_hello(SSL *s)
 		p += s->d1->cookie_len;
 
 		/* Ciphers supported */
-		i = ssl_cipher_list_to_bytes(s, SSL_get_ciphers(s), &(p[2]), 0);
+		i = ssl_cipher_list_to_bytes(s, SSL_get_ciphers(s), &p[2]);
 		if (i == 0) {
 			SSLerr(SSL_F_DTLS1_CLIENT_HELLO,
 			    SSL_R_NO_CIPHERS_AVAILABLE);
@@ -984,7 +982,7 @@ dtls1_send_client_key_exchange(SSL *s)
 			    s->session->master_key,
 			    tmp_buf, sizeof tmp_buf);
 			OPENSSL_cleanse(tmp_buf, sizeof tmp_buf);
-		} else if (alg_k & (SSL_kDHE|SSL_kDHr|SSL_kDHd)) {
+		} else if (alg_k & SSL_kDHE) {
 			DH *dh_srvr, *dh_clnt;
 
 			if (s->session->sess_cert->peer_dh_tmp != NULL)

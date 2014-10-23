@@ -1,4 +1,4 @@
-/* $OpenBSD: s_time.c,v 1.33 2014/07/12 19:31:21 jsing Exp $ */
+/* $OpenBSD: s_time.c,v 1.1 2014/08/26 17:47:25 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -63,6 +63,7 @@
    Written and donated by Larry Streepy <streepy@healthcare.com>
   -----------------------------------------*/
 
+#include <sys/select.h>
 #include <sys/socket.h>
 
 #include <stdio.h>
@@ -212,8 +213,6 @@ parseArgs(int argc, char **argv)
 		else if (strcmp(*argv, "-new") == 0)
 			perform = 1;
 		else if (strcmp(*argv, "-verify") == 0) {
-			const char *errstr;
-
 			tm_verify = SSL_VERIFY_PEER | SSL_VERIFY_CLIENT_ONCE;
 			if (--argc < 1)
 				goto bad;
@@ -374,9 +373,9 @@ s_time_main(int argc, char **argv)
 			goto end;
 
 		if (s_www_path != NULL) {
-			int ret = snprintf(buf, sizeof buf,
+			int retval = snprintf(buf, sizeof buf,
 			    "GET %s HTTP/1.0\r\n\r\n", s_www_path);
-			if (ret == -1 || ret >= sizeof buf) {
+			if ((size_t)retval >= sizeof buf) {
 				fprintf(stderr, "URL too long\n");
 				goto end;
 			}
@@ -434,9 +433,9 @@ next:
 		goto end;
 	}
 	if (s_www_path != NULL) {
-		int ret = snprintf(buf, sizeof buf,
+		int retval = snprintf(buf, sizeof buf,
 		    "GET %s HTTP/1.0\r\n\r\n", s_www_path);
-		if (ret == -1 || ret >= sizeof buf) {
+		if ((size_t)retval >= sizeof buf) {
 			fprintf(stderr, "URL too long\n");
 			goto end;
 		}
@@ -467,9 +466,9 @@ next:
 			goto end;
 
 		if (s_www_path) {
-			int ret = snprintf(buf, sizeof buf,
+			int retval = snprintf(buf, sizeof buf,
 			    "GET %s HTTP/1.0\r\n\r\n", s_www_path);
-			if (ret == -1 || ret >= sizeof buf) {
+			if ((size_t)retval >= sizeof buf) {
 				fprintf(stderr, "URL too long\n");
 				goto end;
 			}

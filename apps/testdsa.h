@@ -1,4 +1,4 @@
-/* $OpenBSD$ */
+/* $OpenBSD: testdsa.h,v 1.7 2014/06/12 15:49:27 deraadt Exp $ */
 
 DSA *get_dsa512(void);
 DSA *get_dsa1024(void);

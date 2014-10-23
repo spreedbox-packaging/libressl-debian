@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_sess.c,v 1.37 2014/07/12 23:59:11 jsing Exp $ */
+/* $OpenBSD: ssl_sess.c,v 1.40 2014/08/11 01:06:22 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -375,26 +375,6 @@ sess_id_done:
 				return 0;
 			}
 		}
-		if (s->tlsext_ecpointformatlist) {
-			free(ss->tlsext_ecpointformatlist);
-			if ((ss->tlsext_ecpointformatlist = malloc(s->tlsext_ecpointformatlist_length)) == NULL) {
-				SSLerr(SSL_F_SSL_GET_NEW_SESSION, ERR_R_MALLOC_FAILURE);
-				SSL_SESSION_free(ss);
-				return 0;
-			}
-			ss->tlsext_ecpointformatlist_length = s->tlsext_ecpointformatlist_length;
-			memcpy(ss->tlsext_ecpointformatlist, s->tlsext_ecpointformatlist, s->tlsext_ecpointformatlist_length);
-		}
-		if (s->tlsext_ellipticcurvelist) {
-			free(ss->tlsext_ellipticcurvelist);
-			if ((ss->tlsext_ellipticcurvelist = malloc(s->tlsext_ellipticcurvelist_length)) == NULL) {
-				SSLerr(SSL_F_SSL_GET_NEW_SESSION, ERR_R_MALLOC_FAILURE);
-				SSL_SESSION_free(ss);
-				return 0;
-			}
-			ss->tlsext_ellipticcurvelist_length = s->tlsext_ellipticcurvelist_length;
-			memcpy(ss->tlsext_ellipticcurvelist, s->tlsext_ellipticcurvelist, s->tlsext_ellipticcurvelist_length);
-		}
 	} else {
 		ss->session_id_length = 0;
 	}
@@ -558,18 +538,7 @@ ssl_get_prev_session(SSL *s, unsigned char *session_id, int len,
 	}
 
 	if (ret->cipher == NULL) {
-		unsigned char buf[5], *p;
-		unsigned long l;
-
-		p = buf;
-		l = ret->cipher_id;
-		l2n(l, p);
-
-		if ((ret->ssl_version >> 8) >= SSL3_VERSION_MAJOR)
-			ret->cipher = ssl_get_cipher_by_char(s, &(buf[2]));
-		else
-			ret->cipher = ssl_get_cipher_by_char(s, &(buf[1]));
-
+		ret->cipher = ssl3_get_cipher_by_id(ret->cipher_id);
 		if (ret->cipher == NULL)
 			goto err;
 	}
