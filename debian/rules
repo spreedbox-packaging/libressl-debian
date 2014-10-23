@@ -1,8 +1,14 @@
 #!/usr/bin/make -f
 #export DH_VERBOSE=1
 
+LIBRESSL_VERSION := $(shell dpkg-parsechangelog | egrep '^Version:' | cut -f 2 -d ' ' | cut -f 1 -d '-')
+
 %:
 	dh $@ --with autoreconf --parallel
+
+override_dh_autoreconf:
+	if [ ! -e "VERSION" ] ; then echo $(LIBRESSL_VERSION) > VERSION; fi
+	dh_autoreconf
 
 override_dh_auto_install:
 	dh_auto_install
