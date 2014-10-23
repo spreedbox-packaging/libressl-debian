@@ -1,4 +1,4 @@
-/* $OpenBSD: engine.c,v 1.26 2014/07/12 19:31:21 jsing Exp $ */
+/* $OpenBSD: engine.c,v 1.27 2014/07/14 00:35:10 deraadt Exp $ */
 /* Written by Richard Levitte <richard@levitte.org> for the OpenSSL
  * project 2000.
  */

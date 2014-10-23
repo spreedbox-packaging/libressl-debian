@@ -1,4 +1,4 @@
-/* $OpenBSD: verify.c,v 1.25 2014/07/12 17:54:31 jsing Exp $ */
+/* $OpenBSD: verify.c,v 1.1 2014/08/26 17:47:25 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -95,8 +95,6 @@ verify_main(int argc, char **argv)
 	if (cert_ctx == NULL)
 		goto end;
 	X509_STORE_set_verify_cb(cert_ctx, cb);
-
-	ERR_load_crypto_strings();
 
 	argc--;
 	argv++;

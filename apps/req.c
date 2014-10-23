@@ -1,4 +1,4 @@
-/* $OpenBSD: req.c,v 1.45 2014/07/09 21:02:35 tedu Exp $ */
+/* $OpenBSD: req.c,v 1.2 2014/08/28 14:23:52 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -97,7 +97,7 @@
 #define STRING_MASK	"string_mask"
 #define UTF8_IN		"utf8"
 
-#define DEFAULT_KEY_LENGTH	512
+#define DEFAULT_KEY_LENGTH	2048
 #define MIN_KEY_LENGTH		384
 
 
@@ -184,9 +184,8 @@ req_main(int argc, char **argv)
 	unsigned long chtype = MBSTRING_ASC;
 
 	req_conf = NULL;
-#ifndef OPENSSL_NO_DES
-	cipher = EVP_des_ede3_cbc();
-#endif
+	cipher = EVP_aes_256_cbc();
+	digest = EVP_sha256();
 
 	infile = NULL;
 	outfile = NULL;
@@ -399,7 +398,7 @@ bad:
 		BIO_printf(bio_err, " -reqopt arg    - various request text options\n\n");
 		goto end;
 	}
-	ERR_load_crypto_strings();
+
 	if (!app_passwd(bio_err, passargin, passargout, &passin, &passout)) {
 		BIO_printf(bio_err, "Error getting passwords\n");
 		goto end;

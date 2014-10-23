@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_ciph.c,v 1.65 2014/07/12 13:11:53 jsing Exp $ */
+/* $OpenBSD: ssl_ciph.c,v 1.69 2014/10/03 06:02:38 doug Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -249,27 +249,12 @@ static const SSL_CIPHER cipher_aliases[] = {
 		.algorithm_mkey = SSL_kRSA,
 	},
 	{
-		/* no such ciphersuites supported! */
-		.name = SSL_TXT_kDHr,
-		.algorithm_mkey = SSL_kDHr,
-	},
-	{
-		/* no such ciphersuites supported! */
-		.name = SSL_TXT_kDHd,
-		.algorithm_mkey = SSL_kDHd,
-	},
-	{
-		/* no such ciphersuites supported! */
-		.name = SSL_TXT_kDH,
-		.algorithm_mkey = SSL_kDHr|SSL_kDHd,
-	},
-	{
 		.name = SSL_TXT_kEDH,
 		.algorithm_mkey = SSL_kDHE,
 	},
 	{
 		.name = SSL_TXT_DH,
-		.algorithm_mkey = SSL_kDHr|SSL_kDHd|SSL_kDHE,
+		.algorithm_mkey = SSL_kDHE,
 	},
 	
 	{
@@ -316,11 +301,6 @@ static const SSL_CIPHER cipher_aliases[] = {
 		.algorithm_auth = SSL_aNULL,
 	},
 	{
-		/* no such ciphersuites supported! */
-		.name = SSL_TXT_aDH,
-		.algorithm_auth = SSL_aDH,
-	},
-	{
 		.name = SSL_TXT_aECDH,
 		.algorithm_auth = SSL_aECDH,
 	},
@@ -347,8 +327,18 @@ static const SSL_CIPHER cipher_aliases[] = {
 	
 	/* aliases combining key exchange and server authentication */
 	{
+		.name = SSL_TXT_DHE,
+		.algorithm_mkey = SSL_kDHE,
+		.algorithm_auth = ~SSL_aNULL,
+	},
+	{
 		.name = SSL_TXT_EDH,
 		.algorithm_mkey = SSL_kDHE,
+		.algorithm_auth = ~SSL_aNULL,
+	},
+	{
+		.name = SSL_TXT_ECDHE,
+		.algorithm_mkey = SSL_kECDHE,
 		.algorithm_auth = ~SSL_aNULL,
 	},
 	{
@@ -432,6 +422,10 @@ static const SSL_CIPHER cipher_aliases[] = {
 	{
 		.name = SSL_TXT_CAMELLIA,
 		.algorithm_enc = SSL_CAMELLIA128|SSL_CAMELLIA256,
+	},
+	{
+		.name = SSL_TXT_CHACHA20,
+		.algorithm_enc = SSL_CHACHA20POLY1305,
 	},
 	
 	/* MAC aliases */
@@ -836,7 +830,8 @@ ll_append_head(CIPHER_ORDER **head, CIPHER_ORDER *curr,
 }
 
 static void
-ssl_cipher_get_disabled(unsigned long *mkey, unsigned long *auth, unsigned long *enc, unsigned long *mac, unsigned long *ssl)
+ssl_cipher_get_disabled(unsigned long *mkey, unsigned long *auth,
+    unsigned long *enc, unsigned long *mac, unsigned long *ssl)
 {
 	*mkey = 0;
 	*auth = 0;
@@ -844,18 +839,17 @@ ssl_cipher_get_disabled(unsigned long *mkey, unsigned long *auth, unsigned long 
 	*mac = 0;
 	*ssl = 0;
 
-	*mkey |= SSL_kDHr|SSL_kDHd; /* no such ciphersuites supported! */
-	*auth |= SSL_aDH;
-
-	/* Check for presence of GOST 34.10 algorithms, and if they
-	 * do not present, disable  appropriate auth and key exchange */
+	/*
+	 * Check for presence of GOST 34.10 algorithms, and if they
+	 * do not present, disable  appropriate auth and key exchange.
+	 */
 	if (!get_optional_pkey_id("gost94")) {
 		*auth |= SSL_aGOST94;
 	}
 	if (!get_optional_pkey_id("gost2001")) {
 		*auth |= SSL_aGOST01;
 	}
-	/* Disable GOST key exchange if no GOST signature algs are available * */
+	/* Disable GOST key exchange if no GOST signature algs are available. */
 	if ((*auth & (SSL_aGOST94|SSL_aGOST01)) == (SSL_aGOST94|SSL_aGOST01)) {
 		*mkey |= SSL_kGOST;
 	}
@@ -1474,7 +1468,6 @@ ssl_create_cipher_list(const SSL_METHOD *ssl_method,
 
 	/* Move ciphers without forward secrecy to the end */
 	ssl_cipher_apply_rule(0, 0, SSL_aECDH, 0, 0, 0, 0, CIPHER_ORD, -1, &head, &tail);
-	/* ssl_cipher_apply_rule(0, 0, SSL_aDH, 0, 0, 0, 0, CIPHER_ORD, -1, &head, &tail); */
 	ssl_cipher_apply_rule(0, SSL_kRSA, 0, 0, 0, 0, 0, CIPHER_ORD, -1, &head, &tail);
 
 	/* RC4 is sort-of broken -- move the the end */
@@ -1576,7 +1569,6 @@ ssl_create_cipher_list(const SSL_METHOD *ssl_method,
 char *
 SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 {
-	static const char *fmt="%-23s %s Kx=%-8s Au=%-4s Enc=%-9s Mac=%-4s\n";
 	unsigned long alg_mkey, alg_auth, alg_enc, alg_mac, alg_ssl, alg2;
 	const char *ver, *kx, *au, *enc, *mac;
 	char *ret;
@@ -1603,12 +1595,6 @@ SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 	case SSL_kRSA:
 		kx = "RSA";
 		break;
-	case SSL_kDHr:
-		kx = "DH/RSA";
-		break;
-	case SSL_kDHd:
-		kx = "DH/DSS";
-		break;
 	case SSL_kDHE:
 		kx = "DH";
 		break;
@@ -1631,9 +1617,6 @@ SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 		break;
 	case SSL_aDSS:
 		au = "DSS";
-		break;
-	case SSL_aDH:
-		au = "DH";
 		break;
 	case SSL_aECDH:
 		au = "ECDH";
@@ -1718,7 +1701,8 @@ SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 		break;
 	}
 
-	if (asprintf(&ret, fmt, cipher->name, ver, kx, au, enc, mac) == -1)
+	if (asprintf(&ret, "%-23s %s Kx=%-8s Au=%-4s Enc=%-9s Mac=%-4s\n",
+	    cipher->name, ver, kx, au, enc, mac) == -1)
 		return "OPENSSL_malloc Error";
 
 	if (buf != NULL) {

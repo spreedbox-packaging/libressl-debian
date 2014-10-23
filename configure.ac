@@ -1,4 +1,4 @@
-AC_INIT([libressl], [2.0.5])
++AC_INIT([libressl], m4_esyscmd([tr -d '\n' < VERSION]))
 AC_CANONICAL_HOST
 AM_INIT_AUTOMAKE([subdir-objects])
 AC_CONFIG_MACRO_DIR([m4])
@@ -6,7 +6,7 @@ AC_CONFIG_MACRO_DIR([m4])
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
 AC_SUBST([USER_CFLAGS], "-O2 $CFLAGS")
-CFLAGS="$CFLAGS -Wall -std=c99 -g"
+CFLAGS="$CFLAGS -Wall -std=gnu99 -g"
 
 case $host_os in
 	*darwin*)
@@ -15,7 +15,7 @@ case $host_os in
 		;;
 	*linux*)
 		HOST_OS=linux;
-		CFLAGS="$CFLAGS -D_BSD_SOURCE -D_POSIX_SOURCE -D_GNU_SOURCE"
+		CFLAGS="$CFLAGS -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_SOURCE -D_GNU_SOURCE"
 		;;
 	*solaris*)
 		HOST_OS=solaris;
@@ -164,6 +164,10 @@ AC_ARG_WITH([enginesdir],
 	AS_HELP_STRING([--with-enginesdir], [Set the default engines directory (use with openssldir)]),
 	AC_DEFINE_UNQUOTED(ENGINESDIR, "$withval")
 )
+
+AC_ARG_ENABLE([asm],
+	AS_HELP_STRING([--disable-asm], [Disable assembly]))
+AS_IF([test "x$enable_asm" = "xno"], [CFLAGS="$CFLAGS -DOPENSSL_NO_ASM"])
 
 LT_INIT
 

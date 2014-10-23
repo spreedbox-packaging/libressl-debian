@@ -1,4 +1,4 @@
-/* $OpenBSD: s3_srvr.c,v 1.78 2014/07/12 22:33:39 jsing Exp $ */
+/* $OpenBSD: s3_srvr.c,v 1.85 2014/09/27 11:03:43 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -184,8 +184,6 @@ const SSL_METHOD SSLv3_server_method_data = {
 	.ssl_dispatch_alert = ssl3_dispatch_alert,
 	.ssl_ctrl = ssl3_ctrl,
 	.ssl_ctx_ctrl = ssl3_ctx_ctrl,
-	.get_cipher_by_char = ssl3_get_cipher_by_char,
-	.put_cipher_by_char = ssl3_put_cipher_by_char,
 	.ssl_pending = ssl3_pending,
 	.num_ciphers = ssl3_num_ciphers,
 	.get_cipher = ssl3_get_cipher,
@@ -422,8 +420,7 @@ ssl3_accept(SSL *s)
 			 * public key for key exchange.
 			 */
 			if (s->s3->tmp.use_rsa_tmp ||
-			    (alg_k & (SSL_kDHr|SSL_kDHd|SSL_kDHE)) ||
-			    (alg_k & SSL_kECDHE) ||
+			    (alg_k & (SSL_kDHE|SSL_kECDHE)) ||
 			    ((alg_k & SSL_kRSA) &&
 			     (s->cert->pkeys[SSL_PKEY_RSA_ENC].privatekey ==
 			     NULL))) {
@@ -1252,8 +1249,8 @@ ssl3_send_server_hello(SSL *s)
 {
 	unsigned char *buf;
 	unsigned char *p, *d;
-	int i, sl;
 	unsigned long l;
+	int sl;
 
 	if (s->state == SSL3_ST_SW_SRVR_HELLO_A) {
 		buf = (unsigned char *)s->init_buf->data;
@@ -1300,8 +1297,7 @@ ssl3_send_server_hello(SSL *s)
 		p += sl;
 
 		/* put the cipher */
-		i = ssl3_put_cipher_by_char(s->s3->tmp.new_cipher, p);
-		p += i;
+		s2n(ssl3_cipher_get_value(s->s3->tmp.new_cipher), p);
 
 		/* put the compression method */
 		*(p++) = 0;
@@ -1440,8 +1436,8 @@ ssl3_send_server_key_exchange(SSL *s)
 				    ERR_R_DH_LIB);
 				goto err;
 			}
-
 			s->s3->tmp.dh = dh;
+
 			if ((dhp->pub_key == NULL || dhp->priv_key == NULL ||
 			    (s->options & SSL_OP_SINGLE_DH_USE))) {
 				if (!DH_generate_key(dh)) {
@@ -1469,9 +1465,15 @@ ssl3_send_server_key_exchange(SSL *s)
 			const EC_GROUP *group;
 
 			ecdhp = cert->ecdh_tmp;
-			if (ecdhp == NULL && s->cert->ecdh_tmp_cb != NULL)
+			if (s->cert->ecdh_tmp_auto != 0) {
+				int nid = tls1_get_shared_curve(s);
+				if (nid != NID_undef)
+					ecdhp = EC_KEY_new_by_curve_name(nid);
+			} else if (ecdhp == NULL &&
+			    s->cert->ecdh_tmp_cb != NULL) {
 				ecdhp = s->cert->ecdh_tmp_cb(s, 0,
 				    SSL_C_PKEYLENGTH(s->s3->tmp.new_cipher));
+			}
 			if (ecdhp == NULL) {
 				al = SSL_AD_HANDSHAKE_FAILURE;
 				SSLerr(SSL_F_SSL3_SEND_SERVER_KEY_EXCHANGE,
@@ -1486,18 +1488,15 @@ ssl3_send_server_key_exchange(SSL *s)
 			}
 
 			/* Duplicate the ECDH structure. */
-			if (ecdhp == NULL) {
+			if (s->cert->ecdh_tmp_auto != 0) {
+				ecdh = ecdhp;
+			} else if ((ecdh = EC_KEY_dup(ecdhp)) == NULL) {
 				SSLerr(SSL_F_SSL3_SEND_SERVER_KEY_EXCHANGE,
 				    ERR_R_ECDH_LIB);
 				goto err;
 			}
-			if ((ecdh = EC_KEY_dup(ecdhp)) == NULL) {
-				SSLerr(SSL_F_SSL3_SEND_SERVER_KEY_EXCHANGE,
-				    ERR_R_ECDH_LIB);
-				goto err;
-			}
-
 			s->s3->tmp.ecdh = ecdh;
+
 			if ((EC_KEY_get0_public_key(ecdh) == NULL) ||
 			    (EC_KEY_get0_private_key(ecdh) == NULL) ||
 			    (s->options & SSL_OP_SINGLE_ECDH_USE)) {
@@ -1609,7 +1608,7 @@ ssl3_send_server_key_exchange(SSL *s)
 			goto err;
 		}
 		d = (unsigned char *)s->init_buf->data;
-		p = &(d[4]);
+		p = &d[4];
 
 		for (i = 0; i < 4 && r[i] != NULL; i++) {
 			s2n(nr[i], p);
@@ -1656,12 +1655,12 @@ ssl3_send_server_key_exchange(SSL *s)
 					    (num == 2) ? s->ctx->md5 :
 					    s->ctx->sha1, NULL);
 					EVP_DigestUpdate(&md_ctx,
-					    &(s->s3->client_random[0]),
+					    s->s3->client_random,
 					    SSL3_RANDOM_SIZE);
 					EVP_DigestUpdate(&md_ctx,
-					    &(s->s3->server_random[0]),
+					    s->s3->server_random,
 					    SSL3_RANDOM_SIZE);
-					EVP_DigestUpdate(&md_ctx, &(d[4]), n);
+					EVP_DigestUpdate(&md_ctx, &d[4], n);
 					EVP_DigestFinal_ex(&md_ctx, q,
 					    (unsigned int *)&i);
 					q += i;
@@ -1691,13 +1690,13 @@ ssl3_send_server_key_exchange(SSL *s)
 				}
 				EVP_SignInit_ex(&md_ctx, md, NULL);
 				EVP_SignUpdate(&md_ctx,
-				    &(s->s3->client_random[0]),
+				    s->s3->client_random,
 				    SSL3_RANDOM_SIZE);
 				EVP_SignUpdate(&md_ctx,
-				    &(s->s3->server_random[0]),
+				    s->s3->server_random,
 				    SSL3_RANDOM_SIZE);
-				EVP_SignUpdate(&md_ctx, &(d[4]), n);
-				if (!EVP_SignFinal(&md_ctx, &(p[2]),
+				EVP_SignUpdate(&md_ctx, &d[4], n);
+				if (!EVP_SignFinal(&md_ctx, &p[2],
 					(unsigned int *)&i, pkey)) {
 					SSLerr(
 					    SSL_F_SSL3_SEND_SERVER_KEY_EXCHANGE,
@@ -1970,8 +1969,7 @@ ssl3_get_client_key_exchange(SSL *s)
 		    s->session->master_key,
 		    p, i);
 		OPENSSL_cleanse(p, i);
-	} else
-	if (alg_k & (SSL_kDHE|SSL_kDHr|SSL_kDHd)) {
+	} else if (alg_k & SSL_kDHE) {
 		if (2 > n)
 			goto truncated;
 		n2s(p, i);
@@ -2446,17 +2444,24 @@ ssl3_get_cert_verify(SSL *s)
 	    pkey->type == NID_id_GostR3410_2001) {
 		unsigned char signature[64];
 		int idx;
-		EVP_PKEY_CTX *pctx = EVP_PKEY_CTX_new(pkey, NULL);
-		EVP_PKEY_verify_init(pctx);
+		EVP_PKEY_CTX *pctx;
+	       
 		if (i != 64) {
 			SSLerr(SSL_F_SSL3_GET_CERT_VERIFY,
 			    SSL_R_WRONG_SIGNATURE_SIZE);
 			al = SSL_AD_DECODE_ERROR;
 			goto f_err;
 		}
-		for (idx = 0; idx < 64; idx++) {
-			signature[63 - idx] = p[idx];
+		pctx = EVP_PKEY_CTX_new(pkey, NULL);
+		if (pctx == NULL) {
+			SSLerr(SSL_F_SSL3_GET_CERT_VERIFY,
+			    ERR_R_INTERNAL_ERROR);
+			al = SSL_AD_DECODE_ERROR;
+			goto f_err;
 		}
+		EVP_PKEY_verify_init(pctx);
+		for (idx = 0; idx < 64; idx++)
+			signature[63 - idx] = p[idx];
 		j = EVP_PKEY_verify(pctx, signature, 64,
 		    s->s3->tmp.cert_verify_md, 32);
 		EVP_PKEY_CTX_free(pctx);

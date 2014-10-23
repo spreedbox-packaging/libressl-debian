@@ -1,4 +1,4 @@
-/* $OpenBSD: s_cb.c,v 1.21 2014/06/12 15:49:27 deraadt Exp $ */
+/* $OpenBSD: s_cb.c,v 1.22 2014/06/13 04:29:13 miod Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *

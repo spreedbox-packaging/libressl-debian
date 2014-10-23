@@ -1,4 +1,4 @@
-/* $OpenBSD: s_server.c,v 1.61 2014/07/14 00:35:10 deraadt Exp $ */
+/* $OpenBSD: s_server.c,v 1.1 2014/08/26 17:47:25 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -148,6 +148,7 @@
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
+#include <sys/select.h>
 #include <sys/socket.h>
 
 #include <assert.h>
@@ -1363,11 +1364,9 @@ sv_body(char *hostname, int s, unsigned char *context)
 		goto err;
 	}
 	if (s_nbio) {
-		unsigned long sl = 1;
-
 		if (!s_quiet)
 			BIO_printf(bio_err, "turning on non blocking io\n");
-		if (BIO_socket_ioctl(s, FIONBIO, &sl) < 0)
+		if (!BIO_socket_nbio(s, 1))
 			ERR_print_errors(bio_err);
 	}
 
@@ -1797,11 +1796,9 @@ www_body(char *hostname, int s, unsigned char *context)
 		goto err;
 
 	if (s_nbio) {
-		unsigned long sl = 1;
-
 		if (!s_quiet)
 			BIO_printf(bio_err, "turning on non blocking io\n");
-		if (BIO_socket_ioctl(s, FIONBIO, &sl) < 0)
+		if (!BIO_socket_nbio(s, 1))
 			ERR_print_errors(bio_err);
 	}
 

@@ -7,7 +7,7 @@ AM_CPPFLAGS += -I$(top_srcdir)/crypto/modes
 lib_LTLIBRARIES = libcrypto.la
 
 libcrypto_la_LIBADD = libcompat.la libcompatnoopt.la
-libcrypto_la_LDFLAGS = -version-info 30:0:0
+libcrypto_la_LDFLAGS = -version-info 30:1:0
 libcrypto_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS) -DOPENSSL_NO_HW_PADLOCK
 
 noinst_LTLIBRARIES = libcompat.la libcompatnoopt.la
