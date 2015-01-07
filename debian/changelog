@@ -1,3 +1,10 @@
+libressl (2.1.2-4ppa1~trusty1) trusty; urgency=low
+
+  * Install "tls.h" into "libressl" subfolder.
+  * Split up libraries into multiple packages.
+
+ -- Joachim Bauch <bauch@struktur.de>  Wed, 07 Jan 2015 16:24:20 +0100
+
 libressl (2.1.2-3ppa1~trusty1) trusty; urgency=low
 
   * Don't include symbols file, should only contain public API.
