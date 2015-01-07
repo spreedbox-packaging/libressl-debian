@@ -3,31 +3,17 @@
 key="$1"
 cert="$2"
 CA="-CAfile $3"
-extra="$4"
+ssltest="${4-./ssltest} -key $key -cert $cert -c_key $key -c_cert $cert"
+openssl=${5-openssl}
+extra="$6"
 
-ssltest="./ssltest -key $key -cert $cert -c_key $key -c_cert $cert"
-
-if openssl x509 -in $cert -text -noout | fgrep 'DSA Public Key' >/dev/null; then
+if $openssl x509 -in $cert -text -noout | fgrep 'DSA Public Key' >/dev/null; then
   dsa_cert=YES
 else
   dsa_cert=NO
 fi
 
 #############################################################################
-
-echo test sslv2
-$ssltest -ssl2 $extra || exit 1
-
-echo test sslv2 with server authentication
-$ssltest -ssl2 -server_auth $CA $extra || exit 1
-
-if [ $dsa_cert = NO ]; then
-  echo test sslv2 with client authentication
-  $ssltest -ssl2 -client_auth $CA $extra || exit 1
-
-  echo test sslv2 with both client and server authentication
-  $ssltest -ssl2 -server_auth -client_auth $CA $extra || exit 1
-fi
 
 echo test sslv3
 $ssltest -ssl3 $extra || exit 1
@@ -52,20 +38,6 @@ $ssltest -client_auth $CA $extra || exit 1
 
 echo test sslv2/sslv3 with both client and server authentication
 $ssltest -server_auth -client_auth $CA $extra || exit 1
-
-echo test sslv2 via BIO pair
-$ssltest -bio_pair -ssl2 $extra || exit 1
-
-echo test sslv2 with server authentication via BIO pair
-$ssltest -bio_pair -ssl2 -server_auth $CA $extra || exit 1
-
-if [ $dsa_cert = NO ]; then
-  echo test sslv2 with client authentication via BIO pair
-  $ssltest -bio_pair -ssl2 -client_auth $CA $extra || exit 1
-
-  echo test sslv2 with both client and server authentication via BIO pair
-  $ssltest -bio_pair -ssl2 -server_auth -client_auth $CA $extra || exit 1
-fi
 
 echo test sslv3 via BIO pair
 $ssltest -bio_pair -ssl3 $extra || exit 1
@@ -103,9 +75,9 @@ echo test sslv2/sslv3 with both client and server authentication via BIO pair an
 $ssltest -bio_pair -server_auth -client_auth -app_verify $CA $extra || exit 1
 
 echo "Testing ciphersuites"
-for protocol in TLSv1.2 SSLv3; do
+for protocol in SSLv3 TLSv1.2; do
   echo "Testing ciphersuites for $protocol"
-  for cipher in `openssl ciphers "RSA+$protocol" | tr ':' ' '`; do
+  for cipher in `$openssl ciphers "RSA+$protocol" | tr ':' ' '`; do
     echo "Testing $cipher"
     prot=""
     if [ $protocol = "SSLv3" ] ; then
@@ -121,20 +93,20 @@ done
 
 #############################################################################
 
-if openssl no-dh; then
+if $openssl no-dh; then
   echo skipping anonymous DH tests
 else
   echo test tls1 with 1024bit anonymous DH, multiple handshakes
   $ssltest -v -bio_pair -tls1 -cipher ADH -dhe1024dsa -num 10 -f -time $extra || exit 1
 fi
 
-#if openssl no-rsa; then
+#if $openssl no-rsa; then
 #  echo skipping RSA tests
 #else
 #  echo 'test tls1 with 1024bit RSA, no (EC)DHE, multiple handshakes'
 #  ./ssltest -v -bio_pair -tls1 -cert ../apps/server2.pem -no_dhe -no_ecdhe -num 10 -f -time $extra || exit 1
 #
-#  if openssl no-dh; then
+#  if $openssl no-dh; then
 #    echo skipping RSA+DHE tests
 #  else
 #    echo test tls1 with 1024bit RSA, 1024bit DHE, multiple handshakes
@@ -161,7 +133,7 @@ $ssltest -dtls1 -server_auth -client_auth $CA $extra || exit 1
 echo "Testing DTLS ciphersuites"
 for protocol in SSLv3; do
   echo "Testing ciphersuites for $protocol"
-  for cipher in `openssl ciphers "RSA+$protocol" | tr ':' '\n' |
+  for cipher in `$openssl ciphers "RSA+$protocol" | tr ':' '\n' |
     grep -v RC4`; do
     echo "Testing $cipher"
     $ssltest -cipher $cipher -dtls1

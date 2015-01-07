@@ -168,6 +168,9 @@ AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 CC = @CC@
+CCAS = @CCAS@
+CCASDEPMODE = @CCASDEPMODE@
+CCASFLAGS = @CCASFLAGS@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
 CPP = @CPP@
@@ -192,8 +195,11 @@ INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LD = @LD@
 LDFLAGS = @LDFLAGS@
+LIBCRYPTO_VERSION = @LIBCRYPTO_VERSION@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
+LIBSSL_VERSION = @LIBSSL_VERSION@
+LIBTLS_VERSION = @LIBTLS_VERSION@
 LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
@@ -216,6 +222,7 @@ PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PLATFORM_LDADD = @PLATFORM_LDADD@
+PROG_LDADD = @PROG_LDADD@
 RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
@@ -275,19 +282,19 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CPPFLAGS = -I$(top_srcdir)/include -DHAVE_CRYPTODEV \
-	-DLIBRESSL_INTERNAL
+AM_CPPFLAGS = -I$(top_srcdir)/include -DLIBRESSL_INTERNAL
 opensslincludedir = $(includedir)/openssl
 opensslinclude_HEADERS = aes.h asn1.h asn1_mac.h asn1t.h bio.h \
-	blowfish.h bn.h buffer.h cast.h chacha.h cmac.h cms.h comp.h \
-	conf.h conf_api.h crypto.h des.h dh.h dsa.h dso.h dtls1.h \
-	e_os2.h ec.h ecdh.h ecdsa.h engine.h err.h evp.h hmac.h idea.h \
-	krb5_asn.h lhash.h md4.h md5.h mdc2.h modes.h obj_mac.h \
-	objects.h ocsp.h opensslconf.h opensslfeatures.h opensslv.h \
-	ossl_typ.h pem.h pem2.h pkcs12.h pkcs7.h poly1305.h rand.h \
-	rc2.h rc4.h rc5.h ripemd.h rsa.h safestack.h sha.h srtp.h \
-	ssl.h ssl2.h ssl23.h ssl3.h stack.h tls1.h ts.h txt_db.h ui.h \
-	ui_compat.h whrlpool.h x509.h x509_vfy.h x509v3.h
+	blowfish.h bn.h buffer.h camellia.h cast.h chacha.h cmac.h \
+	cms.h comp.h conf.h conf_api.h crypto.h des.h dh.h dsa.h dso.h \
+	dtls1.h e_os2.h ec.h ecdh.h ecdsa.h engine.h err.h evp.h \
+	gost.h hmac.h idea.h krb5_asn.h lhash.h md4.h md5.h mdc2.h \
+	modes.h obj_mac.h objects.h ocsp.h opensslconf.h \
+	opensslfeatures.h opensslv.h ossl_typ.h pem.h pem2.h pkcs12.h \
+	pkcs7.h poly1305.h rand.h rc2.h rc4.h rc5.h ripemd.h rsa.h \
+	safestack.h sha.h srtp.h ssl.h ssl2.h ssl23.h ssl3.h stack.h \
+	tls1.h ts.h txt_db.h ui.h ui_compat.h whrlpool.h x509.h \
+	x509_vfy.h x509v3.h
 all: all-am
 
 .SUFFIXES:

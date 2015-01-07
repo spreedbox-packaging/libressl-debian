@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl3.h,v 1.25 2014/07/10 09:26:08 jsing Exp $ */
+/* $OpenBSD: ssl3.h,v 1.28 2014/10/31 15:34:06 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -353,7 +353,7 @@ typedef struct ssl3_buffer_st {
  * enough to contain all of the cert types defined either for
  * SSLv3 and TLSv1.
  */
-#define SSL3_CT_NUMBER			9
+#define SSL3_CT_NUMBER			11
 
 
 #define SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS	0x0001
@@ -472,8 +472,6 @@ typedef struct ssl3_state_st {
 		int ctype_num;
 		char ctype[SSL3_CT_NUMBER];
 		STACK_OF(X509_NAME) *ca_names;
-
-		int use_rsa_tmp;
 
 		int key_block_length;
 		unsigned char *key_block;

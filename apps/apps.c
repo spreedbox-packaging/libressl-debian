@@ -1,4 +1,4 @@
-/* $OpenBSD: apps.c,v 1.9 2014/08/30 15:14:03 jsing Exp $ */
+/* $OpenBSD: apps.c,v 1.12 2014/11/07 14:16:48 jsing Exp $ */
 /*
  * Copyright (c) 2014 Joel Sing <jsing@openbsd.org>
  *
@@ -2107,7 +2107,9 @@ pkey_ctrl_string(EVP_PKEY_CTX *ctx, char *value)
 	int rv;
 	char *stmp, *vtmp = NULL;
 
-	stmp = BUF_strdup(value);
+	if (value == NULL)
+		return -1;
+	stmp = strdup(value);
 	if (!stmp)
 		return -1;
 	vtmp = strchr(stmp, ':');
@@ -2161,7 +2163,7 @@ policies_print(BIO *out, X509_STORE_CTX *ctx)
 		BIO_free(out);
 }
 
-#if !defined(OPENSSL_NO_TLSEXT) && !defined(OPENSSL_NO_NEXTPROTONEG)
+#if !defined(OPENSSL_NO_NEXTPROTONEG)
 /* next_protos_parse parses a comma separated list of strings into a string
  * in a format suitable for passing to SSL_CTX_set_next_protos_advertised.
  *   outlen: (output) set to the length of the resulting buffer on success.
@@ -2201,28 +2203,7 @@ next_protos_parse(unsigned short *outlen, const char *in)
 	return out;
 }
 #endif
-/* !OPENSSL_NO_TLSEXT && !OPENSSL_NO_NEXTPROTONEG */
-
-double
-app_tminterval(int stop, int usertime)
-{
-	double ret = 0;
-	struct tms rus;
-	clock_t now = times(&rus);
-	static clock_t tmstart;
-
-	if (usertime)
-		now = rus.tms_utime;
-
-	if (stop == TM_START)
-		tmstart = now;
-	else {
-		long int tck = sysconf(_SC_CLK_TCK);
-		ret = (now - tmstart) / (double) tck;
-	}
-
-	return (ret);
-}
+/* !OPENSSL_NO_NEXTPROTONEG */
 
 int
 app_isdir(const char *name)
@@ -2339,7 +2320,7 @@ options_parse(int argc, char **argv, struct option *opts, char **unnamed)
 				if (opt->func(opt, NULL) != 0)
 					return (1);
 				break;
-				
+
 			case OPTION_FLAG:
 				*opt->opt.flag = 1;
 				break;

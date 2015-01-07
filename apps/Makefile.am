@@ -3,17 +3,11 @@ include $(top_srcdir)/Makefile.am.common
 bin_PROGRAMS = openssl
 
 openssl_CFLAGS = $(USER_CFLAGS)
-openssl_LDADD = $(PLATFORM_LDADD)
+openssl_LDADD = $(PLATFORM_LDADD) $(PROG_LDADD)
 openssl_LDADD += $(top_builddir)/ssl/libssl.la
 openssl_LDADD += $(top_builddir)/crypto/libcrypto.la
 
-openssl_SOURCES =
-noinst_HEADERS =
-
-if NO_STRTONUM
-openssl_SOURCES += strtonum.c
-endif
-openssl_SOURCES += apps.c
+openssl_SOURCES = apps.c
 openssl_SOURCES += asn1pars.c
 openssl_SOURCES += ca.c
 openssl_SOURCES += ciphers.c
@@ -62,9 +56,27 @@ openssl_SOURCES += ts.c
 openssl_SOURCES += verify.c
 openssl_SOURCES += version.c
 openssl_SOURCES += x509.c
-noinst_HEADERS += apps.h
+
+if HOST_WIN
+openssl_SOURCES += apps_win.c
+else
+openssl_SOURCES += apps_posix.c
+endif
+
+if !HAVE_POLL
+if HOST_WIN
+openssl_SOURCES += poll_win.c
+endif
+endif
+
+if !HAVE_STRTONUM
+openssl_SOURCES += strtonum.c
+endif
+
+noinst_HEADERS = apps.h
 noinst_HEADERS += progs.h
 noinst_HEADERS += s_apps.h
 noinst_HEADERS += testdsa.h
 noinst_HEADERS += testrsa.h
 noinst_HEADERS += timeouts.h
+noinst_HEADERS += openssl.cnf
