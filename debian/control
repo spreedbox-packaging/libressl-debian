@@ -14,7 +14,7 @@ Homepage: http://www.libressl.org/
 Vcs-Git: http://git.intranet.struktur.de/debian/libressl.git
 Vcs-Browser: http://git.intranet.struktur.de/debian/libressl
 
-Package: libressl-1
+Package: libressl-crypto-30
 Architecture: any
 Multi-Arch: same
 Depends:
@@ -22,16 +22,48 @@ Depends:
  ${shlibs:Depends}
 Conflicts:
  libressl-0
-Description: SSL library, forked from OpenSSL
+Description: SSL library, forked from OpenSSL - crypto library
  LibreSSL strives to maintain API compatibility with OpenSSL, but
  do away with all the cruft.
+ .
+ This package provides the "-crypto" library.
+
+Package: libressl-ssl-29
+Architecture: any
+Multi-Arch: same
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends}
+Conflicts:
+ libressl-0
+Description: SSL library, forked from OpenSSL - SSL library
+ LibreSSL strives to maintain API compatibility with OpenSSL, but
+ do away with all the cruft.
+ .
+ This package provides the "-ssl" library.
+
+Package: libressl-tls-1
+Architecture: any
+Multi-Arch: same
+Depends:
+ ${misc:Depends},
+ ${shlibs:Depends}
+Conflicts:
+ libressl-0
+Description: SSL library, forked from OpenSSL - TLS library
+ LibreSSL strives to maintain API compatibility with OpenSSL, but
+ do away with all the cruft.
+ .
+ This package provides the "-tls" library.
 
 Package: libressl-apps
 Section: utils
 Architecture: any
 Multi-Arch: same
 Depends:
- libressl-1 (= ${binary:Version}),
+ libressl-crypto-30 (= ${binary:Version}),
+ libressl-ssl-29 (= ${binary:Version}),
+ libressl-tls-1 (= ${binary:Version}),
  ${misc:Depends},
  ${shlibs:Depends}
 Description: SSL library, forked from OpenSSL - applications
@@ -45,7 +77,9 @@ Section: libdevel
 Multi-Arch: same
 Architecture: any
 Depends:
- libressl-1 (= ${binary:Version}),
+ libressl-crypto-30 (= ${binary:Version}),
+ libressl-ssl-29 (= ${binary:Version}),
+ libressl-tls-1 (= ${binary:Version}),
  ${misc:Depends}
 Description: SSL library, forked from OpenSSL - development files
  LibreSSL strives to maintain API compatibility with OpenSSL, but
@@ -67,18 +101,66 @@ Description: SSL library, forked from OpenSSL - documentation
  .
  The documentation for libressl is provided by this package.
 
-Package: libressl-dbg
+Package: libressl-apps-dbg
 Section: debug
 Priority: extra
 Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
 Depends:
- libressl-1 (= ${binary:Version}),
+ libressl-apps (= ${binary:Version}),
  ${misc:Depends}
-Description: SSL library, forked from OpenSSL - debug symbols
+Description: SSL library, forked from OpenSSL - applications debug symbols
  LibreSSL strives to maintain API compatibility with OpenSSL, but
  do away with all the cruft.
  .
  The debugging symbols for tracking down bugs in applications that
- use libressl are provided by this package.
+ use libressl-apps are provided by this package.
+
+Package: libressl-crypto-dbg
+Section: debug
+Priority: extra
+Architecture: any
+Multi-Arch: same
+Pre-Depends: ${misc:Pre-Depends}
+Depends:
+ libressl-crypto-30 (= ${binary:Version}),
+ ${misc:Depends}
+Description: SSL library, forked from OpenSSL - crypto debug symbols
+ LibreSSL strives to maintain API compatibility with OpenSSL, but
+ do away with all the cruft.
+ .
+ The debugging symbols for tracking down bugs in applications that
+ use libressl-crypto are provided by this package.
+
+Package: libressl-ssl-dbg
+Section: debug
+Priority: extra
+Architecture: any
+Multi-Arch: same
+Pre-Depends: ${misc:Pre-Depends}
+Depends:
+ libressl-ssl-29 (= ${binary:Version}),
+ ${misc:Depends}
+Description: SSL library, forked from OpenSSL - SSL debug symbols
+ LibreSSL strives to maintain API compatibility with OpenSSL, but
+ do away with all the cruft.
+ .
+ The debugging symbols for tracking down bugs in applications that
+ use libressl-ssl are provided by this package.
+
+Package: libressl-tls-dbg
+Section: debug
+Priority: extra
+Architecture: any
+Multi-Arch: same
+Pre-Depends: ${misc:Pre-Depends}
+Depends:
+ libressl-tls-1 (= ${binary:Version}),
+ ${misc:Depends}
+Description: SSL library, forked from OpenSSL - TLS debug symbols
+ LibreSSL strives to maintain API compatibility with OpenSSL, but
+ do away with all the cruft.
+ .
+ The debugging symbols for tracking down bugs in applications that
+ use libressl-tls are provided by this package.
