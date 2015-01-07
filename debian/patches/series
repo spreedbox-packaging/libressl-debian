@@ -1,2 +1,3 @@
 rename_libraries.patch
 change_include_path.patch
+link_libraries.patch
