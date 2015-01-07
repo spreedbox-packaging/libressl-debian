@@ -1,3 +1,14 @@
+libressl (2.1.2-1ppa1~trusty1) trusty; urgency=low
+
+  * Imported Upstream version 2.1.2
+  * Updated patches for new upstream version 2.1.2.
+  * Binary API changed, need to rename package.
+  * Also build and include libtls library.
+  * Added symbols file.
+  * Explicitly link dependencies.
+
+ -- Joachim Bauch <bauch@struktur.de>  Wed, 07 Jan 2015 14:49:44 +0100
+
 libressl (2.1.1-1ppa1~trusty1) trusty; urgency=low
 
   * Imported Upstream version 2.1.1
