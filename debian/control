@@ -14,7 +14,7 @@ Homepage: http://www.libressl.org/
 Vcs-Git: http://git.intranet.struktur.de/debian/libressl.git
 Vcs-Browser: http://git.intranet.struktur.de/debian/libressl
 
-Package: libressl-0
+Package: libressl-1
 Architecture: any
 Multi-Arch: same
 Depends:
@@ -29,7 +29,7 @@ Section: utils
 Architecture: any
 Multi-Arch: same
 Depends:
- libressl-0 (= ${binary:Version}),
+ libressl-1 (= ${binary:Version}),
  ${misc:Depends},
  ${shlibs:Depends}
 Description: SSL library, forked from OpenSSL - applications
@@ -43,7 +43,7 @@ Section: libdevel
 Multi-Arch: same
 Architecture: any
 Depends:
- libressl-0 (= ${binary:Version}),
+ libressl-1 (= ${binary:Version}),
  ${misc:Depends}
 Description: SSL library, forked from OpenSSL - development files
  LibreSSL strives to maintain API compatibility with OpenSSL, but
@@ -72,7 +72,7 @@ Architecture: any
 Multi-Arch: same
 Pre-Depends: ${misc:Pre-Depends}
 Depends:
- libressl-0 (= ${binary:Version}),
+ libressl-1 (= ${binary:Version}),
  ${misc:Depends}
 Description: SSL library, forked from OpenSSL - debug symbols
  LibreSSL strives to maintain API compatibility with OpenSSL, but
