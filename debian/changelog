@@ -1,3 +1,9 @@
+libressl (2.1.2-2ppa1~precise1) precise; urgency=low
+
+  * Need to "Conflict" with previous package due to same filename.
+
+ -- Joachim Bauch <bauch@struktur.de>  Wed, 07 Jan 2015 15:05:40 +0100
+
 libressl (2.1.2-1ppa1~precise1) precise; urgency=low
 
   * Imported Upstream version 2.1.2
