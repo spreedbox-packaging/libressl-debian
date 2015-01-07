@@ -1,0 +1,25 @@
+Index: libressl/ssl/Makefile.am
+===================================================================
+--- libressl.orig/ssl/Makefile.am	2015-01-07 14:04:46.000000000 +0100
++++ libressl/ssl/Makefile.am	2015-01-07 14:05:00.000000000 +0100
+@@ -6,6 +6,7 @@
+ 
+ libressl_ssl_la_LDFLAGS = -version-info @LIBSSL_VERSION@
+ libressl_ssl_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
++libressl_ssl_la_LIBADD = $(top_builddir)/crypto/libressl-crypto.la
+ 
+ libressl_ssl_la_SOURCES = bio_ssl.c
+ libressl_ssl_la_SOURCES += d1_both.c
+Index: libressl/tls/Makefile.am
+===================================================================
+--- libressl.orig/tls/Makefile.am	2015-01-07 14:04:46.000000000 +0100
++++ libressl/tls/Makefile.am	2015-01-07 14:05:06.000000000 +0100
+@@ -7,6 +7,8 @@
+ 
+ libressl_tls_la_LDFLAGS = -version-info @LIBTLS_VERSION@
+ libressl_tls_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
++libressl_tls_la_LIBADD = $(top_builddir)/ssl/libressl-ssl.la
++libressl_tls_la_LIBADD += $(top_builddir)/crypto/libressl-crypto.la
+ 
+ libressl_tls_la_SOURCES = tls.c
+ libressl_tls_la_SOURCES += tls_client.c
