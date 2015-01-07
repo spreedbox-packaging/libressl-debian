@@ -1,3 +1,9 @@
+libressl (2.1.2-3ppa1~precise1) precise; urgency=low
+
+  * Don't include symbols file, should only contain public API.
+
+ -- Joachim Bauch <bauch@struktur.de>  Wed, 07 Jan 2015 15:28:55 +0100
+
 libressl (2.1.2-2ppa1~precise1) precise; urgency=low
 
   * Need to "Conflict" with previous package due to same filename.
