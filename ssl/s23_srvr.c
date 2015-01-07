@@ -1,4 +1,4 @@
-/* $OpenBSD: s23_srvr.c,v 1.33 2014/08/07 19:46:31 miod Exp $ */
+/* $OpenBSD: s23_srvr.c,v 1.35 2014/10/18 16:13:16 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -110,11 +110,12 @@
  */
 
 #include <stdio.h>
+
 #include "ssl_locl.h"
+
 #include <openssl/buffer.h>
-#include <openssl/rand.h>
-#include <openssl/objects.h>
 #include <openssl/evp.h>
+#include <openssl/objects.h>
 
 static const SSL_METHOD *ssl23_get_server_method(int ver);
 int ssl23_get_client_hello(SSL *s);

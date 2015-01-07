@@ -82,7 +82,10 @@ host_triplet = @host@
 DIST_COMMON = $(top_srcdir)/Makefile.am.common $(srcdir)/Makefile.in \
 	$(srcdir)/Makefile.am $(top_srcdir)/depcomp $(noinst_HEADERS)
 bin_PROGRAMS = openssl$(EXEEXT)
-@NO_STRTONUM_TRUE@am__append_1 = strtonum.c
+@HOST_WIN_TRUE@am__append_1 = apps_win.c
+@HOST_WIN_FALSE@am__append_2 = apps_posix.c
+@HAVE_POLL_FALSE@@HOST_WIN_TRUE@am__append_3 = poll_win.c
+@HAVE_STRTONUM_FALSE@am__append_4 = strtonum.c
 subdir = apps
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
@@ -96,43 +99,48 @@ CONFIG_CLEAN_FILES =
 CONFIG_CLEAN_VPATH_FILES =
 am__installdirs = "$(DESTDIR)$(bindir)"
 PROGRAMS = $(bin_PROGRAMS)
-am__openssl_SOURCES_DIST = strtonum.c apps.c asn1pars.c ca.c ciphers.c \
-	cms.c crl.c crl2p7.c dgst.c dh.c dhparam.c dsa.c dsaparam.c \
-	ec.c ecparam.c enc.c engine.c errstr.c gendh.c gendsa.c \
-	genpkey.c genrsa.c nseq.c ocsp.c openssl.c passwd.c pkcs12.c \
-	pkcs7.c pkcs8.c pkey.c pkeyparam.c pkeyutl.c prime.c rand.c \
-	req.c rsa.c rsautl.c s_cb.c s_client.c s_server.c s_socket.c \
+am__openssl_SOURCES_DIST = apps.c asn1pars.c ca.c ciphers.c cms.c \
+	crl.c crl2p7.c dgst.c dh.c dhparam.c dsa.c dsaparam.c ec.c \
+	ecparam.c enc.c engine.c errstr.c gendh.c gendsa.c genpkey.c \
+	genrsa.c nseq.c ocsp.c openssl.c passwd.c pkcs12.c pkcs7.c \
+	pkcs8.c pkey.c pkeyparam.c pkeyutl.c prime.c rand.c req.c \
+	rsa.c rsautl.c s_cb.c s_client.c s_server.c s_socket.c \
 	s_time.c sess_id.c smime.c speed.c spkac.c ts.c verify.c \
-	version.c x509.c
-@NO_STRTONUM_TRUE@am__objects_1 = openssl-strtonum.$(OBJEXT)
-am_openssl_OBJECTS = $(am__objects_1) openssl-apps.$(OBJEXT) \
-	openssl-asn1pars.$(OBJEXT) openssl-ca.$(OBJEXT) \
-	openssl-ciphers.$(OBJEXT) openssl-cms.$(OBJEXT) \
-	openssl-crl.$(OBJEXT) openssl-crl2p7.$(OBJEXT) \
-	openssl-dgst.$(OBJEXT) openssl-dh.$(OBJEXT) \
-	openssl-dhparam.$(OBJEXT) openssl-dsa.$(OBJEXT) \
-	openssl-dsaparam.$(OBJEXT) openssl-ec.$(OBJEXT) \
-	openssl-ecparam.$(OBJEXT) openssl-enc.$(OBJEXT) \
-	openssl-engine.$(OBJEXT) openssl-errstr.$(OBJEXT) \
-	openssl-gendh.$(OBJEXT) openssl-gendsa.$(OBJEXT) \
-	openssl-genpkey.$(OBJEXT) openssl-genrsa.$(OBJEXT) \
-	openssl-nseq.$(OBJEXT) openssl-ocsp.$(OBJEXT) \
-	openssl-openssl.$(OBJEXT) openssl-passwd.$(OBJEXT) \
-	openssl-pkcs12.$(OBJEXT) openssl-pkcs7.$(OBJEXT) \
-	openssl-pkcs8.$(OBJEXT) openssl-pkey.$(OBJEXT) \
-	openssl-pkeyparam.$(OBJEXT) openssl-pkeyutl.$(OBJEXT) \
-	openssl-prime.$(OBJEXT) openssl-rand.$(OBJEXT) \
-	openssl-req.$(OBJEXT) openssl-rsa.$(OBJEXT) \
-	openssl-rsautl.$(OBJEXT) openssl-s_cb.$(OBJEXT) \
-	openssl-s_client.$(OBJEXT) openssl-s_server.$(OBJEXT) \
-	openssl-s_socket.$(OBJEXT) openssl-s_time.$(OBJEXT) \
-	openssl-sess_id.$(OBJEXT) openssl-smime.$(OBJEXT) \
-	openssl-speed.$(OBJEXT) openssl-spkac.$(OBJEXT) \
-	openssl-ts.$(OBJEXT) openssl-verify.$(OBJEXT) \
-	openssl-version.$(OBJEXT) openssl-x509.$(OBJEXT)
+	version.c x509.c apps_win.c apps_posix.c poll_win.c strtonum.c
+@HOST_WIN_TRUE@am__objects_1 = openssl-apps_win.$(OBJEXT)
+@HOST_WIN_FALSE@am__objects_2 = openssl-apps_posix.$(OBJEXT)
+@HAVE_POLL_FALSE@@HOST_WIN_TRUE@am__objects_3 =  \
+@HAVE_POLL_FALSE@@HOST_WIN_TRUE@	openssl-poll_win.$(OBJEXT)
+@HAVE_STRTONUM_FALSE@am__objects_4 = openssl-strtonum.$(OBJEXT)
+am_openssl_OBJECTS = openssl-apps.$(OBJEXT) openssl-asn1pars.$(OBJEXT) \
+	openssl-ca.$(OBJEXT) openssl-ciphers.$(OBJEXT) \
+	openssl-cms.$(OBJEXT) openssl-crl.$(OBJEXT) \
+	openssl-crl2p7.$(OBJEXT) openssl-dgst.$(OBJEXT) \
+	openssl-dh.$(OBJEXT) openssl-dhparam.$(OBJEXT) \
+	openssl-dsa.$(OBJEXT) openssl-dsaparam.$(OBJEXT) \
+	openssl-ec.$(OBJEXT) openssl-ecparam.$(OBJEXT) \
+	openssl-enc.$(OBJEXT) openssl-engine.$(OBJEXT) \
+	openssl-errstr.$(OBJEXT) openssl-gendh.$(OBJEXT) \
+	openssl-gendsa.$(OBJEXT) openssl-genpkey.$(OBJEXT) \
+	openssl-genrsa.$(OBJEXT) openssl-nseq.$(OBJEXT) \
+	openssl-ocsp.$(OBJEXT) openssl-openssl.$(OBJEXT) \
+	openssl-passwd.$(OBJEXT) openssl-pkcs12.$(OBJEXT) \
+	openssl-pkcs7.$(OBJEXT) openssl-pkcs8.$(OBJEXT) \
+	openssl-pkey.$(OBJEXT) openssl-pkeyparam.$(OBJEXT) \
+	openssl-pkeyutl.$(OBJEXT) openssl-prime.$(OBJEXT) \
+	openssl-rand.$(OBJEXT) openssl-req.$(OBJEXT) \
+	openssl-rsa.$(OBJEXT) openssl-rsautl.$(OBJEXT) \
+	openssl-s_cb.$(OBJEXT) openssl-s_client.$(OBJEXT) \
+	openssl-s_server.$(OBJEXT) openssl-s_socket.$(OBJEXT) \
+	openssl-s_time.$(OBJEXT) openssl-sess_id.$(OBJEXT) \
+	openssl-smime.$(OBJEXT) openssl-speed.$(OBJEXT) \
+	openssl-spkac.$(OBJEXT) openssl-ts.$(OBJEXT) \
+	openssl-verify.$(OBJEXT) openssl-version.$(OBJEXT) \
+	openssl-x509.$(OBJEXT) $(am__objects_1) $(am__objects_2) \
+	$(am__objects_3) $(am__objects_4)
 openssl_OBJECTS = $(am_openssl_OBJECTS)
 am__DEPENDENCIES_1 =
-openssl_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+openssl_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(top_builddir)/ssl/libssl.la \
 	$(top_builddir)/crypto/libcrypto.la
 AM_V_lt = $(am__v_lt_@AM_V@)
@@ -213,6 +221,9 @@ AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 CC = @CC@
+CCAS = @CCAS@
+CCASDEPMODE = @CCASDEPMODE@
+CCASFLAGS = @CCASFLAGS@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
 CPP = @CPP@
@@ -237,8 +248,11 @@ INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LD = @LD@
 LDFLAGS = @LDFLAGS@
+LIBCRYPTO_VERSION = @LIBCRYPTO_VERSION@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
+LIBSSL_VERSION = @LIBSSL_VERSION@
+LIBTLS_VERSION = @LIBTLS_VERSION@
 LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
@@ -261,6 +275,7 @@ PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PLATFORM_LDADD = @PLATFORM_LDADD@
+PROG_LDADD = @PROG_LDADD@
 RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
@@ -320,21 +335,22 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CPPFLAGS = -I$(top_srcdir)/include -DHAVE_CRYPTODEV \
-	-DLIBRESSL_INTERNAL
+AM_CPPFLAGS = -I$(top_srcdir)/include -DLIBRESSL_INTERNAL
 openssl_CFLAGS = $(USER_CFLAGS)
-openssl_LDADD = $(PLATFORM_LDADD) $(top_builddir)/ssl/libssl.la \
+openssl_LDADD = $(PLATFORM_LDADD) $(PROG_LDADD) \
+	$(top_builddir)/ssl/libssl.la \
 	$(top_builddir)/crypto/libcrypto.la
-openssl_SOURCES = $(am__append_1) apps.c asn1pars.c ca.c ciphers.c \
-	cms.c crl.c crl2p7.c dgst.c dh.c dhparam.c dsa.c dsaparam.c \
-	ec.c ecparam.c enc.c engine.c errstr.c gendh.c gendsa.c \
-	genpkey.c genrsa.c nseq.c ocsp.c openssl.c passwd.c pkcs12.c \
-	pkcs7.c pkcs8.c pkey.c pkeyparam.c pkeyutl.c prime.c rand.c \
-	req.c rsa.c rsautl.c s_cb.c s_client.c s_server.c s_socket.c \
-	s_time.c sess_id.c smime.c speed.c spkac.c ts.c verify.c \
-	version.c x509.c
+openssl_SOURCES = apps.c asn1pars.c ca.c ciphers.c cms.c crl.c \
+	crl2p7.c dgst.c dh.c dhparam.c dsa.c dsaparam.c ec.c ecparam.c \
+	enc.c engine.c errstr.c gendh.c gendsa.c genpkey.c genrsa.c \
+	nseq.c ocsp.c openssl.c passwd.c pkcs12.c pkcs7.c pkcs8.c \
+	pkey.c pkeyparam.c pkeyutl.c prime.c rand.c req.c rsa.c \
+	rsautl.c s_cb.c s_client.c s_server.c s_socket.c s_time.c \
+	sess_id.c smime.c speed.c spkac.c ts.c verify.c version.c \
+	x509.c $(am__append_1) $(am__append_2) $(am__append_3) \
+	$(am__append_4)
 noinst_HEADERS = apps.h progs.h s_apps.h testdsa.h testrsa.h \
-	timeouts.h
+	timeouts.h openssl.cnf
 all: all-am
 
 .SUFFIXES:
@@ -431,6 +447,8 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-apps.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-apps_posix.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-apps_win.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-asn1pars.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-ca.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-ciphers.Po@am__quote@
@@ -461,6 +479,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-pkey.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-pkeyparam.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-pkeyutl.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-poll_win.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-prime.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-rand.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-req.Po@am__quote@
@@ -504,20 +523,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
-
-openssl-strtonum.o: strtonum.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -MT openssl-strtonum.o -MD -MP -MF $(DEPDIR)/openssl-strtonum.Tpo -c -o openssl-strtonum.o `test -f 'strtonum.c' || echo '$(srcdir)/'`strtonum.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openssl-strtonum.Tpo $(DEPDIR)/openssl-strtonum.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='strtonum.c' object='openssl-strtonum.o' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -c -o openssl-strtonum.o `test -f 'strtonum.c' || echo '$(srcdir)/'`strtonum.c
-
-openssl-strtonum.obj: strtonum.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -MT openssl-strtonum.obj -MD -MP -MF $(DEPDIR)/openssl-strtonum.Tpo -c -o openssl-strtonum.obj `if test -f 'strtonum.c'; then $(CYGPATH_W) 'strtonum.c'; else $(CYGPATH_W) '$(srcdir)/strtonum.c'; fi`
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openssl-strtonum.Tpo $(DEPDIR)/openssl-strtonum.Po
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='strtonum.c' object='openssl-strtonum.obj' libtool=no @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -c -o openssl-strtonum.obj `if test -f 'strtonum.c'; then $(CYGPATH_W) 'strtonum.c'; else $(CYGPATH_W) '$(srcdir)/strtonum.c'; fi`
 
 openssl-apps.o: apps.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -MT openssl-apps.o -MD -MP -MF $(DEPDIR)/openssl-apps.Tpo -c -o openssl-apps.o `test -f 'apps.c' || echo '$(srcdir)/'`apps.c
@@ -1204,6 +1209,62 @@ openssl-x509.obj: x509.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='x509.c' object='openssl-x509.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -c -o openssl-x509.obj `if test -f 'x509.c'; then $(CYGPATH_W) 'x509.c'; else $(CYGPATH_W) '$(srcdir)/x509.c'; fi`
+
+openssl-apps_win.o: apps_win.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -MT openssl-apps_win.o -MD -MP -MF $(DEPDIR)/openssl-apps_win.Tpo -c -o openssl-apps_win.o `test -f 'apps_win.c' || echo '$(srcdir)/'`apps_win.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openssl-apps_win.Tpo $(DEPDIR)/openssl-apps_win.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='apps_win.c' object='openssl-apps_win.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -c -o openssl-apps_win.o `test -f 'apps_win.c' || echo '$(srcdir)/'`apps_win.c
+
+openssl-apps_win.obj: apps_win.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -MT openssl-apps_win.obj -MD -MP -MF $(DEPDIR)/openssl-apps_win.Tpo -c -o openssl-apps_win.obj `if test -f 'apps_win.c'; then $(CYGPATH_W) 'apps_win.c'; else $(CYGPATH_W) '$(srcdir)/apps_win.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openssl-apps_win.Tpo $(DEPDIR)/openssl-apps_win.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='apps_win.c' object='openssl-apps_win.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -c -o openssl-apps_win.obj `if test -f 'apps_win.c'; then $(CYGPATH_W) 'apps_win.c'; else $(CYGPATH_W) '$(srcdir)/apps_win.c'; fi`
+
+openssl-apps_posix.o: apps_posix.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -MT openssl-apps_posix.o -MD -MP -MF $(DEPDIR)/openssl-apps_posix.Tpo -c -o openssl-apps_posix.o `test -f 'apps_posix.c' || echo '$(srcdir)/'`apps_posix.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openssl-apps_posix.Tpo $(DEPDIR)/openssl-apps_posix.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='apps_posix.c' object='openssl-apps_posix.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -c -o openssl-apps_posix.o `test -f 'apps_posix.c' || echo '$(srcdir)/'`apps_posix.c
+
+openssl-apps_posix.obj: apps_posix.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -MT openssl-apps_posix.obj -MD -MP -MF $(DEPDIR)/openssl-apps_posix.Tpo -c -o openssl-apps_posix.obj `if test -f 'apps_posix.c'; then $(CYGPATH_W) 'apps_posix.c'; else $(CYGPATH_W) '$(srcdir)/apps_posix.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openssl-apps_posix.Tpo $(DEPDIR)/openssl-apps_posix.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='apps_posix.c' object='openssl-apps_posix.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -c -o openssl-apps_posix.obj `if test -f 'apps_posix.c'; then $(CYGPATH_W) 'apps_posix.c'; else $(CYGPATH_W) '$(srcdir)/apps_posix.c'; fi`
+
+openssl-poll_win.o: poll_win.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -MT openssl-poll_win.o -MD -MP -MF $(DEPDIR)/openssl-poll_win.Tpo -c -o openssl-poll_win.o `test -f 'poll_win.c' || echo '$(srcdir)/'`poll_win.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openssl-poll_win.Tpo $(DEPDIR)/openssl-poll_win.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='poll_win.c' object='openssl-poll_win.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -c -o openssl-poll_win.o `test -f 'poll_win.c' || echo '$(srcdir)/'`poll_win.c
+
+openssl-poll_win.obj: poll_win.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -MT openssl-poll_win.obj -MD -MP -MF $(DEPDIR)/openssl-poll_win.Tpo -c -o openssl-poll_win.obj `if test -f 'poll_win.c'; then $(CYGPATH_W) 'poll_win.c'; else $(CYGPATH_W) '$(srcdir)/poll_win.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openssl-poll_win.Tpo $(DEPDIR)/openssl-poll_win.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='poll_win.c' object='openssl-poll_win.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -c -o openssl-poll_win.obj `if test -f 'poll_win.c'; then $(CYGPATH_W) 'poll_win.c'; else $(CYGPATH_W) '$(srcdir)/poll_win.c'; fi`
+
+openssl-strtonum.o: strtonum.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -MT openssl-strtonum.o -MD -MP -MF $(DEPDIR)/openssl-strtonum.Tpo -c -o openssl-strtonum.o `test -f 'strtonum.c' || echo '$(srcdir)/'`strtonum.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openssl-strtonum.Tpo $(DEPDIR)/openssl-strtonum.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='strtonum.c' object='openssl-strtonum.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -c -o openssl-strtonum.o `test -f 'strtonum.c' || echo '$(srcdir)/'`strtonum.c
+
+openssl-strtonum.obj: strtonum.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -MT openssl-strtonum.obj -MD -MP -MF $(DEPDIR)/openssl-strtonum.Tpo -c -o openssl-strtonum.obj `if test -f 'strtonum.c'; then $(CYGPATH_W) 'strtonum.c'; else $(CYGPATH_W) '$(srcdir)/strtonum.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openssl-strtonum.Tpo $(DEPDIR)/openssl-strtonum.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='strtonum.c' object='openssl-strtonum.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -c -o openssl-strtonum.obj `if test -f 'strtonum.c'; then $(CYGPATH_W) 'strtonum.c'; else $(CYGPATH_W) '$(srcdir)/strtonum.c'; fi`
 
 mostlyclean-libtool:
 	-rm -f *.lo

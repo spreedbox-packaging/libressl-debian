@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_sess.c,v 1.40 2014/08/11 01:06:22 jsing Exp $ */
+/* $OpenBSD: ssl_sess.c,v 1.42 2014/10/18 16:13:16 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -136,7 +136,6 @@
  */
 
 #include <openssl/lhash.h>
-#include <openssl/rand.h>
 
 #ifndef OPENSSL_NO_ENGINE
 #include <openssl/engine.h>
@@ -239,15 +238,14 @@ SSL_SESSION_get_compress_id(const SSL_SESSION *s)
 }
 
 /*
- * Even with SSLv2, we have 16 bytes (128 bits) of session ID space.
- * SSLv3/TLSv1 has 32 bytes (256 bits). As such, filling the ID with random
- * gunk repeatedly until we have no conflict is going to complete in one
- * iteration pretty much "most" of the time (btw: understatement). So, if it
- * takes us 10 iterations and we still can't avoid a conflict - well that's a
- * reasonable point to call it quits. Either the RAND code is broken or someone
- * is trying to open roughly very close to 2^128 (or 2^256) SSL sessions to our
- * server. How you might store that many sessions is perhaps a more interesting
- * question...
+ * SSLv3/TLSv1 has 32 bytes (256 bits) of session ID space. As such, filling
+ * the ID with random gunk repeatedly until we have no conflict is going to
+ * complete in one iteration pretty much "most" of the time (btw:
+ * understatement). So, if it takes us 10 iterations and we still can't avoid
+ * a conflict - well that's a reasonable point to call it quits. Either the
+ * arc4random code is broken or someone is trying to open roughly very close to
+ * 2^128 (or 2^256) SSL sessions to our server. How you might store that many
+ * sessions is perhaps a more interesting question...
  */
 
 #define MAX_SESS_ID_ATTEMPTS 10
@@ -258,8 +256,7 @@ def_generate_session_id(const SSL *ssl, unsigned char *id, unsigned int *id_len)
 	unsigned int retry = 0;
 
 	do {
-		if (RAND_pseudo_bytes(id, *id_len) <= 0)
-			return 0;
+		arc4random_buf(id, *id_len);
 	} while (SSL_has_matching_session_id(ssl, id, *id_len) &&
 	    (++retry < MAX_SESS_ID_ATTEMPTS));
 

@@ -1,4 +1,4 @@
-/* $OpenBSD: t1_clnt.c,v 1.13 2014/06/12 15:49:31 deraadt Exp $ */
+/* $OpenBSD: t1_clnt.c,v 1.15 2014/10/18 16:13:16 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -57,11 +57,12 @@
  */
 
 #include <stdio.h>
+
 #include "ssl_locl.h"
+
 #include <openssl/buffer.h>
-#include <openssl/rand.h>
-#include <openssl/objects.h>
 #include <openssl/evp.h>
+#include <openssl/objects.h>
 
 static const SSL_METHOD *tls1_get_client_method(int ver);
 

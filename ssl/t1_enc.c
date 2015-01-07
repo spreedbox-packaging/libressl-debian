@@ -1,4 +1,4 @@
-/* $OpenBSD: t1_enc.c,v 1.67 2014/07/10 10:09:54 jsing Exp $ */
+/* $OpenBSD: t1_enc.c,v 1.72 2014/11/16 14:12:47 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -136,11 +136,12 @@
  */
 
 #include <stdio.h>
+
 #include "ssl_locl.h"
+
 #include <openssl/evp.h>
 #include <openssl/hmac.h>
 #include <openssl/md5.h>
-#include <openssl/rand.h>
 
 /* seed1 through seed5 are virtually concatenated */
 static int
@@ -447,6 +448,18 @@ tls1_change_cipher_state_cipher(SSL *s, char is_read, char use_client_keys,
 		    mac_secret_size, (unsigned char *)mac_secret);
 	}
 
+	if (s->s3->tmp.new_cipher->algorithm_enc == SSL_eGOST2814789CNT) {
+		int nid;
+		if (s->s3->tmp.new_cipher->algorithm2 & SSL_HANDSHAKE_MAC_GOST94)
+			nid = NID_id_Gost28147_89_CryptoPro_A_ParamSet;
+		else
+			nid = NID_id_tc26_gost_28147_param_Z;
+
+		EVP_CIPHER_CTX_ctrl(cipher_ctx, EVP_CTRL_GOST_SET_SBOX, nid, 0);
+		if (s->s3->tmp.new_cipher->algorithm_mac == SSL_GOST89MAC)
+			EVP_MD_CTX_ctrl(mac_ctx, EVP_MD_CTRL_GOST_SET_SBOX, nid, 0);
+	}
+
 	return (1);
 
 err:
@@ -603,14 +616,14 @@ tls1_setup_key_block(SSL *s)
 	s->s3->tmp.new_mac_pkey_type = mac_type;
 	s->s3->tmp.new_mac_secret_size = mac_secret_size;
 
-	key_block_len = (mac_secret_size + key_len + iv_len) * 2;
-
 	ssl3_cleanup_key_block(s);
 
-	if ((key_block = malloc(key_block_len)) == NULL) {
+	if ((key_block = reallocarray(NULL, mac_secret_size + key_len + iv_len,
+	    2)) == NULL) {
 		SSLerr(SSL_F_TLS1_SETUP_KEY_BLOCK, ERR_R_MALLOC_FAILURE);
 		goto err;
 	}
+	key_block_len = (mac_secret_size + key_len + iv_len) * 2;
 
 	s->s3->tmp.key_block_length = key_block_len;
 	s->s3->tmp.key_block = key_block;
@@ -810,8 +823,8 @@ tls1_enc(SSL *s, int send)
 					fprintf(stderr,
 					    "%s:%d: rec->data != rec->input\n",
 					    __FILE__, __LINE__);
-				else if (RAND_bytes(rec->input, ivlen) <= 0)
-					return -1;
+				else 
+					arc4random_buf(rec->input, ivlen);
 			}
 		}
 	} else {

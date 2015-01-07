@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_asn1.c,v 1.36 2014/07/13 21:38:23 jsing Exp $ */
+/* $OpenBSD: ssl_asn1.c,v 1.38 2014/10/16 03:19:02 beck Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -481,6 +481,7 @@ d2i_SSL_SESSION(SSL_SESSION **a, const unsigned char **pp, long length)
 
 	/* 4 - Session ID (OCTET STRING). */
 	os.length = 0;
+	free(os.data);
 	os.data = NULL;
 	if (c.slen != 0L &&
 	    *c.p == (V_ASN1_CONSTRUCTED | V_ASN1_CONTEXT_SPECIFIC | 4)) {
@@ -585,7 +586,7 @@ d2i_SSL_SESSION(SSL_SESSION **a, const unsigned char **pp, long length)
 		c.slen -= (c.p - c.q);
 	}
 	if (os.data) {
-		ret->tlsext_hostname = BUF_strndup((char *)os.data, os.length);
+		ret->tlsext_hostname = strndup((char *)os.data, os.length);
 		free(os.data);
 		os.data = NULL;
 		os.length = 0;

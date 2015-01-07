@@ -1,4 +1,4 @@
-/* $OpenBSD: s_client.c,v 1.2 2014/09/01 20:54:37 doug Exp $ */
+/* $OpenBSD: s_client.c,v 1.8 2014/11/18 20:54:28 krw Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -137,7 +137,6 @@
 
 #include <sys/types.h>
 #include <sys/ioctl.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 
 #include <netinet/in.h>
@@ -148,9 +147,9 @@
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <limits.h>
 #include <string.h>
 #include <unistd.h>
+#include <poll.h>
 
 #include "apps.h"
 
@@ -158,7 +157,6 @@
 #include <openssl/err.h>
 #include <openssl/ocsp.h>
 #include <openssl/pem.h>
-#include <openssl/rand.h>
 #include <openssl/ssl.h>
 #include <openssl/x509.h>
 
@@ -180,10 +178,8 @@ extern int verify_return_error;
 static int c_nbio = 0;
 static int c_Pause = 0;
 static int c_debug = 0;
-#ifndef OPENSSL_NO_TLSEXT
 static int c_tlsextdebug = 0;
 static int c_status_req = 0;
-#endif
 static int c_msg = 0;
 static int c_showcerts = 0;
 
@@ -192,9 +188,7 @@ static int keymatexportlen = 20;
 
 static void sc_usage(void);
 static void print_stuff(BIO * berr, SSL * con, int full);
-#ifndef OPENSSL_NO_TLSEXT
 static int ocsp_resp_cb(SSL * s, void *arg);
-#endif
 static BIO *bio_c_out = NULL;
 static int c_quiet = 0;
 static int c_ign_eof = 0;
@@ -252,14 +246,12 @@ sc_usage(void)
 #endif
 	BIO_printf(bio_err, " -sess_out arg - file to write SSL session to\n");
 	BIO_printf(bio_err, " -sess_in arg  - file to read SSL session from\n");
-#ifndef OPENSSL_NO_TLSEXT
 	BIO_printf(bio_err, " -servername host  - Set TLS extension servername in ClientHello\n");
 	BIO_printf(bio_err, " -tlsextdebug      - hex dump of all TLS extensions received\n");
 	BIO_printf(bio_err, " -status           - request certificate status from server\n");
 	BIO_printf(bio_err, " -no_ticket        - disable use of RFC4507bis session tickets\n");
 #ifndef OPENSSL_NO_NEXTPROTONEG
 	BIO_printf(bio_err, " -nextprotoneg arg - enable NPN extension, considering named protocols supported (comma-separated list)\n");
-#endif
 #endif
 #ifndef OPENSSL_NO_SRTP
 	BIO_printf(bio_err, " -use_srtp profiles - Offer SRTP key management with a colon-separated profile list\n");
@@ -268,7 +260,6 @@ sc_usage(void)
 	BIO_printf(bio_err, " -keymatexportlen len  - Export len bytes of keying material (default 20)\n");
 }
 
-#ifndef OPENSSL_NO_TLSEXT
 
 /* This is a context that we pass to callbacks */
 typedef struct tlsextctx_st {
@@ -325,7 +316,6 @@ next_proto_cb(SSL * s, unsigned char **out, unsigned char *outlen, const unsigne
 	return SSL_TLSEXT_ERR_OK;
 }
 #endif				/* ndef OPENSSL_NO_NEXTPROTONEG */
-#endif
 
 enum {
 	PROTO_OFF = 0,
@@ -344,11 +334,10 @@ s_client_main(int argc, char **argv)
 {
 	unsigned int off = 0, clr = 0;
 	SSL *con = NULL;
-	int s, k, width, state = 0, af = AF_UNSPEC;
+	int s, k, state = 0, af = AF_UNSPEC;
 	char *cbuf = NULL, *sbuf = NULL, *mbuf = NULL;
 	int cbuf_len, cbuf_off;
 	int sbuf_len, sbuf_off;
-	fd_set readfds, writefds;
 	char *port = PORT_STR;
 	int full_log = 1;
 	char *host = SSL_HOST_NAME;
@@ -371,7 +360,7 @@ s_client_main(int argc, char **argv)
 	int socket_type = SOCK_STREAM;
 	BIO *sbio;
 	int mbuf_len = 0;
-	struct timeval timeout, *timeoutp;
+	struct timeval timeout;
 	const char *errstr = NULL;
 #ifndef OPENSSL_NO_ENGINE
 	char *engine_id = NULL;
@@ -379,13 +368,11 @@ s_client_main(int argc, char **argv)
 	ENGINE *ssl_client_engine = NULL;
 #endif
 	ENGINE *e = NULL;
-#ifndef OPENSSL_NO_TLSEXT
 	char *servername = NULL;
 	tlsextctx tlsextcbp =
 	{NULL, 0};
 #ifndef OPENSSL_NO_NEXTPROTONEG
 	const char *next_proto_neg_in = NULL;
-#endif
 #endif
 	char *sess_in = NULL;
 	char *sess_out = NULL;
@@ -476,12 +463,10 @@ s_client_main(int argc, char **argv)
 			c_Pause = 1;
 		else if (strcmp(*argv, "-debug") == 0)
 			c_debug = 1;
-#ifndef OPENSSL_NO_TLSEXT
 		else if (strcmp(*argv, "-tlsextdebug") == 0)
 			c_tlsextdebug = 1;
 		else if (strcmp(*argv, "-status") == 0)
 			c_status_req = 1;
-#endif
 		else if (strcmp(*argv, "-msg") == 0)
 			c_msg = 1;
 		else if (strcmp(*argv, "-showcerts") == 0)
@@ -549,7 +534,6 @@ s_client_main(int argc, char **argv)
 		else if (strcmp(*argv, "-no_comp") == 0) {
 			off |= SSL_OP_NO_COMPRESSION;
 		}
-#ifndef OPENSSL_NO_TLSEXT
 		else if (strcmp(*argv, "-no_ticket") == 0) {
 			off |= SSL_OP_NO_TICKET;
 		}
@@ -559,7 +543,6 @@ s_client_main(int argc, char **argv)
 				goto bad;
 			next_proto_neg_in = *(++argv);
 		}
-#endif
 #endif
 		else if (strcmp(*argv, "-serverpref") == 0)
 			off |= SSL_OP_CIPHER_SERVER_PREFERENCE;
@@ -612,14 +595,12 @@ s_client_main(int argc, char **argv)
 		} else if (strcmp(*argv, "-6") == 0) {
 			af = AF_INET6;
 		}
-#ifndef OPENSSL_NO_TLSEXT
 		else if (strcmp(*argv, "-servername") == 0) {
 			if (--argc < 1)
 				goto bad;
 			servername = *(++argv);
 			/* meth=TLSv1_client_method(); */
 		}
-#endif
 #ifndef OPENSSL_NO_SRTP
 		else if (strcmp(*argv, "-use_srtp") == 0) {
 			if (--argc < 1)
@@ -655,7 +636,7 @@ bad:
 		goto end;
 	}
 
-#if !defined(OPENSSL_NO_TLSEXT) && !defined(OPENSSL_NO_NEXTPROTONEG)
+#if !defined(OPENSSL_NO_NEXTPROTONEG)
 	next_proto.status = -1;
 	if (next_proto_neg_in) {
 		next_proto.data = next_protos_parse(&next_proto.len, next_proto_neg_in);
@@ -751,7 +732,7 @@ bad:
 	if (socket_type == SOCK_DGRAM)
 		SSL_CTX_set_read_ahead(ctx, 1);
 
-#if !defined(OPENSSL_NO_TLSEXT) && !defined(OPENSSL_NO_NEXTPROTONEG)
+#if !defined(OPENSSL_NO_NEXTPROTONEG)
 	if (next_proto.data)
 		SSL_CTX_set_next_proto_select_cb(ctx, next_proto_cb, &next_proto);
 #endif
@@ -778,13 +759,11 @@ bad:
 		ERR_print_errors(bio_err);
 		/* goto end; */
 	}
-#ifndef OPENSSL_NO_TLSEXT
 	if (servername != NULL) {
 		tlsextcbp.biodebug = bio_err;
 		SSL_CTX_set_tlsext_servername_callback(ctx, ssl_servername_cb);
 		SSL_CTX_set_tlsext_servername_arg(ctx, &tlsextcbp);
 	}
-#endif
 
 	con = SSL_new(ctx);
 	if (sess_in) {
@@ -807,7 +786,6 @@ bad:
 		SSL_set_session(con, sess);
 		SSL_SESSION_free(sess);
 	}
-#ifndef OPENSSL_NO_TLSEXT
 	if (servername != NULL) {
 		if (!SSL_set_tlsext_host_name(con, servername)) {
 			BIO_printf(bio_err, "Unable to set TLS servername extension.\n");
@@ -815,15 +793,12 @@ bad:
 			goto end;
 		}
 	}
-#endif
 /*	SSL_set_cipher_list(con,"RC4-MD5"); */
 
 re_start:
 
 	if (init_client(&s, host, port, socket_type, af) == 0) {
 		BIO_printf(bio_err, "connect:errno=%d\n", errno);
-		shutdown(s, SHUT_RD);
-		close(s);
 		goto end;
 	}
 	BIO_printf(bio_c_out, "CONNECTED(%08X)\n", s);
@@ -884,7 +859,6 @@ re_start:
 		SSL_set_msg_callback(con, msg_cb);
 		SSL_set_msg_callback_arg(con, bio_c_out);
 	}
-#ifndef OPENSSL_NO_TLSEXT
 	if (c_tlsextdebug) {
 		SSL_set_tlsext_debug_callback(con, tlsext_cb);
 		SSL_set_tlsext_debug_arg(con, bio_c_out);
@@ -894,14 +868,11 @@ re_start:
 		SSL_CTX_set_tlsext_status_cb(ctx, ocsp_resp_cb);
 		SSL_CTX_set_tlsext_status_arg(ctx, bio_c_out);
 	}
-#endif
 
 	SSL_set_bio(con, sbio, sbio);
 	SSL_set_connect_state(con);
 
 	/* ok, lets connect */
-	width = SSL_get_fd(con) + 1;
-
 	read_tty = 1;
 	write_tty = 0;
 	tty_on = 0;
@@ -1017,14 +988,12 @@ re_start:
 		mbuf[0] = 0;
 	}
 	for (;;) {
-		FD_ZERO(&readfds);
-		FD_ZERO(&writefds);
+		struct pollfd pfd[3];	/* stdin, stdout, socket */
+		int ptimeout = -1;
 
 		if ((SSL_version(con) == DTLS1_VERSION) &&
 		    DTLSv1_get_timeout(con, &timeout))
-			timeoutp = &timeout;
-		else
-			timeoutp = NULL;
+			ptimeout = timeout.tv_sec * 1000 + timeout.tv_usec / 1000;
 
 		if (SSL_in_init(con) && !SSL_total_renegotiations(con)) {
 			in_init = 1;
@@ -1064,24 +1033,31 @@ re_start:
 
 		ssl_pending = read_ssl && SSL_pending(con);
 
-		/* XXX should add tests for fd_set overflow */
-
+		pfd[0].fd = -1;
+		pfd[1].fd = -1;
 		if (!ssl_pending) {
 			if (tty_on) {
-				if (read_tty)
-					FD_SET(fileno(stdin), &readfds);
-				if (write_tty)
-					FD_SET(fileno(stdout), &writefds);
+				if (read_tty) {
+					pfd[0].fd = fileno(stdin);
+					pfd[0].events = POLLIN;
+				}
+				if (write_tty) {
+					pfd[1].fd = fileno(stdout);
+					pfd[1].events = POLLOUT;
+				}
 			}
+
+			pfd[2].fd = SSL_get_fd(con);
+			pfd[2].events = 0;
 			if (read_ssl)
-				FD_SET(SSL_get_fd(con), &readfds);
+				pfd[2].events |= POLLIN;
 			if (write_ssl)
-				FD_SET(SSL_get_fd(con), &writefds);
+				pfd[2].events |= POLLOUT;
+
 /*			printf("mode tty(%d %d%d) ssl(%d%d)\n",
 				tty_on,read_tty,write_tty,read_ssl,write_ssl);*/
 
-			i = select(width, &readfds, &writefds,
-			    NULL, timeoutp);
+			i = poll(pfd, 3, ptimeout);
 			if (i < 0) {
 				BIO_printf(bio_err, "bad select %d\n",
 				    errno);
@@ -1092,7 +1068,11 @@ re_start:
 		if ((SSL_version(con) == DTLS1_VERSION) && DTLSv1_handle_timeout(con) > 0) {
 			BIO_printf(bio_err, "TIMEOUT occured\n");
 		}
-		if (!ssl_pending && FD_ISSET(SSL_get_fd(con), &writefds)) {
+		if (!ssl_pending && (pfd[2].revents & (POLLOUT|POLLERR|POLLNVAL))) {
+			if (pfd[2].revents & (POLLERR|POLLNVAL)) {
+				BIO_printf(bio_err, "poll error");
+				goto shut;
+			}
 			k = SSL_write(con, &(cbuf[cbuf_off]),
 			    (unsigned int) cbuf_len);
 			switch (SSL_get_error(con, k)) {
@@ -1149,7 +1129,12 @@ re_start:
 				ERR_print_errors(bio_err);
 				goto shut;
 			}
-		} else if (!ssl_pending && FD_ISSET(fileno(stdout), &writefds)) {
+		} else if (!ssl_pending &&
+		    (pfd[1].revents & (POLLOUT|POLLERR|POLLNVAL))) {
+			if (pfd[1].revents & (POLLERR|POLLNVAL)) {
+				BIO_printf(bio_err, "poll error");
+				goto shut;
+			}
 			i = write(fileno(stdout), &(sbuf[sbuf_off]), sbuf_len);
 
 			if (i <= 0) {
@@ -1164,7 +1149,7 @@ re_start:
 				read_ssl = 1;
 				write_tty = 0;
 			}
-		} else if (ssl_pending || FD_ISSET(SSL_get_fd(con), &readfds)) {
+		} else if (ssl_pending || (pfd[2].revents & (POLLIN|POLLHUP))) {
 #ifdef RENEG
 			{
 				static int iiii;
@@ -1214,7 +1199,11 @@ re_start:
 				goto shut;
 				/* break; */
 			}
-		} else if (FD_ISSET(fileno(stdin), &readfds)) {
+		} else if (pfd[0].revents) {
+			if (pfd[0].revents & (POLLERR|POLLNVAL)) {
+				BIO_printf(bio_err, "poll error");
+				goto shut;
+			}
 			if (crlf) {
 				int j, lf_num;
 
@@ -1268,7 +1257,7 @@ end:
 			print_stuff(bio_c_out, con, 1);
 		SSL_free(con);
 	}
-#if !defined(OPENSSL_NO_TLSEXT) && !defined(OPENSSL_NO_NEXTPROTONEG)
+#if !defined(OPENSSL_NO_NEXTPROTONEG)
 	free(next_proto.data);
 #endif
 	if (ctx != NULL)
@@ -1424,7 +1413,7 @@ print_stuff(BIO * bio, SSL * s, int full)
 	}
 #endif
 
-#if !defined(OPENSSL_NO_TLSEXT) && !defined(OPENSSL_NO_NEXTPROTONEG)
+#if !defined(OPENSSL_NO_NEXTPROTONEG)
 	if (next_proto.status != -1) {
 		const unsigned char *proto;
 		unsigned int proto_len;
@@ -1475,7 +1464,6 @@ print_stuff(BIO * bio, SSL * s, int full)
 	(void) BIO_flush(bio);
 }
 
-#ifndef OPENSSL_NO_TLSEXT
 
 static int
 ocsp_resp_cb(SSL * s, void *arg)
@@ -1502,4 +1490,3 @@ ocsp_resp_cb(SSL * s, void *arg)
 	return 1;
 }
 
-#endif

@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_locl.h,v 1.69 2014/09/27 11:01:06 jsing Exp $ */
+/* $OpenBSD: ssl_locl.h,v 1.78 2014/12/06 13:51:06 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -145,20 +145,20 @@
 
 #include <sys/types.h>
 
-#include <stdlib.h>
-#include <time.h>
-#include <string.h>
 #include <errno.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #include <openssl/opensslconf.h>
-#include <openssl/buffer.h>
 #include <openssl/bio.h>
-#include <openssl/stack.h>
-#include <openssl/rsa.h>
+#include <openssl/buffer.h>
 #include <openssl/dsa.h>
 #include <openssl/err.h>
+#include <openssl/rsa.h>
 #include <openssl/ssl.h>
+#include <openssl/stack.h>
 
 #define c2l(c,l)	(l = ((unsigned long)(*((c)++)))     , \
 			 l|=(((unsigned long)(*((c)++)))<< 8), \
@@ -274,18 +274,16 @@
 #define SSL_DES			0x00000001L
 #define SSL_3DES		0x00000002L
 #define SSL_RC4			0x00000004L
-#define SSL_RC2			0x00000008L
-#define SSL_IDEA		0x00000010L
-#define SSL_eNULL		0x00000020L
-#define SSL_AES128		0x00000040L
-#define SSL_AES256		0x00000080L
-#define SSL_CAMELLIA128		0x00000100L
-#define SSL_CAMELLIA256		0x00000200L
-#define SSL_eGOST2814789CNT	0x00000400L
-#define SSL_SEED		0x00000800L
-#define SSL_AES128GCM		0x00001000L
-#define SSL_AES256GCM		0x00002000L
-#define SSL_CHACHA20POLY1305	0x00004000L
+#define SSL_IDEA		0x00000008L
+#define SSL_eNULL		0x00000010L
+#define SSL_AES128		0x00000020L
+#define SSL_AES256		0x00000040L
+#define SSL_CAMELLIA128		0x00000080L
+#define SSL_CAMELLIA256		0x00000100L
+#define SSL_eGOST2814789CNT	0x00000200L
+#define SSL_AES128GCM		0x00000400L
+#define SSL_AES256GCM		0x00000800L
+#define SSL_CHACHA20POLY1305	0x00001000L
 
 #define SSL_AES        		(SSL_AES128|SSL_AES256|SSL_AES128GCM|SSL_AES256GCM)
 #define SSL_CAMELLIA		(SSL_CAMELLIA128|SSL_CAMELLIA256)
@@ -301,9 +299,10 @@
 #define SSL_SHA384		0x00000020L
 /* Not a real MAC, just an indication it is part of cipher */
 #define SSL_AEAD		0x00000040L
+#define SSL_STREEBOG256		0x00000080L
+#define SSL_STREEBOG512		0x00000100L
 
 /* Bits for algorithm_ssl (protocol version) */
-#define SSL_SSLV2		0x00000001L
 #define SSL_SSLV3		0x00000002L
 #define SSL_TLSV1		SSL_SSLV3	/* for now */
 #define SSL_TLSV1_2		0x00000004L
@@ -316,11 +315,13 @@
 #define SSL_HANDSHAKE_MAC_GOST94 0x40
 #define SSL_HANDSHAKE_MAC_SHA256 0x80
 #define SSL_HANDSHAKE_MAC_SHA384 0x100
+#define SSL_HANDSHAKE_MAC_STREEBOG256 0x200
+#define SSL_HANDSHAKE_MAC_STREEBOG512 0x400
 #define SSL_HANDSHAKE_MAC_DEFAULT (SSL_HANDSHAKE_MAC_MD5 | SSL_HANDSHAKE_MAC_SHA)
 
 /* When adding new digest in the ssl_ciph.c and increment SSM_MD_NUM_IDX
  * make sure to update this constant too */
-#define SSL_MAX_DIGEST 6
+#define SSL_MAX_DIGEST 8
 
 #define SSL3_CK_ID		0x03000000
 #define SSL3_CK_VALUE_MASK	0x0000ffff
@@ -333,6 +334,7 @@
 #define TLS1_PRF_SHA256 (SSL_HANDSHAKE_MAC_SHA256 << TLS1_PRF_DGST_SHIFT)
 #define TLS1_PRF_SHA384 (SSL_HANDSHAKE_MAC_SHA384 << TLS1_PRF_DGST_SHIFT)
 #define TLS1_PRF_GOST94 (SSL_HANDSHAKE_MAC_GOST94 << TLS1_PRF_DGST_SHIFT)
+#define TLS1_PRF_STREEBOG256 (SSL_HANDSHAKE_MAC_STREEBOG256 << TLS1_PRF_DGST_SHIFT)
 #define TLS1_PRF (TLS1_PRF_MD5 | TLS1_PRF_SHA1)
 
 /* Stream MAC for GOST ciphersuites from cryptopro draft
@@ -440,11 +442,9 @@ typedef struct cert_st {
 	unsigned long mask_k;
 	unsigned long mask_a;
 
-	RSA *rsa_tmp;
-	RSA *(*rsa_tmp_cb)(SSL *ssl, int is_export, int keysize);
-
 	DH *dh_tmp;
 	DH *(*dh_tmp_cb)(SSL *ssl, int is_export, int keysize);
+	int dh_tmp_auto;
 
 	EC_KEY *ecdh_tmp;
 	EC_KEY *(*ecdh_tmp_cb)(SSL *ssl, int is_export, int keysize);
@@ -467,7 +467,6 @@ typedef struct sess_cert_st {
 	/* Obviously we don't have the private keys of these,
 	 * so maybe we shouldn't even use the CERT_PKEY type here. */
 
-	RSA *peer_rsa_tmp;
 	DH *peer_dh_tmp;
 	EC_KEY *peer_ecdh_tmp;
 
@@ -591,6 +590,7 @@ int ssl_undefined_const_function(const SSL *s);
 CERT_PKEY *ssl_get_server_send_pkey(const SSL *s);
 X509 *ssl_get_server_send_cert(const SSL *);
 EVP_PKEY *ssl_get_sign_pkey(SSL *s, const SSL_CIPHER *c, const EVP_MD **pmd);
+DH *ssl_get_auto_dh(SSL *s);
 int ssl_cert_type(X509 *x, EVP_PKEY *pkey);
 void ssl_set_cert_masks(CERT *c, const SSL_CIPHER *cipher);
 STACK_OF(SSL_CIPHER) *ssl_get_ciphers_by_id(SSL *s);
@@ -799,8 +799,8 @@ int ssl_check_srvr_ecc_cert_and_alg(X509 *x, SSL *s);
 
 SSL_COMP *ssl3_comp_find(STACK_OF(SSL_COMP) *sk, int n);
 
-int tls1_ec_curve_id2nid(int curve_id);
-int tls1_ec_nid2curve_id(int nid);
+int tls1_ec_curve_id2nid(uint16_t curve_id);
+uint16_t tls1_ec_nid2curve_id(int nid);
 int tls1_check_curve(SSL *s, const unsigned char *p, size_t len);
 int tls1_get_shared_curve(SSL *s);
 

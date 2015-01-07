@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_cert.c,v 1.41 2014/07/10 08:25:00 guenther Exp $ */
+/* $OpenBSD: ssl_cert.c,v 1.46 2014/11/18 05:33:43 miod Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -116,17 +116,18 @@
 
 #include <sys/types.h>
 
+#include <dirent.h>
 #include <stdio.h>
 #include <unistd.h>
-#include <dirent.h>
 
-#include <openssl/opensslconf.h>
-#include <openssl/objects.h>
 #include <openssl/bio.h>
+#include <openssl/bn.h>
+#include <openssl/dh.h>
+#include <openssl/objects.h>
+#include <openssl/opensslconf.h>
 #include <openssl/pem.h>
 #include <openssl/x509v3.h>
-#include <openssl/dh.h>
-#include <openssl/bn.h>
+
 #include "ssl_locl.h"
 
 int
@@ -165,6 +166,10 @@ ssl_cert_set_default_md(CERT *cert)
 	cert->pkeys[SSL_PKEY_RSA_SIGN].digest = EVP_sha1();
 	cert->pkeys[SSL_PKEY_RSA_ENC].digest = EVP_sha1();
 	cert->pkeys[SSL_PKEY_ECC].digest = EVP_sha1();
+#ifndef OPENSSL_NO_GOST
+	cert->pkeys[SSL_PKEY_GOST94].digest = EVP_gostr341194();
+	cert->pkeys[SSL_PKEY_GOST01].digest = EVP_gostr341194();
+#endif
 }
 
 CERT *
@@ -205,12 +210,6 @@ ssl_cert_dup(CERT *cert)
 	ret->mask_k = cert->mask_k;
 	ret->mask_a = cert->mask_a;
 
-	if (cert->rsa_tmp != NULL) {
-		RSA_up_ref(cert->rsa_tmp);
-		ret->rsa_tmp = cert->rsa_tmp;
-	}
-	ret->rsa_tmp_cb = cert->rsa_tmp_cb;
-
 	if (cert->dh_tmp != NULL) {
 		ret->dh_tmp = DHparams_dup(cert->dh_tmp);
 		if (ret->dh_tmp == NULL) {
@@ -235,6 +234,7 @@ ssl_cert_dup(CERT *cert)
 		}
 	}
 	ret->dh_tmp_cb = cert->dh_tmp_cb;
+	ret->dh_tmp_auto = cert->dh_tmp_auto;
 
 	if (cert->ecdh_tmp) {
 		ret->ecdh_tmp = EC_KEY_dup(cert->ecdh_tmp);
@@ -305,7 +305,6 @@ ssl_cert_dup(CERT *cert)
 	return (ret);
 
 err:
-	RSA_free(ret->rsa_tmp);
 	DH_free(ret->dh_tmp);
 	EC_KEY_free(ret->ecdh_tmp);
 
@@ -331,7 +330,6 @@ ssl_cert_free(CERT *c)
 	if (i > 0)
 		return;
 
-	RSA_free(c->rsa_tmp);
 	DH_free(c->dh_tmp);
 	EC_KEY_free(c->ecdh_tmp);
 
@@ -408,7 +406,6 @@ ssl_sess_cert_free(SESS_CERT *sc)
 			X509_free(sc->peer_pkeys[i].x509);
 	}
 
-	RSA_free(sc->peer_rsa_tmp);
 	DH_free(sc->peer_dh_tmp);
 	EC_KEY_free(sc->peer_ecdh_tmp);
 

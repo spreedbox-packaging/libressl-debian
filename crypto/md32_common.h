@@ -1,4 +1,4 @@
-/* $OpenBSD: md32_common.h,v 1.17 2014/08/12 15:02:52 bcook Exp $ */
+/* $OpenBSD: md32_common.h,v 1.19 2014/10/20 13:06:54 bcook Exp $ */
 /* ====================================================================
  * Copyright (c) 1999-2007 The OpenSSL Project.  All rights reserved.
  *
@@ -64,8 +64,7 @@
  * HASH_CBLOCK
  *	size of a unit chunk HASH_BLOCK operates on.
  * HASH_LONG
- *	has to be at lest 32 bit wide, if it's wider, then
- *	HASH_LONG_LOG2 *has to* be defined along
+ *	has to be at least 32 bit wide.
  * HASH_CTX
  *	context structure that at least contains following
  *	members:
@@ -98,7 +97,6 @@
  *	#define DATA_ORDER_IS_LITTLE_ENDIAN
  *
  *	#define HASH_LONG		MD5_LONG
- *	#define HASH_LONG_LOG2		MD5_LONG_LOG2
  *	#define HASH_CTX		MD5_CTX
  *	#define HASH_CBLOCK		MD5_CBLOCK
  *	#define HASH_UPDATE		MD5_Update
@@ -133,8 +131,8 @@
 #ifndef HASH_TRANSFORM
 #error "HASH_TRANSFORM must be defined!"
 #endif
-#ifndef HASH_FINAL
-#error "HASH_FINAL must be defined!"
+#if !defined(HASH_FINAL) && !defined(HASH_NO_FINAL)
+#error "HASH_FINAL or HASH_NO_FINAL must be defined!"
 #endif
 
 #ifndef HASH_BLOCK_DATA_ORDER
@@ -289,6 +287,7 @@ void HASH_TRANSFORM (HASH_CTX *c, const unsigned char *data)
 }
 
 
+#ifndef HASH_NO_FINAL
 int HASH_FINAL (unsigned char *md, HASH_CTX *c)
 {
 	unsigned char *p = (unsigned char *)c->data;
@@ -325,6 +324,7 @@ int HASH_FINAL (unsigned char *md, HASH_CTX *c)
 
 	return 1;
 }
+#endif
 
 #ifndef MD32_REG_T
 #if defined(__alpha) || defined(__sparcv9) || defined(__mips)
