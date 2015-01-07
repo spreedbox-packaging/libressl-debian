@@ -1,4 +1,4 @@
-/* $OpenBSD: s3_enc.c,v 1.52 2014/07/10 08:51:14 tedu Exp $ */
+/* $OpenBSD: s3_enc.c,v 1.55 2014/10/18 03:04:28 doug Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -136,7 +136,9 @@
  */
 
 #include <stdio.h>
+
 #include "ssl_locl.h"
+
 #include <openssl/evp.h>
 #include <openssl/md5.h>
 
@@ -347,12 +349,12 @@ ssl3_setup_key_block(SSL *s)
 	if (mac_len < 0)
 		return 0;
 
-	key_block_len = (mac_len + key_len + iv_len) * 2;
-
 	ssl3_cleanup_key_block(s);
 
-	if ((key_block = malloc(key_block_len)) == NULL)
+	if ((key_block = reallocarray(NULL, mac_len + key_len + iv_len, 2))
+	    == NULL)
 		goto err;
+	key_block_len = (mac_len + key_len + iv_len) * 2;
 
 	s->s3->tmp.key_block_length = key_block_len;
 	s->s3->tmp.key_block = key_block;

@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_clnt.c,v 1.34 2014/08/10 14:42:55 jsing Exp $ */
+/* $OpenBSD: d1_clnt.c,v 1.38 2014/11/27 16:03:03 jsing Exp $ */
 /*
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
@@ -114,14 +114,15 @@
  */
 
 #include <stdio.h>
+
 #include "ssl_locl.h"
+
+#include <openssl/bn.h>
 #include <openssl/buffer.h>
-#include <openssl/rand.h>
-#include <openssl/objects.h>
+#include <openssl/dh.h>
 #include <openssl/evp.h>
 #include <openssl/md5.h>
-#include <openssl/bn.h>
-#include <openssl/dh.h>
+#include <openssl/objects.h>
 
 static const SSL_METHOD *dtls1_get_client_method(int ver);
 static int dtls1_get_hello_verify(SSL *s);
@@ -779,7 +780,7 @@ dtls1_client_hello(SSL *s)
 		for (i = 0; p[i]=='\0' && i < sizeof(s->s3->client_random); i++)
 			;
 		if (i == sizeof(s->s3->client_random))
-			RAND_pseudo_bytes(p, sizeof(s->s3->client_random));
+			arc4random_buf(p, sizeof(s->s3->client_random));
 
 		/* Do the message type and length last */
 		d = p = &(buf[DTLS1_HM_HEADER_LENGTH]);
@@ -933,29 +934,32 @@ dtls1_send_client_key_exchange(SSL *s)
 
 		alg_k = s->s3->tmp.new_cipher->algorithm_mkey;
 
+		if (s->session->sess_cert == NULL) {
+			ssl3_send_alert(s, SSL3_AL_FATAL,
+			    SSL_AD_HANDSHAKE_FAILURE);
+			SSLerr(SSL_F_DTLS1_SEND_CLIENT_KEY_EXCHANGE,
+			    ERR_R_INTERNAL_ERROR);
+			goto err;
+		}
+
 		if (alg_k & SSL_kRSA) {
 			RSA *rsa;
 			unsigned char tmp_buf[SSL_MAX_MASTER_KEY_LENGTH];
 
-			if (s->session->sess_cert->peer_rsa_tmp != NULL)
-				rsa = s->session->sess_cert->peer_rsa_tmp;
-			else {
-				pkey = X509_get_pubkey(s->session->sess_cert->peer_pkeys[SSL_PKEY_RSA_ENC].x509);
-				if ((pkey == NULL) ||
-				    (pkey->type != EVP_PKEY_RSA) ||
-				    (pkey->pkey.rsa == NULL)) {
-					SSLerr(SSL_F_DTLS1_SEND_CLIENT_KEY_EXCHANGE,
-					    ERR_R_INTERNAL_ERROR);
-					goto err;
-				}
-				rsa = pkey->pkey.rsa;
-				EVP_PKEY_free(pkey);
+			pkey = X509_get_pubkey(s->session->sess_cert->peer_pkeys[SSL_PKEY_RSA_ENC].x509);
+			if ((pkey == NULL) ||
+			    (pkey->type != EVP_PKEY_RSA) ||
+			    (pkey->pkey.rsa == NULL)) {
+				SSLerr(SSL_F_DTLS1_SEND_CLIENT_KEY_EXCHANGE,
+				    ERR_R_INTERNAL_ERROR);
+				goto err;
 			}
+			rsa = pkey->pkey.rsa;
+			EVP_PKEY_free(pkey);
 
 			tmp_buf[0] = s->client_version >> 8;
 			tmp_buf[1] = s->client_version&0xff;
-			if (RAND_bytes(&(tmp_buf[2]), sizeof tmp_buf - 2) <= 0)
-				goto err;
+			arc4random_buf(&tmp_buf[2], sizeof(tmp_buf) - 2);
 
 			s->session->master_key_length = sizeof tmp_buf;
 

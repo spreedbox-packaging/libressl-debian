@@ -78,13 +78,14 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
+@ENABLE_LIBTLS_TRUE@am__append_1 = libtls.pc
 subdir = .
 DIST_COMMON = INSTALL NEWS README AUTHORS ChangeLog \
 	$(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/configure $(am__configure_deps) \
-	$(srcdir)/libcrypto.pc.in $(srcdir)/libssl.pc.in \
-	$(srcdir)/openssl.pc.in COPYING compile config.guess \
-	config.sub depcomp install-sh missing ltmain.sh
+	$(srcdir)/libtls.pc.in $(srcdir)/libcrypto.pc.in \
+	$(srcdir)/libssl.pc.in $(srcdir)/openssl.pc.in COPYING compile \
+	config.guess config.sub depcomp install-sh missing ltmain.sh
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
@@ -95,7 +96,7 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
-CONFIG_CLEAN_FILES = libcrypto.pc libssl.pc openssl.pc
+CONFIG_CLEAN_FILES = libtls.pc libcrypto.pc libssl.pc openssl.pc
 CONFIG_CLEAN_VPATH_FILES =
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -233,6 +234,9 @@ AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
 AWK = @AWK@
 CC = @CC@
+CCAS = @CCAS@
+CCASDEPMODE = @CCASDEPMODE@
+CCASFLAGS = @CCASFLAGS@
 CCDEPMODE = @CCDEPMODE@
 CFLAGS = @CFLAGS@
 CPP = @CPP@
@@ -257,8 +261,11 @@ INSTALL_SCRIPT = @INSTALL_SCRIPT@
 INSTALL_STRIP_PROGRAM = @INSTALL_STRIP_PROGRAM@
 LD = @LD@
 LDFLAGS = @LDFLAGS@
+LIBCRYPTO_VERSION = @LIBCRYPTO_VERSION@
 LIBOBJS = @LIBOBJS@
 LIBS = @LIBS@
+LIBSSL_VERSION = @LIBSSL_VERSION@
+LIBTLS_VERSION = @LIBTLS_VERSION@
 LIBTOOL = @LIBTOOL@
 LIPO = @LIPO@
 LN_S = @LN_S@
@@ -281,6 +288,7 @@ PACKAGE_URL = @PACKAGE_URL@
 PACKAGE_VERSION = @PACKAGE_VERSION@
 PATH_SEPARATOR = @PATH_SEPARATOR@
 PLATFORM_LDADD = @PLATFORM_LDADD@
+PROG_LDADD = @PROG_LDADD@
 RANLIB = @RANLIB@
 SED = @SED@
 SET_MAKE = @SET_MAKE@
@@ -340,10 +348,11 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-SUBDIRS = crypto ssl include apps tests man
+SUBDIRS = crypto ssl tls include apps tests man
 ACLOCAL_AMFLAGS = -I m4
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = libcrypto.pc libssl.pc openssl.pc
+pkgconfig_DATA = libcrypto.pc libssl.pc openssl.pc $(am__append_1)
+EXTRA_DIST = VERSION
 all: all-recursive
 
 .SUFFIXES:
@@ -381,6 +390,8 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	$(am__cd) $(srcdir) && $(ACLOCAL) $(ACLOCAL_AMFLAGS)
 $(am__aclocal_m4_deps):
+@ENABLE_LIBTLS_TRUE@libtls.pc: $(top_builddir)/config.status $(srcdir)/libtls.pc.in
+@ENABLE_LIBTLS_TRUE@	cd $(top_builddir) && $(SHELL) ./config.status $@
 libcrypto.pc: $(top_builddir)/config.status $(srcdir)/libcrypto.pc.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 libssl.pc: $(top_builddir)/config.status $(srcdir)/libssl.pc.in

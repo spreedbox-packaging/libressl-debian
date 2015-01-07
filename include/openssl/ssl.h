@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl.h,v 1.67 2014/10/03 13:58:18 jsing Exp $ */
+/* $OpenBSD: ssl.h,v 1.72 2014/11/18 05:33:43 miod Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -144,22 +144,23 @@
 #define HEADER_SSL_H 
 
 #include <openssl/opensslconf.h>
+#include <openssl/hmac.h>
+#include <openssl/pem.h>
+#include <openssl/safestack.h>
 
 #ifndef OPENSSL_NO_BIO
 #include <openssl/bio.h>
 #endif
+
 #ifndef OPENSSL_NO_DEPRECATED
+#include <openssl/buffer.h>
+#include <openssl/crypto.h>
+#include <openssl/lhash.h>
+
 #ifndef OPENSSL_NO_X509
 #include <openssl/x509.h>
 #endif
-#include <openssl/crypto.h>
-#include <openssl/lhash.h>
-#include <openssl/buffer.h>
 #endif
-#include <openssl/pem.h>
-#include <openssl/hmac.h>
-
-#include <openssl/safestack.h>
 
 #ifdef  __cplusplus
 extern "C" {
@@ -294,6 +295,8 @@ extern "C" {
 #define SSL_TXT_GOST89MAC		"GOST89MAC" 
 #define SSL_TXT_SHA256		"SHA256"
 #define SSL_TXT_SHA384		"SHA384"
+#define SSL_TXT_STREEBOG256		"STREEBOG256"
+#define SSL_TXT_STREEBOG512		"STREEBOG512"
 
 #define SSL_TXT_DTLS1		"DTLSv1"
 #define SSL_TXT_DTLS1_BAD	"DTLSv1-bad"
@@ -412,9 +415,6 @@ struct ssl_method_st {
 	int (*ssl_dispatch_alert)(SSL *s);
 	long (*ssl_ctrl)(SSL *s, int cmd, long larg, void *parg);
 	long (*ssl_ctx_ctrl)(SSL_CTX *ctx, int cmd, long larg, void *parg);
-	/* XXX - remove get_cipher_by_char and put_cipher_by_char. */
-	const SSL_CIPHER *(*get_cipher_by_char)(const unsigned char *ptr);
-	int (*put_cipher_by_char)(const SSL_CIPHER *cipher, unsigned char *ptr);
 	int (*ssl_pending)(const SSL *s);
 	int (*num_ciphers)(void);
 	const SSL_CIPHER *(*get_cipher)(unsigned ncipher);
@@ -500,9 +500,10 @@ struct ssl_session_st {
 	struct ssl_session_st *prev, *next;
 	char *tlsext_hostname;
 	size_t tlsext_ecpointformatlist_length;
-	unsigned char *tlsext_ecpointformatlist; /* peer's list */
+	uint8_t *tlsext_ecpointformatlist; /* peer's list */
 	size_t tlsext_ellipticcurvelist_length;
-	unsigned char *tlsext_ellipticcurvelist; /* peer's list */
+	uint16_t *tlsext_ellipticcurvelist; /* peer's list */
+
 	/* RFC4507 info */
 	unsigned char *tlsext_tick;	/* Session ticket */
 	size_t tlsext_ticklen;		/* Session ticket length */
@@ -1142,9 +1143,9 @@ struct ssl_st {
 	/* RFC4507 session ticket expected to be received or sent */
 	int tlsext_ticket_expected;
 	size_t tlsext_ecpointformatlist_length;
-	unsigned char *tlsext_ecpointformatlist; /* our list */
+	uint8_t *tlsext_ecpointformatlist; /* our list */
 	size_t tlsext_ellipticcurvelist_length;
-	unsigned char *tlsext_ellipticcurvelist; /* our list */
+	uint16_t *tlsext_ellipticcurvelist; /* our list */
 
 	/* TLS Session Ticket extension override */
 	TLS_SESSION_TICKET_EXT *tlsext_session_ticket;
@@ -1429,6 +1430,8 @@ DECLARE_PEM_rw(SSL_SESSION, SSL_SESSION)
 
 #define SSL_CTRL_SET_ECDH_AUTO				94
 
+#define SSL_CTRL_SET_DH_AUTO			118
+
 #define DTLSv1_get_timeout(ssl, arg) \
 	SSL_ctrl(ssl,DTLS_CTRL_GET_TIMEOUT,0, (void *)arg)
 #define DTLSv1_handle_timeout(ssl) \
@@ -1453,6 +1456,8 @@ DECLARE_PEM_rw(SSL_SESSION, SSL_SESSION)
 	SSL_CTX_ctrl(ctx,SSL_CTRL_SET_TMP_DH,0,(char *)dh)
 #define SSL_CTX_set_tmp_ecdh(ctx,ecdh) \
 	SSL_CTX_ctrl(ctx,SSL_CTRL_SET_TMP_ECDH,0,(char *)ecdh)
+#define SSL_CTX_set_dh_auto(ctx, onoff) \
+	SSL_CTX_ctrl(ctx,SSL_CTRL_SET_DH_AUTO,onoff,NULL)
 #define SSL_CTX_set_ecdh_auto(ctx, onoff) \
 	SSL_CTX_ctrl(ctx,SSL_CTRL_SET_ECDH_AUTO,onoff,NULL)
 
@@ -1464,6 +1469,8 @@ DECLARE_PEM_rw(SSL_SESSION, SSL_SESSION)
 	SSL_ctrl(ssl,SSL_CTRL_SET_TMP_DH,0,(char *)dh)
 #define SSL_set_tmp_ecdh(ssl,ecdh) \
 	SSL_ctrl(ssl,SSL_CTRL_SET_TMP_ECDH,0,(char *)ecdh)
+#define SSL_set_dh_auto(s, onoff) \
+	SSL_ctrl(s,SSL_CTRL_SET_DH_AUTO,onoff,NULL)
 #define SSL_set_ecdh_auto(s, onoff) \
 	SSL_ctrl(s,SSL_CTRL_SET_ECDH_AUTO,onoff,NULL)
 

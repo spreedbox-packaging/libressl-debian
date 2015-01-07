@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_srvr.c,v 1.38 2014/09/07 12:16:23 jsing Exp $ */
+/* $OpenBSD: d1_srvr.c,v 1.41 2014/10/31 14:51:01 jsing Exp $ */
 /* 
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.  
@@ -114,15 +114,16 @@
  */
 
 #include <stdio.h>
+
 #include "ssl_locl.h"
-#include <openssl/buffer.h>
-#include <openssl/rand.h>
-#include <openssl/objects.h>
-#include <openssl/evp.h>
-#include <openssl/x509.h>
-#include <openssl/md5.h>
+
 #include <openssl/bn.h>
+#include <openssl/buffer.h>
 #include <openssl/dh.h>
+#include <openssl/evp.h>
+#include <openssl/md5.h>
+#include <openssl/objects.h>
+#include <openssl/x509.h>
 
 static const SSL_METHOD *dtls1_get_server_method(int ver);
 static int dtls1_send_hello_verify_request(SSL *s);
@@ -447,27 +448,8 @@ dtls1_accept(SSL *s)
 		case SSL3_ST_SW_KEY_EXCH_B:
 			alg_k = s->s3->tmp.new_cipher->algorithm_mkey;
 
-			/* clear this, it may get reset by
-			 * send_server_key_exchange */
-			if ((s->options & SSL_OP_EPHEMERAL_RSA)
-			)
-				/* option SSL_OP_EPHEMERAL_RSA sends temporary RSA key
-				 * even when forbidden by protocol specs
-				 * (handshake may fail as clients are not required to
-				 * be able to handle this) */
-				s->s3->tmp.use_rsa_tmp = 1;
-			else
-				s->s3->tmp.use_rsa_tmp = 0;
-
-			/* only send if a DH key exchange or
-			 * RSA but we have a sign only certificate */
-			if (s->s3->tmp.use_rsa_tmp
-			|| (alg_k & (SSL_kDHE|SSL_kECDHE))
-			|| ((alg_k & SSL_kRSA)
-			&& (s->cert->pkeys[SSL_PKEY_RSA_ENC].privatekey == NULL
-			)
-			)
-			) {
+			/* Only send if using a DH key exchange. */
+			if (alg_k & (SSL_kDHE|SSL_kECDHE)) {
 				dtls1_start_timer(s);
 				ret = dtls1_send_server_key_exchange(s);
 				if (ret <= 0)
@@ -902,8 +884,7 @@ dtls1_send_server_hello(SSL *s)
 
 	if (s->state == SSL3_ST_SW_SRVR_HELLO_A) {
 		buf = (unsigned char *)s->init_buf->data;
-		p = s->s3->server_random;
-		RAND_pseudo_bytes(p, SSL3_RANDOM_SIZE);
+		arc4random_buf(s->s3->server_random, SSL3_RANDOM_SIZE);
 
 		/* Do the message type and length last */
 		d = p= &(buf[DTLS1_HM_HEADER_LENGTH]);
@@ -996,7 +977,6 @@ dtls1_send_server_key_exchange(SSL *s)
 {
 	unsigned char *q;
 	int j, num;
-	RSA *rsa;
 	unsigned char md_buf[MD5_DIGEST_LENGTH + SHA_DIGEST_LENGTH];
 	unsigned int u;
 	DH *dh = NULL, *dhp;
@@ -1026,28 +1006,7 @@ dtls1_send_server_key_exchange(SSL *s)
 
 		r[0] = r[1] = r[2] = r[3] = NULL;
 		n = 0;
-		if (type & SSL_kRSA) {
-			rsa = cert->rsa_tmp;
-			if ((rsa == NULL) && (s->cert->rsa_tmp_cb != NULL)) {
-				rsa = s->cert->rsa_tmp_cb(s, 0,
-				    SSL_C_PKEYLENGTH(s->s3->tmp.new_cipher));
-				if (rsa == NULL) {
-					al = SSL_AD_HANDSHAKE_FAILURE;
-					SSLerr(SSL_F_DTLS1_SEND_SERVER_KEY_EXCHANGE, SSL_R_ERROR_GENERATING_TMP_RSA_KEY);
-					goto f_err;
-				}
-				RSA_up_ref(rsa);
-				cert->rsa_tmp = rsa;
-			}
-			if (rsa == NULL) {
-				al = SSL_AD_HANDSHAKE_FAILURE;
-				SSLerr(SSL_F_DTLS1_SEND_SERVER_KEY_EXCHANGE, SSL_R_MISSING_TMP_RSA_KEY);
-				goto f_err;
-			}
-			r[0] = rsa->n;
-			r[1] = rsa->e;
-			s->s3->tmp.use_rsa_tmp = 1;
-		} else
+
 		if (type & SSL_kDHE) {
 			dhp = cert->dh_tmp;
 			if ((dhp == NULL) && (s->cert->dh_tmp_cb != NULL))
@@ -1089,8 +1048,7 @@ dtls1_send_server_key_exchange(SSL *s)
 			r[0] = dh->p;
 			r[1] = dh->g;
 			r[2] = dh->pub_key;
-		} else
-		if (type & SSL_kECDHE) {
+		} else if (type & SSL_kECDHE) {
 			const EC_GROUP *group;
 
 			ecdhp = cert->ecdh_tmp;
@@ -1187,10 +1145,10 @@ dtls1_send_server_key_exchange(SSL *s)
 			r[1] = NULL;
 			r[2] = NULL;
 			r[3] = NULL;
-		} else
-		{
+		} else {
 			al = SSL_AD_HANDSHAKE_FAILURE;
-			SSLerr(SSL_F_DTLS1_SEND_SERVER_KEY_EXCHANGE, SSL_R_UNKNOWN_KEY_EXCHANGE_TYPE);
+			SSLerr(SSL_F_DTLS1_SEND_SERVER_KEY_EXCHANGE,
+			    SSL_R_UNKNOWN_KEY_EXCHANGE_TYPE);
 			goto f_err;
 		}
 		for (i = 0; r[i] != NULL; i++) {
@@ -1513,7 +1471,7 @@ dtls1_send_newsession_ticket(SSL *s)
 				return -1;
 			}
 		} else {
-			RAND_pseudo_bytes(iv, 16);
+			arc4random_buf(iv, 16);
 			EVP_EncryptInit_ex(&ctx, EVP_aes_128_cbc(), NULL,
 			    tctx->tlsext_tick_aes_key, iv);
 			HMAC_Init_ex(&hctx, tctx->tlsext_tick_hmac_key, 16,
