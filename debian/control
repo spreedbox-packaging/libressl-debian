@@ -20,6 +20,8 @@ Multi-Arch: same
 Depends:
  ${misc:Depends},
  ${shlibs:Depends}
+Conflicts:
+ libressl-0
 Description: SSL library, forked from OpenSSL
  LibreSSL strives to maintain API compatibility with OpenSSL, but
  do away with all the cruft.
