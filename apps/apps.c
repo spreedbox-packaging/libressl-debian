@@ -1,4 +1,4 @@
-/* $OpenBSD: apps.c,v 1.12 2014/11/07 14:16:48 jsing Exp $ */
+/* $OpenBSD: apps.c,v 1.23 2015/01/01 14:28:00 jsing Exp $ */
 /*
  * Copyright (c) 2014 Joel Sing <jsing@openbsd.org>
  *
@@ -229,6 +229,8 @@ chopup_args(ARGS *arg, char *buf, int *argc, char **argv[])
 	if (arg->count == 0) {
 		arg->count = 20;
 		arg->data = reallocarray(NULL, arg->count, sizeof(char *));
+		if (arg->data == NULL)
+			return 0;
 	}
 	for (i = 0; i < arg->count; i++)
 		arg->data[i] = NULL;
@@ -2163,7 +2165,6 @@ policies_print(BIO *out, X509_STORE_CTX *ctx)
 		BIO_free(out);
 }
 
-#if !defined(OPENSSL_NO_NEXTPROTONEG)
 /* next_protos_parse parses a comma separated list of strings into a string
  * in a format suitable for passing to SSL_CTX_set_next_protos_advertised.
  *   outlen: (output) set to the length of the resulting buffer on success.
@@ -2202,8 +2203,6 @@ next_protos_parse(unsigned short *outlen, const char *in)
 	*outlen = len + 1;
 	return out;
 }
-#endif
-/* !OPENSSL_NO_NEXTPROTONEG */
 
 int
 app_isdir(const char *name)
@@ -2245,109 +2244,147 @@ options_usage(struct option *opts)
 }
 
 int
-options_parse(int argc, char **argv, struct option *opts, char **unnamed)
+options_parse(int argc, char **argv, struct option *opts, char **unnamed,
+    int *argsused)
 {
 	const char *errstr;
 	struct option *opt;
 	long long val;
 	char *arg, *p;
+	int fmt, used;
 	int ord = 0;
 	int i, j;
-	int fmt;
+
+	if (unnamed != NULL)
+		*unnamed = NULL;
 
 	for (i = 1; i < argc; i++) {
 		p = arg = argv[i];
 
+		/* Single unnamed argument (without leading hyphen). */
 		if (*p++ != '-') {
+			if (argsused != NULL)
+				goto done;
 			if (unnamed == NULL)
 				goto unknown;
+			if (*unnamed != NULL)
+				goto toomany;
 			*unnamed = arg;
 			continue;
 		}
-		if (*p == '\0') /* XXX - end of named options. */
-			goto unknown;
 
-		for (j = 0; opts[j].name != NULL; j++) {
-			opt = &opts[j];
-			if (strcmp(p, opt->name) != 0)
+		/* End of named options (single hyphen). */
+		if (*p == '\0') {
+			if (++i >= argc)
+				goto done;
+			if (argsused != NULL)
+				goto done;
+			if (unnamed != NULL && i == argc - 1) {
+				if (*unnamed != NULL)
+					goto toomany;
+				*unnamed = argv[i];
 				continue;
-
-			if (opt->type == OPTION_ARG ||
-			    opt->type == OPTION_ARG_FORMAT ||
-			    opt->type == OPTION_ARG_FUNC ||
-			    opt->type == OPTION_ARG_INT) {
-				if (++i >= argc) {
-					fprintf(stderr,
-					    "missing %s argument for -%s\n",
-					    opt->argname, opt->name);
-					return (1);
-				}
 			}
-
-			switch (opt->type) {
-			case OPTION_ARG:
-				*opt->opt.arg = argv[i];
-				break;
-
-			case OPTION_ARG_FORMAT:
-				fmt = str2fmt(argv[i]);
-				if (fmt == FORMAT_UNDEF) {
-					fprintf(stderr,
-					    "unknown %s '%s' for -%s\n",
-					    opt->argname, argv[i], opt->name);
-					return (1);
-				}
-				*opt->opt.value = fmt;
-				break;
-
-			case OPTION_ARG_FUNC:
-				if (opt->func(opt, argv[i]) != 0)
-					return (1);
-				break;
-
-			case OPTION_ARG_INT:
-				val = strtonum(argv[i], 0, INT_MAX, &errstr);
-				if (errstr != NULL) {
-					fprintf(stderr,
-					    "%s %s argument for -%s\n",
-					    errstr, opt->argname, opt->name);
-					return (1);
-				}
-				*opt->opt.value = (int)val;
-				break;
-
-			case OPTION_FUNC:
-				if (opt->func(opt, NULL) != 0)
-					return (1);
-				break;
-
-			case OPTION_FLAG:
-				*opt->opt.flag = 1;
-				break;
-
-			case OPTION_FLAG_ORD:
-				*opt->opt.flag = ++ord;
-				break;
-
-			case OPTION_VALUE:
-				*opt->opt.value = opt->value;
-				break;
-
-			default:
-				fprintf(stderr,
-				    "option %s - unknown type %i\n",
-				    opt->name, opt->type);
-				return (1);
-			}
-
-			break;
+			goto unknown;
 		}
 
-		if (opts[j].name == NULL)
+		/* See if there is a matching option... */
+		for (j = 0; opts[j].name != NULL; j++) {
+			if (strcmp(p, opts[j].name) == 0)
+				break;
+		}
+		opt = &opts[j];
+		if (opt->name == NULL && opt->type == 0)
 			goto unknown;
+
+		if (opt->type == OPTION_ARG ||
+		    opt->type == OPTION_ARG_FORMAT ||
+		    opt->type == OPTION_ARG_FUNC ||
+		    opt->type == OPTION_ARG_INT) {
+			if (++i >= argc) {
+				fprintf(stderr, "missing %s argument for -%s\n",
+				    opt->argname, opt->name);
+				return (1);
+			}
+		}
+
+		switch (opt->type) {
+		case OPTION_ARG:
+			*opt->opt.arg = argv[i];
+			break;
+
+		case OPTION_ARGV_FUNC:
+			if (opt->opt.argvfunc(argc - i, &argv[i], &used) != 0)
+				return (1);
+			i += used - 1;
+			break;
+
+		case OPTION_ARG_FORMAT:
+			fmt = str2fmt(argv[i]);
+			if (fmt == FORMAT_UNDEF) {
+				fprintf(stderr, "unknown %s '%s' for -%s\n",
+				    opt->argname, argv[i], opt->name);
+				return (1);
+			}
+			*opt->opt.value = fmt;
+			break;
+
+		case OPTION_ARG_FUNC:
+			if (opt->opt.argfunc(argv[i]) != 0)
+				return (1);
+			break;
+
+		case OPTION_ARG_INT:
+			val = strtonum(argv[i], 0, INT_MAX, &errstr);
+			if (errstr != NULL) {
+				fprintf(stderr, "%s %s argument for -%s\n",
+				    errstr, opt->argname, opt->name);
+				return (1);
+			}
+			*opt->opt.value = (int)val;
+			break;
+
+		case OPTION_FUNC:
+			if (opt->opt.func() != 0)
+				return (1);
+			break;
+
+		case OPTION_FLAG:
+			*opt->opt.flag = 1;
+			break;
+
+		case OPTION_FLAG_ORD:
+			*opt->opt.flag = ++ord;
+			break;
+
+		case OPTION_VALUE:
+			*opt->opt.value = opt->value;
+			break;
+
+		case OPTION_VALUE_AND:
+			*opt->opt.value &= opt->value;
+			break;
+
+		case OPTION_VALUE_OR:
+			*opt->opt.value |= opt->value;
+			break;
+
+		default:
+			fprintf(stderr, "option %s - unknown type %i\n",
+			    opt->name, opt->type);
+			return (1);
+		}
 	}
 
+done:
+	if (argsused != NULL)
+		*argsused = i;
+
 	return (0);
+
+toomany:
+	fprintf(stderr, "too many arguments\n");
+	return (1);
 
 unknown:
 	fprintf(stderr, "unknown option '%s'\n", arg);

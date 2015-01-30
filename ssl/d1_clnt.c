@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_clnt.c,v 1.38 2014/11/27 16:03:03 jsing Exp $ */
+/* $OpenBSD: d1_clnt.c,v 1.40 2014/12/10 15:43:31 jsing Exp $ */
 /*
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
@@ -310,7 +310,10 @@ dtls1_connect(SSL *s)
 			s->shutdown = 0;
 
 			/* every DTLS ClientHello resets Finished MAC */
-			ssl3_init_finished_mac(s);
+			if (!ssl3_init_finished_mac(s)) {
+				ret = -1;
+				goto end;
+			}
 
 			dtls1_start_timer(s);
 			ret = dtls1_client_hello(s);
@@ -756,14 +759,12 @@ end:
 int
 dtls1_client_hello(SSL *s)
 {
-	unsigned char *buf;
-	unsigned char *p, *d;
+	unsigned char *bufend, *d, *p;
 	unsigned int i;
-	unsigned long l;
 
-	buf = (unsigned char *)s->init_buf->data;
 	if (s->state == SSL3_ST_CW_CLNT_HELLO_A) {
 		SSL_SESSION *sess = s->session;
+
 		if ((s->session == NULL) ||
 		    (s->session->ssl_version != s->version) ||
 		    (!sess->session_id_length && !sess->tlsext_tick) ||
@@ -782,8 +783,7 @@ dtls1_client_hello(SSL *s)
 		if (i == sizeof(s->s3->client_random))
 			arc4random_buf(p, sizeof(s->s3->client_random));
 
-		/* Do the message type and length last */
-		d = p = &(buf[DTLS1_HM_HEADER_LENGTH]);
+		d = p = ssl3_handshake_msg_start(s, SSL3_MT_CLIENT_HELLO);
 
 		*(p++) = s->version >> 8;
 		*(p++) = s->version&0xff;
@@ -832,29 +832,20 @@ dtls1_client_hello(SSL *s)
 		*(p++) = 1;
 		*(p++) = 0; /* Add the NULL method */
 
-		if ((p = ssl_add_clienthello_tlsext(s, p,
-		    buf + SSL3_RT_MAX_PLAIN_LENGTH)) == NULL) {
+		bufend = (unsigned char *)s->init_buf->data +
+		    SSL3_RT_MAX_PLAIN_LENGTH;
+		if ((p = ssl_add_clienthello_tlsext(s, p, bufend)) == NULL) {
 			SSLerr(SSL_F_DTLS1_CLIENT_HELLO, ERR_R_INTERNAL_ERROR);
 			goto err;
 		}
 
-		l = (p - d);
-		d = buf;
-
-		d = dtls1_set_message_header(s, d, SSL3_MT_CLIENT_HELLO,
-		    l, 0, l);
+		ssl3_handshake_msg_finish(s, p - d);
 
 		s->state = SSL3_ST_CW_CLNT_HELLO_B;
-		/* number of bytes to write */
-		s->init_num = p - buf;
-		s->init_off = 0;
-
-		/* buffer the message to handle re-xmits */
-		dtls1_buffer_message(s, 0);
 	}
 
 	/* SSL3_ST_CW_CLNT_HELLO_B */
-	return (dtls1_do_write(s, SSL3_RT_HANDSHAKE));
+	return (ssl3_handshake_write(s));
 err:
 	return (-1);
 }
@@ -916,10 +907,9 @@ f_err:
 int
 dtls1_send_client_key_exchange(SSL *s)
 {
-	unsigned char *p, *d;
+	unsigned char *p, *q;
 	int n;
 	unsigned long alg_k;
-	unsigned char *q;
 	EVP_PKEY *pkey = NULL;
 	EC_KEY *clnt_ecdh = NULL;
 	const EC_POINT *srvr_ecpoint = NULL;
@@ -929,8 +919,7 @@ dtls1_send_client_key_exchange(SSL *s)
 	BN_CTX * bn_ctx = NULL;
 
 	if (s->state == SSL3_ST_CW_KEY_EXCH_A) {
-		d = (unsigned char *)s->init_buf->data;
-		p = &(d[DTLS1_HM_HEADER_LENGTH]);
+		p = ssl3_handshake_msg_start(s, SSL3_MT_CLIENT_KEY_EXCHANGE);
 
 		alg_k = s->s3->tmp.new_cipher->algorithm_mkey;
 
@@ -1214,26 +1203,13 @@ dtls1_send_client_key_exchange(SSL *s)
 			goto err;
 		}
 
-		d = dtls1_set_message_header(s, d,
-		    SSL3_MT_CLIENT_KEY_EXCHANGE, n, 0, n);
-		/*
-		 *(d++)=SSL3_MT_CLIENT_KEY_EXCHANGE;
-		 l2n3(n,d);
-		 l2n(s->d1->handshake_write_seq,d);
-		 s->d1->handshake_write_seq++;
-		*/
+		ssl3_handshake_msg_finish(s, n);
 
 		s->state = SSL3_ST_CW_KEY_EXCH_B;
-		/* number of bytes to write */
-		s->init_num = n + DTLS1_HM_HEADER_LENGTH;
-		s->init_off = 0;
-
-		/* buffer the message to handle re-xmits */
-		dtls1_buffer_message(s, 0);
 	}
 
 	/* SSL3_ST_CW_KEY_EXCH_B */
-	return (dtls1_do_write(s, SSL3_RT_HANDSHAKE));
+	return (ssl3_handshake_write(s));
 
 err:
 	BN_CTX_free(bn_ctx);
@@ -1246,7 +1222,7 @@ err:
 int
 dtls1_send_client_verify(SSL *s)
 {
-	unsigned char *p, *d;
+	unsigned char *p;
 	unsigned char data[MD5_DIGEST_LENGTH + SHA_DIGEST_LENGTH];
 	EVP_PKEY *pkey;
 	unsigned u = 0;
@@ -1254,8 +1230,8 @@ dtls1_send_client_verify(SSL *s)
 	int j;
 
 	if (s->state == SSL3_ST_CW_CERT_VRFY_A) {
-		d = (unsigned char *)s->init_buf->data;
-		p = &(d[DTLS1_HM_HEADER_LENGTH]);
+		p = ssl3_handshake_msg_start(s, SSL3_MT_CERTIFICATE_VERIFY);
+
 		pkey = s->cert->key->privatekey;
 
 		s->method->ssl3_enc->cert_verify_mac(s, NID_sha1,
@@ -1301,20 +1277,14 @@ dtls1_send_client_verify(SSL *s)
 			goto err;
 		}
 
-		d = dtls1_set_message_header(s, d,
-		    SSL3_MT_CERTIFICATE_VERIFY, n, 0, n);
-
-		s->init_num = (int)n + DTLS1_HM_HEADER_LENGTH;
-		s->init_off = 0;
-
-		/* buffer the message to handle re-xmits */
-		dtls1_buffer_message(s, 0);
+		ssl3_handshake_msg_finish(s, n);
 
 		s->state = SSL3_ST_CW_CERT_VRFY_B;
 	}
 
 	/* s->state = SSL3_ST_CW_CERT_VRFY_B */
-	return (dtls1_do_write(s, SSL3_RT_HANDSHAKE));
+	return (ssl3_handshake_write(s));
+
 err:
 	return (-1);
 }

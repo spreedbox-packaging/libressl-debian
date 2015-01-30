@@ -1,4 +1,4 @@
-/* $OpenBSD: ecparam.c,v 1.4 2014/10/13 02:46:14 bcook Exp $ */
+/* $OpenBSD: ecparam.c,v 1.7 2014/12/28 14:21:42 jsing Exp $ */
 /*
  * Written by Nils Larsch for the OpenSSL project.
  */
@@ -111,7 +111,7 @@ static struct {
 } ecparam_config;
 
 static int
-ecparam_opt_form(struct option *opt, char *arg)
+ecparam_opt_form(char *arg)
 {
 	if (strcmp(arg, "compressed") == 0)
 		ecparam_config.form = POINT_CONVERSION_COMPRESSED;
@@ -127,7 +127,7 @@ ecparam_opt_form(struct option *opt, char *arg)
 }
 
 static int
-ecparam_opt_enctype(struct option *opt, char *arg)
+ecparam_opt_enctype(char *arg)
 {
 	if (strcmp(arg, "explicit") == 0)
 		ecparam_config.asn1_flag = 0;
@@ -159,7 +159,7 @@ struct option ecparam_options[] = {
 		.desc = "Specify point conversion form:\n"
 		    "  compressed, uncompressed (default), hybrid",
 		.type = OPTION_ARG_FUNC,
-		.func = ecparam_opt_form,
+		.opt.argfunc = ecparam_opt_form,
 	},
 #ifndef OPENSSL_NO_ENGINE
 	{
@@ -237,7 +237,7 @@ struct option ecparam_options[] = {
 		.desc = "Specify EC parameter ASN.1 encoding type:\n"
 		    "  explicit, named_curve (default)",
 		.type = OPTION_ARG_FUNC,
-		.func = ecparam_opt_enctype,
+		.opt.argfunc = ecparam_opt_enctype,
 	},
 	{
 		.name = "text",
@@ -277,7 +277,7 @@ ecparam_main(int argc, char **argv)
 	ecparam_config.informat = FORMAT_PEM;
 	ecparam_config.outformat = FORMAT_PEM;
 
-	if (options_parse(argc, argv, ecparam_options, NULL) != 0) {
+	if (options_parse(argc, argv, ecparam_options, NULL, NULL) != 0) {
 		ecparam_usage();
 		goto end;
 	}
@@ -583,25 +583,20 @@ ecparam_main(int argc, char **argv)
 		EC_KEY_free(eckey);
 	}
 	ret = 0;
+
 end:
-	if (ec_p)
-		BN_free(ec_p);
-	if (ec_a)
-		BN_free(ec_a);
-	if (ec_b)
-		BN_free(ec_b);
-	if (ec_gen)
-		BN_free(ec_gen);
-	if (ec_order)
-		BN_free(ec_order);
-	if (ec_cofactor)
-		BN_free(ec_cofactor);
+	BN_free(ec_p);
+	BN_free(ec_a);
+	BN_free(ec_b);
+	BN_free(ec_gen);
+	BN_free(ec_order);
+	BN_free(ec_cofactor);
+
 	free(buffer);
+
 	BIO_free(in);
-	if (out != NULL)
-		BIO_free_all(out);
-	if (group != NULL)
-		EC_GROUP_free(group);
+	BIO_free_all(out);
+	EC_GROUP_free(group);
 
 	return (ret);
 }

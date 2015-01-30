@@ -1771,3 +1771,6 @@ end_main_loop_a3b:
 .Lepilogue:
 	.byte	0xf3,0xc3
 .size	mod_exp_512, . - mod_exp_512
+#if defined(HAVE_GNU_STACK)
+.section .note.GNU-stack,"",%progbits
+#endif
