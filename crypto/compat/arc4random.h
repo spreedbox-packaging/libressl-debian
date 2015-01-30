@@ -6,8 +6,14 @@
 #if defined(__FreeBSD__)
 #include "arc4random_freebsd.h"
 
+#elif defined(__hpux)
+#include "arc4random_hpux.h"
+
 #elif defined(__linux__)
 #include "arc4random_linux.h"
+
+#elif defined(__NetBSD__)
+#include "arc4random_netbsd.h"
 
 #elif defined(__APPLE__)
 #include "arc4random_osx.h"

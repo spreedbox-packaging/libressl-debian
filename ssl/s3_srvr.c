@@ -1,4 +1,4 @@
-/* $OpenBSD: s3_srvr.c,v 1.90 2014/11/16 14:12:47 jsing Exp $ */
+/* $OpenBSD: s3_srvr.c,v 1.95 2014/12/15 00:46:53 doug Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -298,7 +298,11 @@ ssl3_accept(SSL *s)
 					goto end;
 				}
 
-				ssl3_init_finished_mac(s);
+				if (!ssl3_init_finished_mac(s)) {
+					ret = -1;
+					goto end;
+				}
+
 				s->state = SSL3_ST_SR_CLNT_HELLO_A;
 				s->ctx->stats.sess_accept++;
 			} else if (!s->s3->send_connection_binding) {
@@ -334,7 +338,10 @@ ssl3_accept(SSL *s)
 			s->state = SSL3_ST_SW_FLUSH;
 			s->init_num = 0;
 
-			ssl3_init_finished_mac(s);
+			if (!ssl3_init_finished_mac(s)) {
+				ret = -1;
+				goto end;
+			}
 			break;
 
 		case SSL3_ST_SW_HELLO_REQ_C:
@@ -530,14 +537,10 @@ ssl3_accept(SSL *s)
 				 * the client uses its key from the certificate
 				 * for key exchange.
 				 */
-#ifdef OPENSSL_NO_NEXTPROTONEG
-				s->state = SSL3_ST_SR_FINISHED_A;
-#else
 				if (s->s3->next_proto_neg_seen)
 					s->state = SSL3_ST_SR_NEXT_PROTO_A;
 				else
 					s->state = SSL3_ST_SR_FINISHED_A;
-#endif
 				s->init_num = 0;
 			} else if (SSL_USE_SIGALGS(s) || (alg_k & SSL_kGOST)) {
 				s->state = SSL3_ST_SR_CERT_VRFY_A;
@@ -602,18 +605,13 @@ ssl3_accept(SSL *s)
 			if (ret <= 0)
 				goto end;
 
-#ifdef OPENSSL_NO_NEXTPROTONEG
-			s->state = SSL3_ST_SR_FINISHED_A;
-#else
 			if (s->s3->next_proto_neg_seen)
 				s->state = SSL3_ST_SR_NEXT_PROTO_A;
 			else
 				s->state = SSL3_ST_SR_FINISHED_A;
-#endif
 			s->init_num = 0;
 			break;
 
-#ifndef OPENSSL_NO_NEXTPROTONEG
 		case SSL3_ST_SR_NEXT_PROTO_A:
 		case SSL3_ST_SR_NEXT_PROTO_B:
 			ret = ssl3_get_next_proto(s);
@@ -622,7 +620,6 @@ ssl3_accept(SSL *s)
 			s->init_num = 0;
 			s->state = SSL3_ST_SR_FINISHED_A;
 			break;
-#endif
 
 		case SSL3_ST_SR_FINISHED_A:
 		case SSL3_ST_SR_FINISHED_B:
@@ -694,9 +691,6 @@ ssl3_accept(SSL *s)
 				goto end;
 			s->state = SSL3_ST_SW_FLUSH;
 			if (s->hit) {
-#ifdef OPENSSL_NO_NEXTPROTONEG
-				s->s3->tmp.next_state = SSL3_ST_SR_FINISHED_A;
-#else
 				if (s->s3->next_proto_neg_seen) {
 					s->s3->flags |= SSL3_FLAGS_CCS_OK;
 					s->s3->tmp.next_state =
@@ -704,7 +698,6 @@ ssl3_accept(SSL *s)
 				} else
 					s->s3->tmp.next_state =
 					    SSL3_ST_SR_FINISHED_A;
-#endif
 			} else
 				s->s3->tmp.next_state = SSL_ST_OK;
 			s->init_num = 0;
@@ -1619,9 +1612,10 @@ ssl3_send_server_key_exchange(SSL *s)
 				q = md_buf;
 				j = 0;
 				for (num = 2; num > 0; num--) {
-					EVP_DigestInit_ex(&md_ctx,
+					if (!EVP_DigestInit_ex(&md_ctx,
 					    (num == 2) ? s->ctx->md5 :
-					    s->ctx->sha1, NULL);
+					    s->ctx->sha1, NULL))
+						goto err;
 					EVP_DigestUpdate(&md_ctx,
 					    s->s3->client_random,
 					    SSL3_RANDOM_SIZE);
@@ -1828,6 +1822,12 @@ ssl3_get_client_key_exchange(SSL *s)
 	alg_k = s->s3->tmp.new_cipher->algorithm_mkey;
 
 	if (alg_k & SSL_kRSA) {
+		char fakekey[SSL_MAX_MASTER_KEY_LENGTH];
+
+		arc4random_buf(fakekey, sizeof(fakekey));
+		fakekey[0] = s->client_version >> 8;
+		fakekey[1] = s->client_version & 0xff;
+
 		pkey = s->cert->pkeys[SSL_PKEY_RSA_ENC].privatekey;
 		if ((pkey == NULL) || (pkey->type != EVP_PKEY_RSA) ||
 		    (pkey->pkey.rsa == NULL)) {
@@ -1856,6 +1856,8 @@ ssl3_get_client_key_exchange(SSL *s)
 		}
 
 		i = RSA_private_decrypt((int)n, p, p, rsa, RSA_PKCS1_PADDING);
+
+		ERR_clear_error();
 
 		al = -1;
 
@@ -1908,11 +1910,8 @@ ssl3_get_client_key_exchange(SSL *s)
 			 * on PKCS #1 v1.5 RSA padding (see RFC 2246,
 			 * section 7.4.7.1).
 			 */
-			ERR_clear_error();
 			i = SSL_MAX_MASTER_KEY_LENGTH;
-			p[0] = s->client_version >> 8;
-			p[1] = s->client_version & 0xff;
-			arc4random_buf(p + 2, i - 2);
+			p = fakekey;
 		}
 
 		s->session->master_key_length =
@@ -2134,9 +2133,7 @@ ssl3_get_client_key_exchange(SSL *s)
 
 		/* Get our certificate private key*/
 		alg_a = s->s3->tmp.new_cipher->algorithm_auth;
-		if (alg_a & SSL_aGOST94)
-			pk = s->cert->pkeys[SSL_PKEY_GOST94].privatekey;
-		else if (alg_a & SSL_aGOST01)
+		if (alg_a & SSL_aGOST01)
 			pk = s->cert->pkeys[SSL_PKEY_GOST01].privatekey;
 
 		pkey_ctx = EVP_PKEY_CTX_new(pk, NULL);
@@ -2845,7 +2842,6 @@ ssl3_send_cert_status(SSL *s)
 	return (ssl3_do_write(s, SSL3_RT_HANDSHAKE));
 }
 
-# ifndef OPENSSL_NO_NEXTPROTONEG
 /*
  * ssl3_get_next_proto reads a Next Protocol Negotiation handshake message.
  * It sets the next_proto member in s if found
@@ -2916,4 +2912,3 @@ ssl3_get_next_proto(SSL *s)
 
 	return (1);
 }
-# endif

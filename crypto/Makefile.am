@@ -8,7 +8,7 @@ lib_LTLIBRARIES = libcrypto.la
 
 EXTRA_DIST = VERSION
 
-libcrypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@
+libcrypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@ -no-undefined
 libcrypto_la_LIBADD = libcompat.la libcompatnoopt.la
 libcrypto_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
 libcrypto_la_CFLAGS += -DOPENSSL_NO_HW_PADLOCK
@@ -74,8 +74,14 @@ if !HAVE_GETENTROPY
 if HOST_FREEBSD
 libcompat_la_SOURCES += compat/getentropy_freebsd.c
 endif
+if HOST_HPUX
+libcompat_la_SOURCES += compat/getentropy_hpux.c
+endif
 if HOST_LINUX
 libcompat_la_SOURCES += compat/getentropy_linux.c
+endif
+if HOST_NETBSD
+libcompat_la_SOURCES += compat/getentropy_netbsd.c
 endif
 if HOST_DARWIN
 libcompat_la_SOURCES += compat/getentropy_osx.c
@@ -94,6 +100,9 @@ if !HAVE_ISSETUGID
 if HOST_LINUX
 libcompat_la_SOURCES += compat/issetugid_linux.c
 endif
+if HOST_HPUX
+libcompat_la_SOURCES += compat/issetugid_hpux.c
+endif
 if HOST_WIN
 libcompat_la_SOURCES += compat/issetugid_win.c
 endif
@@ -102,7 +111,9 @@ endif
 noinst_HEADERS =
 noinst_HEADERS += compat/arc4random.h
 noinst_HEADERS += compat/arc4random_freebsd.h
+noinst_HEADERS += compat/arc4random_hpux.h
 noinst_HEADERS += compat/arc4random_linux.h
+noinst_HEADERS += compat/arc4random_netbsd.h
 noinst_HEADERS += compat/arc4random_osx.h
 noinst_HEADERS += compat/arc4random_solaris.h
 noinst_HEADERS += compat/arc4random_win.h

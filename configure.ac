@@ -22,10 +22,18 @@ case $host_os in
 		HOST_ABI=elf
 		AC_SUBST([PROG_LDADD], ['-lthr'])
 		;;
+	*hpux*)
+		HOST_OS=hpux;
+		CFLAGS="$CFLAGS -mlp64 -D_XOPEN_SOURCE=600 -D__STRICT_ALIGNMENT"
+		AC_SUBST([PLATFORM_LDADD], ['-lpthread'])
+		;;
 	*linux*)
 		HOST_OS=linux
 		HOST_ABI=elf
 		CFLAGS="$CFLAGS -D_DEFAULT_SOURCE -D_BSD_SOURCE -D_POSIX_SOURCE -D_GNU_SOURCE"
+		;;
+	*netbsd*)
+		HOST_OS=netbsd
 		;;
 	*openbsd*)
 		HOST_ABI=elf
@@ -33,7 +41,7 @@ case $host_os in
 		;;
 	*mingw*)
 		HOST_OS=win
-		CFLAGS="$CFLAGS -D_GNU_SOURCE -D_POSIX -D_POSIX_SOURCE -D_REENTRANT -D_POSIX_THREAD_SAFE_FUNCTIONS -DWIN32_LEAN_AND_MEAN -D_WIN32_WINNT=0x0600 -DOPENSSL_NO_SPEED -D__USE_MINGW_ANSI_STDIO"
+		CFLAGS="$CFLAGS -D_GNU_SOURCE -D_POSIX -D_POSIX_SOURCE -D_REENTRANT -D_POSIX_THREAD_SAFE_FUNCTIONS -DWIN32_LEAN_AND_MEAN -D_WIN32_WINNT=0x0600 -DOPENSSL_NO_SPEED -DNO_SYSLOG -D__USE_MINGW_ANSI_STDIO"
 		AC_SUBST([PLATFORM_LDADD], ['-lws2_32'])
 		;;
 	*solaris*)
@@ -45,9 +53,17 @@ case $host_os in
 	*) ;;
 esac
 
+case $host_cpu in
+	*sparc*)
+		CFLAGS="$CFLAGS -D__STRICT_ALIGNMENT"
+		;;
+esac
+
 AM_CONDITIONAL([HOST_DARWIN],  [test x$HOST_OS = xdarwin])
 AM_CONDITIONAL([HOST_FREEBSD], [test x$HOST_OS = xfreebsd])
+AM_CONDITIONAL([HOST_HPUX],    [test x$HOST_OS = xhpux])
 AM_CONDITIONAL([HOST_LINUX],   [test x$HOST_OS = xlinux])
+AM_CONDITIONAL([HOST_NETBSD],  [test x$HOST_OS = xnetbsd])
 AM_CONDITIONAL([HOST_SOLARIS], [test x$HOST_OS = xsolaris])
 AM_CONDITIONAL([HOST_WIN],     [test x$HOST_OS = xwin])
 
@@ -57,12 +73,102 @@ AC_CHECK_FUNC([clock_gettime],,
 AC_CHECK_FUNC([dl_iterate_phdr],,
 	[AC_SEARCH_LIBS([dl_iterate_phdr],[dl])])
 
-AM_PROG_AS
 AC_PROG_CC
 AC_PROG_LIBTOOL
 AC_PROG_CC_STDC
 AM_PROG_CC_C_O
 
+AC_MSG_CHECKING([if compiling with clang])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [[
+#ifndef __clang__
+	not clang
+#endif
+	]])],
+	[CLANG=yes],
+	[CLANG=no]
+)
+AC_MSG_RESULT([$CLANG])
+AS_IF([test "x$CLANG" = "xyes"], [CLANG_FLAGS=-Qunused-arguments])
+
+# We want to check for compiler flag support. Prior to clang v5.1, there was no
+# way to make clang's "argument unused" warning fatal.  So we invoke the
+# compiler through a wrapper script that greps for this message.
+saved_CC="$CC"
+saved_LD="$LD"
+flag_wrap="$srcdir/scripts/wrap-compiler-for-flag-check"
+CC="$flag_wrap $CC"
+LD="$flag_wrap $LD"
+
+AC_ARG_ENABLE([hardening],
+	[AS_HELP_STRING([--disable-hardening],
+			[Disable options to frustrate memory corruption exploits])],
+	[], [enable_hardening=yes])
+
+AC_DEFUN([CHECK_CFLAG], [
+	 AC_LANG_ASSERT(C)
+	 AC_MSG_CHECKING([if $saved_CC supports "$1"])
+	 old_cflags="$CFLAGS"
+	 CFLAGS="$1 -Wall -Werror"
+	 AC_TRY_LINK([
+		      #include <stdio.h>
+		      ],
+		     [printf("Hello")],
+		     AC_MSG_RESULT([yes])
+		     CFLAGS=$old_cflags
+		     HARDEN_CFLAGS="$HARDEN_CFLAGS $1",
+		     AC_MSG_RESULT([no])
+		     CFLAGS=$old_cflags
+		     [$2])
+])
+
+AC_DEFUN([CHECK_LDFLAG], [
+	 AC_LANG_ASSERT(C)
+	 AC_MSG_CHECKING([if $saved_LD supports "$1"])
+	 old_ldflags="$LDFLAGS"
+	 LDFLAGS="$1 -Wall -Werror"
+	 AC_TRY_LINK([
+		      #include <stdio.h>
+		      ],
+		     [printf("Hello")],
+		     AC_MSG_RESULT([yes])
+		     LDFLAGS=$old_ldflags
+		     HARDEN_LDFLAGS="$HARDEN_LDFLAGS $1",
+		     AC_MSG_RESULT([no])
+		     LDFLAGS=$old_ldflags
+		     [$2])
+])
+
+AS_IF([test "x$enable_hardening" = "xyes"], [
+	# Tell GCC to NOT optimize based on signed arithmetic overflow
+	CHECK_CFLAG([[-fno-strict-overflow]])
+
+	# _FORTIFY_SOURCE replaces builtin functions with safer versions.
+	CHECK_CFLAG([[-D_FORTIFY_SOURCE=2]])
+
+	# Enable read only relocations
+	CHECK_LDFLAG([[-Wl,-z,relro]])
+	CHECK_LDFLAG([[-Wl,-z,now]])
+])
+
+# Use stack-protector-strong if available; if not, fallback to
+# stack-protector-all which is considered to be overkill
+AS_IF([test "x$enable_hardening" = "xyes" -a "x$HOST_OS" != "xwin"], [
+	CHECK_CFLAG([[-fstack-protector-strong]],
+		CHECK_CFLAG([[-fstack-protector-all]],
+			AC_MSG_WARN([compiler does not appear to support stack protection])
+		)
+	)
+])
+
+
+# Restore CC, LD
+CC="$saved_CC"
+LD="$saved_LD"
+
+CFLAGS="$CFLAGS $HARDEN_CFLAGS"
+LDFLAGS="$LDFLAGS $HARDEN_LDFLAGS"
+
+# Removing the dependency on -Wno-pointer-sign should be a goal
 save_cflags="$CFLAGS"
 CFLAGS=-Wno-pointer-sign
 AC_MSG_CHECKING([whether CC supports -Wno-pointer-sign])
@@ -73,16 +179,18 @@ AC_COMPILE_IFELSE([AC_LANG_PROGRAM([])],
 )
 CFLAGS="$save_cflags $AM_CFLAGS"
 
-AC_MSG_CHECKING([if compiling with clang])
-AC_COMPILE_IFELSE([AC_LANG_PROGRAM([], [[
-#ifndef __clang__
-	not clang
-#endif
-	]])],
+save_cflags="$CFLAGS"
+CFLAGS=
+AC_MSG_CHECKING([whether AS supports .note.GNU-stack])
+AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[
+__asm__(".section .note.GNU-stack,\"\",@progbits");]])],
 	[AC_MSG_RESULT([yes])]
-	[CLANG_FLAGS=-Qunused-arguments],
+	[AM_CFLAGS=-DHAVE_GNU_STACK],
 	[AC_MSG_RESULT([no])]
 )
+CFLAGS="$save_cflags $AM_CFLAGS"
+AM_PROG_AS
+
 CFLAGS="$CFLAGS $CLANG_CFLAGS"
 LDFLAGS="$LDFLAGS $CLANG_FLAGS"
 
@@ -110,7 +218,10 @@ AM_CONDITIONAL([HAVE_TIMINGSAFE_MEMCMP], [test "x$ac_cv_func_timingsafe_memcmp" 
 
 # overrides for arc4random_buf implementations with known issues
 AM_CONDITIONAL([HAVE_ARC4RANDOM_BUF],
-	[test "x$HOST_OS" != xdarwin -a "x$HOST_OS" != xfreebsd -a "x$ac_cv_func_arc4random_buf" = xyes])
+	[test "x$HOST_OS" != xdarwin \
+	   -a "x$HOST_OS" != xfreebsd \
+	   -a "x$HOST_OS" != xnetbsd \
+	   -a "x$ac_cv_func_arc4random_buf" = xyes])
 
 AC_CACHE_CHECK([whether va_copy exists], ac_cv_have_va_copy, [
 	AC_LINK_IFELSE([AC_LANG_PROGRAM([[

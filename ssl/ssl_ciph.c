@@ -1,25 +1,25 @@
-/* $OpenBSD: ssl_ciph.c,v 1.76 2014/12/06 15:27:45 jsing Exp $ */
+/* $OpenBSD: ssl_ciph.c,v 1.78 2014/12/10 15:36:47 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
  * This package is an SSL implementation written
  * by Eric Young (eay@cryptsoft.com).
  * The implementation was written so as to conform with Netscapes SSL.
- * 
+ *
  * This library is free for commercial and non-commercial use as long as
  * the following conditions are aheared to.  The following conditions
  * apply to all code found in this distribution, be it the RC4, RSA,
  * lhash, DES, etc., code; not just the SSL code.  The SSL documentation
  * included with this distribution is covered by the same copyright terms
  * except that the holder is Tim Hudson (tjh@cryptsoft.com).
- * 
+ *
  * Copyright remains Eric Young's, and as such any Copyright notices in
  * the code are not to be removed.
  * If this package is used in a product, Eric Young should be given attribution
  * as the author of the parts of the library used.
  * This can be in the form of a textual message at program startup or
  * in documentation (online or textual) provided with the package.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -34,10 +34,10 @@
  *     Eric Young (eay@cryptsoft.com)"
  *    The word 'cryptographic' can be left out if the rouines from the library
  *    being used are not cryptographic related :-).
- * 4. If you include any Windows specific code (or a derivative thereof) from 
+ * 4. If you include any Windows specific code (or a derivative thereof) from
  *    the apps directory (application code) you must include an acknowledgement:
  *    "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -49,7 +49,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- * 
+ *
  * The licence and distribution terms for any publically available version or
  * derivative of this code cannot be changed.  i.e. this code cannot simply be
  * copied and put under another distribution licence
@@ -63,7 +63,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -110,7 +110,7 @@
  */
 /* ====================================================================
  * Copyright 2002 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
- * ECC cipher suite support in OpenSSL originally developed by 
+ * ECC cipher suite support in OpenSSL originally developed by
  * SUN MICROSYSTEMS, INC., and contributed to the OpenSSL project.
  */
 /* ====================================================================
@@ -177,10 +177,10 @@ static const EVP_CIPHER *ssl_cipher_methods[SSL_ENC_NUM_IDX] = {
 #define SSL_MD_SHA384_IDX 5
 #define SSL_MD_STREEBOG256_IDX 6
 #define SSL_MD_STREEBOG512_IDX 7
-/*Constant SSL_MAX_DIGEST equal to size of digests array should be 
+/*Constant SSL_MAX_DIGEST equal to size of digests array should be
  * defined in the
  * ssl_locl.h */
-#define SSL_MD_NUM_IDX	SSL_MAX_DIGEST 
+#define SSL_MD_NUM_IDX	SSL_MAX_DIGEST
 static const EVP_MD *ssl_digest_methods[SSL_MD_NUM_IDX] = {
 	NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
 };
@@ -227,7 +227,7 @@ static const SSL_CIPHER cipher_aliases[] = {
 		.name = SSL_TXT_CMPALL,
 		.algorithm_enc = SSL_eNULL,
 	},
-	
+
 	/*
 	 * "COMPLEMENTOFDEFAULT"
 	 * (does *not* include ciphersuites not found in ALL!)
@@ -238,7 +238,7 @@ static const SSL_CIPHER cipher_aliases[] = {
 		.algorithm_auth = SSL_aNULL,
 		.algorithm_enc = ~SSL_eNULL,
 	},
-	
+
 	/*
 	 * key exchange aliases
 	 * (some of those using only a single bit here combine multiple key
@@ -257,7 +257,7 @@ static const SSL_CIPHER cipher_aliases[] = {
 		.name = SSL_TXT_DH,
 		.algorithm_mkey = SSL_kDHE,
 	},
-	
+
 	{
 		.name = SSL_TXT_kECDHr,
 		.algorithm_mkey = SSL_kECDHr,
@@ -278,12 +278,12 @@ static const SSL_CIPHER cipher_aliases[] = {
 		.name = SSL_TXT_ECDH,
 		.algorithm_mkey = SSL_kECDHr|SSL_kECDHe|SSL_kECDHE,
 	},
-	
+
 	{
 		.name = SSL_TXT_kGOST,
 		.algorithm_mkey = SSL_kGOST,
 	},
-	
+
 	/* server authentication aliases */
 	{
 		.name = SSL_TXT_aRSA,
@@ -314,16 +314,12 @@ static const SSL_CIPHER cipher_aliases[] = {
 		.algorithm_auth = SSL_aECDSA,
 	},
 	{
-		.name = SSL_TXT_aGOST94,
-		.algorithm_auth = SSL_aGOST94,
-	},
-	{
 		.name = SSL_TXT_aGOST01,
 		.algorithm_auth = SSL_aGOST01,
 	},
 	{
 		.name = SSL_TXT_aGOST,
-		.algorithm_auth = SSL_aGOST94|SSL_aGOST01,
+		.algorithm_auth = SSL_aGOST01,
 	},
 
 	/* aliases combining key exchange and server authentication */
@@ -420,7 +416,7 @@ static const SSL_CIPHER cipher_aliases[] = {
 		.name = SSL_TXT_CHACHA20,
 		.algorithm_enc = SSL_CHACHA20POLY1305,
 	},
-	
+
 	/* MAC aliases */
 	{
 		.name = SSL_TXT_MD5,
@@ -458,7 +454,7 @@ static const SSL_CIPHER cipher_aliases[] = {
 		.name = SSL_TXT_STREEBOG512,
 		.algorithm_mac = SSL_STREEBOG512,
 	},
-	
+
 	/* protocol version aliases */
 	{
 		.name = SSL_TXT_SSLV3,
@@ -472,7 +468,7 @@ static const SSL_CIPHER cipher_aliases[] = {
 		.name = SSL_TXT_TLSV1_2,
 		.algorithm_ssl = SSL_TLSV1_2,
 	},
-	
+
 	/* strength classes */
 	{
 		.name = SSL_TXT_LOW,
@@ -808,12 +804,10 @@ ssl_cipher_get_disabled(unsigned long *mkey, unsigned long *auth,
 	 * algorithms. If they are not available disable the associated
 	 * authentication and key exchange algorithms.
 	 */
-	if (EVP_PKEY_meth_find(NID_id_GostR3410_94) == NULL)
-		*auth |= SSL_aGOST94;
-	if (EVP_PKEY_meth_find(NID_id_GostR3410_2001) == NULL)
+	if (EVP_PKEY_meth_find(NID_id_GostR3410_2001) == NULL) {
 		*auth |= SSL_aGOST01;
-	if (((~*auth) & (SSL_aGOST94|SSL_aGOST01)) == 0)
 		*mkey |= SSL_kGOST;
+	}
 
 #ifdef SSL_FORBID_ENULL
 	*enc |= SSL_eNULL;
@@ -882,7 +876,7 @@ ssl_cipher_collect_ciphers(const SSL_METHOD *ssl_method, int num_of_ciphers,
 
 	/*
 	 * Prepare linked list from list entries
-	 */	
+	 */
 	if (co_list_num > 0) {
 		co_list[0].prev = NULL;
 
@@ -1588,9 +1582,6 @@ SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 		break;
 	case SSL_aECDSA:
 		au = "ECDSA";
-		break;
-	case SSL_aGOST94:
-		au = "GOST94";
 		break;
 	case SSL_aGOST01:
 		au = "GOST01";
