@@ -1,7 +1,7 @@
 Index: libressl/Makefile.am
 ===================================================================
---- libressl.orig/Makefile.am	2015-01-07 12:45:36.000000000 +0100
-+++ libressl/Makefile.am	2015-01-07 12:48:53.000000000 +0100
+--- libressl.orig/Makefile.am	2015-01-30 10:37:21.000000000 +0100
++++ libressl/Makefile.am	2015-01-30 10:39:07.000000000 +0100
 @@ -2,10 +2,10 @@
  ACLOCAL_AMFLAGS = -I m4
  
@@ -14,31 +14,11 @@ Index: libressl/Makefile.am
 +pkgconfig_DATA += libressl-tls.pc
  endif
  
- EXTRA_DIST = VERSION
-Index: libressl/libcrypto.pc.in
-===================================================================
---- libressl.orig/libcrypto.pc.in	2015-01-07 12:45:36.000000000 +0100
-+++ /dev/null	1970-01-01 00:00:00.000000000 +0000
-@@ -1,15 +0,0 @@
--#libcrypto pkg-config source file
--
--prefix=@prefix@
--exec_prefix=@exec_prefix@
--libdir=@libdir@
--includedir=@includedir@
--
--Name: LibreSSL-libssl
--Description: Secure Sockets Layer and cryptography libraries
--Version: @VERSION@
--Requires:
--Conflicts:
--Libs: -L${libdir} -lcrypto
--Libs.private: @LIBS@
--Cflags: -I${includedir}
+ EXTRA_DIST = VERSION config scripts
 Index: libressl/libressl-crypto.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-crypto.pc.in	2015-01-07 12:48:53.000000000 +0100
++++ libressl/libressl-crypto.pc.in	2015-01-30 10:40:15.000000000 +0100
 @@ -0,0 +1,15 @@
 +#libcrypto pkg-config source file
 +
@@ -49,7 +29,7 @@ Index: libressl/libressl-crypto.pc.in
 +
 +Name: LibreSSL-libssl
 +Description: Secure Sockets Layer and cryptography libraries
-+Version: @VERSION@
++Version: @LIBCRYPTO_VERSION@
 +Requires:
 +Conflicts:
 +Libs: -L${libdir} -lressl-crypto
@@ -58,7 +38,7 @@ Index: libressl/libressl-crypto.pc.in
 Index: libressl/libressl-openssl.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-openssl.pc.in	2015-01-07 12:48:53.000000000 +0100
++++ libressl/libressl-openssl.pc.in	2015-01-30 10:39:07.000000000 +0100
 @@ -0,0 +1,11 @@
 +#openssl pkg-config source file
 +
@@ -74,7 +54,7 @@ Index: libressl/libressl-openssl.pc.in
 Index: libressl/libressl-ssl.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-ssl.pc.in	2015-01-07 12:48:53.000000000 +0100
++++ libressl/libressl-ssl.pc.in	2015-01-30 10:41:05.000000000 +0100
 @@ -0,0 +1,16 @@
 +#libssl pkg-config source file
 +
@@ -85,37 +65,16 @@ Index: libressl/libressl-ssl.pc.in
 +
 +Name: LibreSSL-libssl
 +Description: Secure Sockets Layer and cryptography libraries
-+Version: @VERSION@
++Version: @LIBSSL_VERSION@
 +Requires:
 +Requires.private: libressl-crypto
 +Conflicts:
 +Libs: -L${libdir} -lressl-ssl
 +Libs.private: @LIBS@ -lressl-crypto
 +Cflags: -I${includedir}
-Index: libressl/libssl.pc.in
-===================================================================
---- libressl.orig/libssl.pc.in	2015-01-07 12:45:36.000000000 +0100
-+++ /dev/null	1970-01-01 00:00:00.000000000 +0000
-@@ -1,16 +0,0 @@
--#libssl pkg-config source file
--
--prefix=@prefix@
--exec_prefix=@exec_prefix@
--libdir=@libdir@
--includedir=@includedir@
--
--Name: LibreSSL-libssl
--Description: Secure Sockets Layer and cryptography libraries
--Version: @VERSION@
--Requires:
--Requires.private: libcrypto
--Conflicts:
--Libs: -L${libdir} -lssl
--Libs.private: @LIBS@ -lcrypto
--Cflags: -I${includedir}
 Index: libressl/openssl.pc.in
 ===================================================================
---- libressl.orig/openssl.pc.in	2015-01-07 12:45:36.000000000 +0100
+--- libressl.orig/openssl.pc.in	2015-01-07 16:24:55.000000000 +0100
 +++ /dev/null	1970-01-01 00:00:00.000000000 +0000
 @@ -1,11 +0,0 @@
 -#openssl pkg-config source file
@@ -131,8 +90,8 @@ Index: libressl/openssl.pc.in
 -Requires: libssl libcrypto
 Index: libressl/crypto/Makefile.am
 ===================================================================
---- libressl.orig/crypto/Makefile.am	2015-01-07 12:45:36.000000000 +0100
-+++ libressl/crypto/Makefile.am	2015-01-07 12:48:53.000000000 +0100
+--- libressl.orig/crypto/Makefile.am	2015-01-30 10:37:21.000000000 +0100
++++ libressl/crypto/Makefile.am	2015-01-30 10:45:12.000000000 +0100
 @@ -4,19 +4,19 @@
  AM_CPPFLAGS += -I$(top_srcdir)/crypto/evp
  AM_CPPFLAGS += -I$(top_srcdir)/crypto/modes
@@ -142,11 +101,11 @@ Index: libressl/crypto/Makefile.am
  
  EXTRA_DIST = VERSION
  
--libcrypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@
+-libcrypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@ -no-undefined
 -libcrypto_la_LIBADD = libcompat.la libcompatnoopt.la
 -libcrypto_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
 -libcrypto_la_CFLAGS += -DOPENSSL_NO_HW_PADLOCK
-+libressl_crypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@
++libressl_crypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@ -no-undefined
 +libressl_crypto_la_LIBADD = libcompat.la libcompatnoopt.la
 +libressl_crypto_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
 +libressl_crypto_la_CFLAGS += -DOPENSSL_NO_HW_PADLOCK
@@ -160,7 +119,7 @@ Index: libressl/crypto/Makefile.am
  endif
  endif
  
-@@ -108,718 +108,718 @@
+@@ -119,718 +119,718 @@
  noinst_HEADERS += compat/arc4random_win.h
  noinst_HEADERS += compat/chacha_private.h
  
@@ -1436,9 +1395,9 @@ Index: libressl/crypto/Makefile.am
  noinst_HEADERS += x509v3/pcy_int.h
 Index: libressl/ssl/Makefile.am
 ===================================================================
---- libressl.orig/ssl/Makefile.am	2015-01-07 12:45:36.000000000 +0100
-+++ libressl/ssl/Makefile.am	2015-01-07 12:48:53.000000000 +0100
-@@ -1,52 +1,52 @@
+--- libressl.orig/ssl/Makefile.am	2015-01-30 10:37:22.000000000 +0100
++++ libressl/ssl/Makefile.am	2015-01-30 10:47:05.000000000 +0100
+@@ -1,53 +1,53 @@
  include $(top_srcdir)/Makefile.am.common
  
 -lib_LTLIBRARIES = libssl.la
@@ -1446,10 +1405,12 @@ Index: libressl/ssl/Makefile.am
  
  EXTRA_DIST = VERSION
  
--libssl_la_LDFLAGS = -version-info @LIBSSL_VERSION@
+-libssl_la_LDFLAGS = -version-info @LIBSSL_VERSION@ -no-undefined
 -libssl_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
-+libressl_ssl_la_LDFLAGS = -version-info @LIBSSL_VERSION@
+-libssl_la_LIBADD = ../crypto/libcrypto.la
++libressl_ssl_la_LDFLAGS = -version-info @LIBSSL_VERSION@ -no-undefined
 +libressl_ssl_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
++libressl_ssl_la_LIBADD = ../crypto/libressl-crypto.la
  
 -libssl_la_SOURCES = bio_ssl.c
 -libssl_la_SOURCES += d1_both.c
@@ -1536,8 +1497,8 @@ Index: libressl/ssl/Makefile.am
  noinst_HEADERS += ssl_locl.h
 Index: libressl/apps/Makefile.am
 ===================================================================
---- libressl.orig/apps/Makefile.am	2015-01-07 12:45:36.000000000 +0100
-+++ libressl/apps/Makefile.am	2015-01-07 12:48:53.000000000 +0100
+--- libressl.orig/apps/Makefile.am	2015-01-07 16:24:55.000000000 +0100
++++ libressl/apps/Makefile.am	2015-01-30 10:39:07.000000000 +0100
 @@ -1,76 +1,76 @@
  include $(top_srcdir)/Makefile.am.common
  
@@ -1676,9 +1637,9 @@ Index: libressl/apps/Makefile.am
  noinst_HEADERS = apps.h
 Index: libressl/configure.ac
 ===================================================================
---- libressl.orig/configure.ac	2015-01-07 12:45:36.000000000 +0100
-+++ libressl/configure.ac	2015-01-07 12:48:53.000000000 +0100
-@@ -163,7 +163,7 @@
+--- libressl.orig/configure.ac	2015-01-30 10:37:21.000000000 +0100
++++ libressl/configure.ac	2015-01-30 10:39:07.000000000 +0100
+@@ -274,7 +274,7 @@
  AC_ARG_ENABLE([libtls],
  	AS_HELP_STRING([--enable-libtls], [Enable building the libtls library]))
  AM_CONDITIONAL([ENABLE_LIBTLS], [test "x$enable_libtls" = xyes])
@@ -1687,7 +1648,7 @@ Index: libressl/configure.ac
  
  LT_INIT
  
-@@ -177,9 +177,9 @@
+@@ -288,9 +288,9 @@
  	tests/Makefile
  	apps/Makefile
  	man/Makefile
@@ -1702,8 +1663,8 @@ Index: libressl/configure.ac
  AC_OUTPUT
 Index: libressl/tests/Makefile.am
 ===================================================================
---- libressl.orig/tests/Makefile.am	2015-01-07 12:45:36.000000000 +0100
-+++ libressl/tests/Makefile.am	2015-01-07 12:48:53.000000000 +0100
+--- libressl.orig/tests/Makefile.am	2015-01-07 16:24:55.000000000 +0100
++++ libressl/tests/Makefile.am	2015-01-30 10:39:07.000000000 +0100
 @@ -4,8 +4,8 @@
  AM_CPPFLAGS += -I $(top_srcdir)/crypto/asn1
  
@@ -1715,31 +1676,10 @@ Index: libressl/tests/Makefile.am
  
  TESTS =
  check_PROGRAMS =
-Index: libressl/libtls.pc.in
-===================================================================
---- libressl.orig/libtls.pc.in	2015-01-07 12:45:36.000000000 +0100
-+++ /dev/null	1970-01-01 00:00:00.000000000 +0000
-@@ -1,16 +0,0 @@
--#libtls pkg-config source file
--
--prefix=@prefix@
--exec_prefix=@exec_prefix@
--libdir=@libdir@
--includedir=@includedir@
--
--Name: LibreSSL-libtls
--Description: Secure communications using the TLS socket protocol.
--Version: @VERSION@
--Requires:
--Requires.private: libcrypto libssl
--Conflicts:
--Libs: -L${libdir} -ltls
--Libs.private: @LIBS@ -lcrypto -lssl
--Cflags: -I${includedir}
 Index: libressl/libressl-tls.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-tls.pc.in	2015-01-07 12:48:53.000000000 +0100
++++ libressl/libressl-tls.pc.in	2015-01-30 10:41:25.000000000 +0100
 @@ -0,0 +1,16 @@
 +#libtls pkg-config source file
 +
@@ -1750,7 +1690,7 @@ Index: libressl/libressl-tls.pc.in
 +
 +Name: LibreSSL-libtls
 +Description: Secure communications using the TLS socket protocol.
-+Version: @VERSION@
++Version: @LIBTLS_VERSION@
 +Requires:
 +Requires.private: libressl-crypto libressl-ssl
 +Conflicts:
@@ -1759,8 +1699,8 @@ Index: libressl/libressl-tls.pc.in
 +Cflags: -I${includedir}
 Index: libressl/tests/testssl
 ===================================================================
---- libressl.orig/tests/testssl	2015-01-07 12:45:36.000000000 +0100
-+++ libressl/tests/testssl	2015-01-07 12:48:53.000000000 +0100
+--- libressl.orig/tests/testssl	2015-01-30 10:37:22.000000000 +0100
++++ libressl/tests/testssl	2015-01-30 10:39:07.000000000 +0100
 @@ -4,7 +4,7 @@
  cert="$2"
  CA="-CAfile $3"
@@ -1772,8 +1712,8 @@ Index: libressl/tests/testssl
  if $openssl x509 -in $cert -text -noout | fgrep 'DSA Public Key' >/dev/null; then
 Index: libressl/crypto/Makefile.am.elf-x86_64
 ===================================================================
---- libressl.orig/crypto/Makefile.am.elf-x86_64	2015-01-07 12:45:36.000000000 +0100
-+++ libressl/crypto/Makefile.am.elf-x86_64	2015-01-07 12:48:53.000000000 +0100
+--- libressl.orig/crypto/Makefile.am.elf-x86_64	2015-01-07 16:24:55.000000000 +0100
++++ libressl/crypto/Makefile.am.elf-x86_64	2015-01-30 10:39:07.000000000 +0100
 @@ -22,20 +22,20 @@
  EXTRA_DIST += $(ASM_X86_64_ELF)
  
@@ -1813,8 +1753,8 @@ Index: libressl/crypto/Makefile.am.elf-x86_64
  endif
 Index: libressl/crypto/Makefile.am.macosx-x86_64
 ===================================================================
---- libressl.orig/crypto/Makefile.am.macosx-x86_64	2015-01-07 12:45:36.000000000 +0100
-+++ libressl/crypto/Makefile.am.macosx-x86_64	2015-01-07 12:48:53.000000000 +0100
+--- libressl.orig/crypto/Makefile.am.macosx-x86_64	2015-01-07 16:24:55.000000000 +0100
++++ libressl/crypto/Makefile.am.macosx-x86_64	2015-01-30 10:39:07.000000000 +0100
 @@ -22,20 +22,20 @@
  EXTRA_DIST += $(ASM_X86_64_MACOSX)
  
@@ -1854,9 +1794,9 @@ Index: libressl/crypto/Makefile.am.macosx-x86_64
  endif
 Index: libressl/tls/Makefile.am
 ===================================================================
---- libressl.orig/tls/Makefile.am	2015-01-07 12:05:06.000000000 +0100
-+++ libressl/tls/Makefile.am	2015-01-07 12:49:26.000000000 +0100
-@@ -1,18 +1,18 @@
+--- libressl.orig/tls/Makefile.am	2015-01-30 10:37:22.000000000 +0100
++++ libressl/tls/Makefile.am	2015-01-30 10:46:51.000000000 +0100
+@@ -1,19 +1,19 @@
  include $(top_srcdir)/Makefile.am.common
  
  if ENABLE_LIBTLS
@@ -1865,10 +1805,12 @@ Index: libressl/tls/Makefile.am
  
  EXTRA_DIST = VERSION
  
--libtls_la_LDFLAGS = -version-info @LIBTLS_VERSION@
+-libtls_la_LDFLAGS = -version-info @LIBTLS_VERSION@ -no-undefined
 -libtls_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
-+libressl_tls_la_LDFLAGS = -version-info @LIBTLS_VERSION@
+-libtls_la_LIBADD = ../crypto/libcrypto.la ../ssl/libssl.la $(PLATFORM_LDADD)
++libressl_tls_la_LDFLAGS = -version-info @LIBTLS_VERSION@ -no-undefined
 +libressl_tls_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
++libressl_tls_la_LIBADD = ../crypto/libressl-crypto.la ../ssl/libressl-ssl.la $(PLATFORM_LDADD)
  
 -libtls_la_SOURCES = tls.c
 -libtls_la_SOURCES += tls_client.c
@@ -1884,3 +1826,65 @@ Index: libressl/tls/Makefile.am
 +libressl_tls_la_SOURCES += tls_verify.c
  noinst_HEADERS = tls_internal.h
  endif
+Index: libressl/libcrypto.pc.in
+===================================================================
+--- libressl.orig/libcrypto.pc.in	2015-01-30 10:48:24.000000000 +0100
++++ /dev/null	1970-01-01 00:00:00.000000000 +0000
+@@ -1,15 +0,0 @@
+-#libcrypto pkg-config source file
+-
+-prefix=@prefix@
+-exec_prefix=@exec_prefix@
+-libdir=@libdir@
+-includedir=@includedir@
+-
+-Name: LibreSSL-libssl
+-Description: Secure Sockets Layer and cryptography libraries
+-Version: @LIBCRYPTO_VERSION@
+-Requires:
+-Conflicts:
+-Libs: -L${libdir} -lcrypto
+-Libs.private: @LIBS@
+-Cflags: -I${includedir}
+Index: libressl/libssl.pc.in
+===================================================================
+--- libressl.orig/libssl.pc.in	2015-01-30 10:48:24.000000000 +0100
++++ /dev/null	1970-01-01 00:00:00.000000000 +0000
+@@ -1,16 +0,0 @@
+-#libssl pkg-config source file
+-
+-prefix=@prefix@
+-exec_prefix=@exec_prefix@
+-libdir=@libdir@
+-includedir=@includedir@
+-
+-Name: LibreSSL-libssl
+-Description: Secure Sockets Layer and cryptography libraries
+-Version: @LIBSSL_VERSION@
+-Requires:
+-Requires.private: libcrypto
+-Conflicts:
+-Libs: -L${libdir} -lssl
+-Libs.private: @LIBS@ -lcrypto
+-Cflags: -I${includedir}
+Index: libressl/libtls.pc.in
+===================================================================
+--- libressl.orig/libtls.pc.in	2015-01-30 10:48:24.000000000 +0100
++++ /dev/null	1970-01-01 00:00:00.000000000 +0000
+@@ -1,16 +0,0 @@
+-#libtls pkg-config source file
+-
+-prefix=@prefix@
+-exec_prefix=@exec_prefix@
+-libdir=@libdir@
+-includedir=@includedir@
+-
+-Name: LibreSSL-libtls
+-Description: Secure communications using the TLS socket protocol.
+-Version: @LIBTLS_VERSION@
+-Requires:
+-Requires.private: libcrypto libssl
+-Conflicts:
+-Libs: -L${libdir} -ltls
+-Libs.private: @LIBS@ -lcrypto -lssl
+-Cflags: -I${includedir}
