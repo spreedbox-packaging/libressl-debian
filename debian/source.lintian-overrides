@@ -1,0 +1,4 @@
+# dependencies are generated through substitution variables
+libressl source: dbg-package-missing-depends libressl-crypto-dbg
+libressl source: dbg-package-missing-depends libressl-ssl-dbg
+libressl source: dbg-package-missing-depends libressl-tls-dbg

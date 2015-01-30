@@ -1,24 +1,27 @@
 #!/usr/bin/make -f
 #export DH_VERBOSE=1
 
-LIBRESSL_VERSION := $(shell dpkg-parsechangelog | egrep '^Version:' | cut -f 2 -d ' ' | cut -f 1 -d '-')
+LIBCRYPTO_VERSION := $(shell cat crypto/VERSION | cut -f 1 -d ':' | tr -d '\n')
+LIBSSL_VERSION := $(shell cat ssl/VERSION | cut -f 1 -d ':' | tr -d '\n')
+LIBTLS_VERSION := $(shell cat tls/VERSION | cut -f 1 -d ':' | tr -d '\n')
+
+SUBSTVARS = \
+	-Vpackage:libcrypto="libressl-crypto-$(LIBCRYPTO_VERSION)" \
+	-Vpackage:libssl="libressl-ssl-$(LIBSSL_VERSION)" \
+	-Vpackage:libtls="libressl-tls-$(LIBTLS_VERSION)"
 
 %:
 	dh $@ --with autoreconf --parallel
 
-override_dh_autoreconf:
-	if [ ! -e "VERSION" ] ; then echo $(LIBRESSL_VERSION) > VERSION; fi
-	dh_autoreconf
-
 override_dh_auto_configure:
 	dh_auto_configure -- --enable-libtls
 
-override_dh_auto_install:
-	dh_auto_install
+override_dh_gencontrol:
+	dh_gencontrol -- $(SUBSTVARS)
 
 override_dh_strip:
-	dh_strip -plibressl-crypto-30 --dbg-package=libressl-crypto-dbg
-	dh_strip -plibressl-ssl-29 --dbg-package=libressl-ssl-dbg
-	dh_strip -plibressl-tls-1 --dbg-package=libressl-tls-dbg
+	dh_strip -plibressl-crypto-$(LIBCRYPTO_VERSION) --dbg-package=libressl-crypto-dbg
+	dh_strip -plibressl-ssl-$(LIBSSL_VERSION) --dbg-package=libressl-ssl-dbg
+	dh_strip -plibressl-tls-$(LIBTLS_VERSION) --dbg-package=libressl-tls-dbg
 	dh_strip -plibressl-apps --dbg-package=libressl-apps-dbg
 	dh_strip --remaining-packages
