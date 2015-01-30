@@ -1,4 +1,4 @@
-/* $OpenBSD: s_client.c,v 1.8 2014/11/18 20:54:28 krw Exp $ */
+/* $OpenBSD: s_client.c,v 1.11 2014/12/14 14:42:06 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -204,6 +204,7 @@ sc_usage(void)
 	BIO_printf(bio_err, " -host host     - use -connect instead\n");
 	BIO_printf(bio_err, " -port port     - use -connect instead\n");
 	BIO_printf(bio_err, " -connect host:port - who to connect to (default is %s:%s)\n", SSL_HOST_NAME, PORT_STR);
+	BIO_printf(bio_err, " -proxy host:port - connect to http proxy\n");
 
 	BIO_printf(bio_err, " -verify arg   - turn on peer certificate verification\n");
 	BIO_printf(bio_err, " -cert arg     - certificate file to use, PEM format assumed\n");
@@ -250,9 +251,8 @@ sc_usage(void)
 	BIO_printf(bio_err, " -tlsextdebug      - hex dump of all TLS extensions received\n");
 	BIO_printf(bio_err, " -status           - request certificate status from server\n");
 	BIO_printf(bio_err, " -no_ticket        - disable use of RFC4507bis session tickets\n");
-#ifndef OPENSSL_NO_NEXTPROTONEG
 	BIO_printf(bio_err, " -nextprotoneg arg - enable NPN extension, considering named protocols supported (comma-separated list)\n");
-#endif
+	BIO_printf(bio_err, " -alpn arg         - enable ALPN extension, considering named protocols supported (comma-separated list)\n");
 #ifndef OPENSSL_NO_SRTP
 	BIO_printf(bio_err, " -use_srtp profiles - Offer SRTP key management with a colon-separated profile list\n");
 #endif
@@ -285,7 +285,6 @@ ssl_servername_cb(SSL * s, int *ad, void *arg)
 char *srtp_profiles = NULL;
 #endif
 
-#ifndef OPENSSL_NO_NEXTPROTONEG
 /* This the context that we pass to next_proto_cb */
 typedef struct tlsextnextprotoctx_st {
 	unsigned char *data;
@@ -315,7 +314,6 @@ next_proto_cb(SSL * s, unsigned char **out, unsigned char *outlen, const unsigne
 	ctx->status = SSL_select_next_proto(out, outlen, in, inlen, ctx->data, ctx->len);
 	return SSL_TLSEXT_ERR_OK;
 }
-#endif				/* ndef OPENSSL_NO_NEXTPROTONEG */
 
 enum {
 	PROTO_OFF = 0,
@@ -341,6 +339,7 @@ s_client_main(int argc, char **argv)
 	char *port = PORT_STR;
 	int full_log = 1;
 	char *host = SSL_HOST_NAME;
+	char *proxy = NULL, *connect = NULL;
 	char *cert_file = NULL, *key_file = NULL;
 	int cert_format = FORMAT_PEM, key_format = FORMAT_PEM;
 	char *passarg = NULL, *pass = NULL;
@@ -371,9 +370,8 @@ s_client_main(int argc, char **argv)
 	char *servername = NULL;
 	tlsextctx tlsextcbp =
 	{NULL, 0};
-#ifndef OPENSSL_NO_NEXTPROTONEG
 	const char *next_proto_neg_in = NULL;
-#endif
+	const char *alpn_in = NULL;
 	char *sess_in = NULL;
 	char *sess_out = NULL;
 	struct sockaddr peer;
@@ -416,8 +414,11 @@ s_client_main(int argc, char **argv)
 		} else if (strcmp(*argv, "-connect") == 0) {
 			if (--argc < 1)
 				goto bad;
-			if (!extract_host_port(*(++argv), &host, NULL, &port))
+			connect = *(++argv);
+		} else if (strcmp(*argv, "-proxy") == 0) {
+			if (--argc < 1)
 				goto bad;
+			proxy = *(++argv);
 		} else if (strcmp(*argv, "-verify") == 0) {
 			verify = SSL_VERIFY_PEER;
 			if (--argc < 1)
@@ -537,14 +538,16 @@ s_client_main(int argc, char **argv)
 		else if (strcmp(*argv, "-no_ticket") == 0) {
 			off |= SSL_OP_NO_TICKET;
 		}
-#ifndef OPENSSL_NO_NEXTPROTONEG
 		else if (strcmp(*argv, "-nextprotoneg") == 0) {
 			if (--argc < 1)
 				goto bad;
 			next_proto_neg_in = *(++argv);
 		}
-#endif
-		else if (strcmp(*argv, "-serverpref") == 0)
+		else if (strcmp(*argv, "-alpn") == 0) {
+			if (--argc < 1)
+				goto bad;
+			alpn_in = *(++argv);
+		} else if (strcmp(*argv, "-serverpref") == 0)
 			off |= SSL_OP_CIPHER_SERVER_PREFERENCE;
 		else if (strcmp(*argv, "-legacy_renegotiation") == 0)
 			; /* no-op */
@@ -626,6 +629,15 @@ s_client_main(int argc, char **argv)
 		argc--;
 		argv++;
 	}
+	if (proxy != NULL) {
+		if (!extract_host_port(proxy, &host, NULL, &port))
+			goto bad;
+		if (connect == NULL)
+			connect = SSL_HOST_NAME;
+	} else if (connect != NULL) {
+		if (!extract_host_port(connect, &host, NULL, &port))
+			goto bad;
+	}
 	if (badop) {
 bad:
 		if (errstr)
@@ -636,7 +648,6 @@ bad:
 		goto end;
 	}
 
-#if !defined(OPENSSL_NO_NEXTPROTONEG)
 	next_proto.status = -1;
 	if (next_proto_neg_in) {
 		next_proto.data = next_protos_parse(&next_proto.len, next_proto_neg_in);
@@ -646,7 +657,6 @@ bad:
 		}
 	} else
 		next_proto.data = NULL;
-#endif
 
 #ifndef OPENSSL_NO_ENGINE
 	e = setup_engine(bio_err, engine_id, 1);
@@ -732,10 +742,19 @@ bad:
 	if (socket_type == SOCK_DGRAM)
 		SSL_CTX_set_read_ahead(ctx, 1);
 
-#if !defined(OPENSSL_NO_NEXTPROTONEG)
 	if (next_proto.data)
 		SSL_CTX_set_next_proto_select_cb(ctx, next_proto_cb, &next_proto);
-#endif
+	if (alpn_in) {
+		unsigned short alpn_len;
+		unsigned char *alpn = next_protos_parse(&alpn_len, alpn_in);
+
+		if (alpn == NULL) {
+			BIO_printf(bio_err, "Error parsing -alpn argument\n");
+			goto end;
+		}
+		SSL_CTX_set_alpn_protos(ctx, alpn, alpn_len);
+		free(alpn);
+	}
 
 	if (state)
 		SSL_CTX_set_info_callback(ctx, apps_ssl_info_callback);
@@ -966,8 +985,7 @@ re_start:
 		BIO_free(fbio);
 		BIO_printf(sbio, "AUTH TLS\r\n");
 		BIO_read(sbio, sbuf, BUFSIZZ);
-	}
-	if (starttls_proto == PROTO_XMPP) {
+	} else if (starttls_proto == PROTO_XMPP) {
 		int seen = 0;
 		BIO_printf(sbio, "<stream:stream "
 		    "xmlns:stream='http://etherx.jabber.org/streams' "
@@ -986,6 +1004,13 @@ re_start:
 		if (!strstr(sbuf, "<proceed"))
 			goto shut;
 		mbuf[0] = 0;
+	} else if (proxy != NULL) {
+		BIO_printf(sbio, "CONNECT %s HTTP/1.0\r\n\r\n", connect);
+		mbuf_len = BIO_read(sbio, mbuf, BUFSIZZ);
+		if (mbuf_len == -1) {
+			BIO_printf(bio_err, "BIO_read failed\n");
+			goto end;
+		}
 	}
 	for (;;) {
 		struct pollfd pfd[3];	/* stdin, stdout, socket */
@@ -1257,9 +1282,7 @@ end:
 			print_stuff(bio_c_out, con, 1);
 		SSL_free(con);
 	}
-#if !defined(OPENSSL_NO_NEXTPROTONEG)
 	free(next_proto.data);
-#endif
 	if (ctx != NULL)
 		SSL_CTX_free(ctx);
 	if (cert)
@@ -1413,7 +1436,6 @@ print_stuff(BIO * bio, SSL * s, int full)
 	}
 #endif
 
-#if !defined(OPENSSL_NO_NEXTPROTONEG)
 	if (next_proto.status != -1) {
 		const unsigned char *proto;
 		unsigned int proto_len;
@@ -1422,7 +1444,17 @@ print_stuff(BIO * bio, SSL * s, int full)
 		BIO_write(bio, proto, proto_len);
 		BIO_write(bio, "\n", 1);
 	}
-#endif
+	{
+		const unsigned char *proto;
+		unsigned int proto_len;
+		SSL_get0_alpn_selected(s, &proto, &proto_len);
+		if (proto_len > 0) {
+			BIO_printf(bio, "ALPN protocol: ");
+			BIO_write(bio, proto, proto_len);
+			BIO_write(bio, "\n", 1);
+		} else
+			BIO_printf(bio, "No ALPN negotiated\n");
+	}
 
 #ifndef OPENSSL_NO_SRTP
 	{

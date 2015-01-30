@@ -1,7 +1,7 @@
-/* $OpenBSD: d1_srvr.c,v 1.41 2014/10/31 14:51:01 jsing Exp $ */
-/* 
+/* $OpenBSD: d1_srvr.c,v 1.45 2014/12/14 15:30:50 jsing Exp $ */
+/*
  * DTLS implementation written by Nagendra Modadugu
- * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.  
+ * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
  */
 /* ====================================================================
  * Copyright (c) 1999-2007 The OpenSSL Project.  All rights reserved.
@@ -11,7 +11,7 @@
  * are met:
  *
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer. 
+ *    notice, this list of conditions and the following disclaimer.
  *
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in
@@ -62,21 +62,21 @@
  * This package is an SSL implementation written
  * by Eric Young (eay@cryptsoft.com).
  * The implementation was written so as to conform with Netscapes SSL.
- * 
+ *
  * This library is free for commercial and non-commercial use as long as
  * the following conditions are aheared to.  The following conditions
  * apply to all code found in this distribution, be it the RC4, RSA,
  * lhash, DES, etc., code; not just the SSL code.  The SSL documentation
  * included with this distribution is covered by the same copyright terms
  * except that the holder is Tim Hudson (tjh@cryptsoft.com).
- * 
+ *
  * Copyright remains Eric Young's, and as such any Copyright notices in
  * the code are not to be removed.
  * If this package is used in a product, Eric Young should be given attribution
  * as the author of the parts of the library used.
  * This can be in the form of a textual message at program startup or
  * in documentation (online or textual) provided with the package.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -91,10 +91,10 @@
  *     Eric Young (eay@cryptsoft.com)"
  *    The word 'cryptographic' can be left out if the rouines from the library
  *    being used are not cryptographic related :-).
- * 4. If you include any Windows specific code (or a derivative thereof) from 
+ * 4. If you include any Windows specific code (or a derivative thereof) from
  *    the apps directory (application code) you must include an acknowledgement:
  *    "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -106,7 +106,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- * 
+ *
  * The licence and distribution terms for any publically available version or
  * derivative of this code cannot be changed.  i.e. this code cannot simply be
  * copied and put under another distribution licence
@@ -272,7 +272,11 @@ dtls1_accept(SSL *s)
 					goto end;
 				}
 
-				ssl3_init_finished_mac(s);
+				if (!ssl3_init_finished_mac(s)) {
+					ret = -1;
+					goto end;
+				}
+
 				s->state = SSL3_ST_SR_CLNT_HELLO_A;
 				s->ctx->stats.sess_accept++;
 			} else {
@@ -297,7 +301,10 @@ dtls1_accept(SSL *s)
 			s->state = SSL3_ST_SW_FLUSH;
 			s->init_num = 0;
 
-			ssl3_init_finished_mac(s);
+			if (!ssl3_init_finished_mac(s)) {
+				ret = -1;
+				goto end;
+			}
 			break;
 
 		case SSL3_ST_SW_HELLO_REQ_C:
@@ -351,8 +358,12 @@ dtls1_accept(SSL *s)
 			s->s3->tmp.next_state = SSL3_ST_SR_CLNT_HELLO_A;
 
 			/* HelloVerifyRequest resets Finished MAC */
-			if (s->version != DTLS1_BAD_VER)
-				ssl3_init_finished_mac(s);
+			if (s->version != DTLS1_BAD_VER) {
+				if (!ssl3_init_finished_mac(s)) {
+					ret = -1;
+					goto end;
+				}
+			}
 			break;
 
 #ifndef OPENSSL_NO_SCTP
@@ -502,23 +513,12 @@ dtls1_accept(SSL *s)
 				ret = dtls1_send_certificate_request(s);
 				if (ret <= 0)
 					goto end;
-#ifndef NETSCAPE_HANG_BUG
 				s->state = SSL3_ST_SW_SRVR_DONE_A;
 #ifndef OPENSSL_NO_SCTP
 				if (BIO_dgram_is_sctp(SSL_get_wbio(s))) {
 					s->d1->next_state = SSL3_ST_SW_SRVR_DONE_A;
 					s->state = DTLS1_SCTP_ST_SW_WRITE_SOCK;
 				}
-#endif
-#else
-				s->state = SSL3_ST_SW_FLUSH;
-				s->s3->tmp.next_state = SSL3_ST_SR_CERT_A;
-#ifndef OPENSSL_NO_SCTP
-				if (BIO_dgram_is_sctp(SSL_get_wbio(s))) {
-					s->d1->next_state = s->s3->tmp.next_state;
-					s->s3->tmp.next_state = DTLS1_SCTP_ST_SW_WRITE_SOCK;
-				}
-#endif
 #endif
 				s->init_num = 0;
 			}
@@ -609,7 +609,7 @@ dtls1_accept(SSL *s)
 				s->init_num = 0;
 
 				/* We need to get hashes here so if there is
-				 * a client cert, it can be verified */ 
+				 * a client cert, it can be verified */
 				s->method->ssl3_enc->cert_verify_mac(s,
 				    NID_md5, &(s->s3->tmp.cert_verify_md[0]));
 				s->method->ssl3_enc->cert_verify_mac(s,
@@ -631,7 +631,7 @@ dtls1_accept(SSL *s)
 			    state == SSL_ST_RENEGOTIATE)
 				s->state = DTLS1_SCTP_ST_SR_READ_SOCK;
 			else
-#endif			
+#endif
 				s->state = SSL3_ST_SR_FINISHED_A;
 			s->init_num = 0;
 			break;
@@ -828,7 +828,7 @@ dtls1_send_hello_request(SSL *s)
 		s->init_num = DTLS1_HM_HEADER_LENGTH;
 		s->init_off = 0;
 
-		/* no need to buffer this message, since there are no retransmit 
+		/* no need to buffer this message, since there are no retransmit
 		 * requests for it */
 	}
 
@@ -1090,7 +1090,7 @@ dtls1_send_server_key_exchange(SSL *s)
 			}
 
 			/* XXX: For now, we only support ephemeral ECDH
-			 * keys over named (not generic) curves. For 
+			 * keys over named (not generic) curves. For
 			 * supported named curves, curve_id is non-zero.
 			 */
 			if ((curve_id = tls1_ec_nid2curve_id(
@@ -1130,11 +1130,11 @@ dtls1_send_server_key_exchange(SSL *s)
 			BN_CTX_free(bn_ctx);
 			bn_ctx = NULL;
 
-			/* XXX: For now, we only support named (not 
+			/* XXX: For now, we only support named (not
 			 * generic) curves in ECDH ephemeral key exchanges.
 			 * In this situation, we need four additional bytes
 			 * to encode the entire ServerECDHParams
-			 * structure. 
+			 * structure.
 			 */
 			n = 4 + encodedlen;
 
@@ -1213,8 +1213,9 @@ dtls1_send_server_key_exchange(SSL *s)
 				q = md_buf;
 				j = 0;
 				for (num = 2; num > 0; num--) {
-					EVP_DigestInit_ex(&md_ctx, (num == 2)
-					    ? s->ctx->md5 : s->ctx->sha1, NULL);
+					if (!EVP_DigestInit_ex(&md_ctx, (num == 2)
+					    ? s->ctx->md5 : s->ctx->sha1, NULL))
+						goto err;
 					EVP_DigestUpdate(&md_ctx,
 					    &(s->s3->client_random[0]),
 					    SSL3_RANDOM_SIZE);
@@ -1364,17 +1365,6 @@ dtls1_send_certificate_request(SSL *s)
 
 		s->init_num = n + DTLS1_HM_HEADER_LENGTH;
 		s->init_off = 0;
-#ifdef NETSCAPE_HANG_BUG
-/* XXX: what to do about this? */
-		p = (unsigned char *)s->init_buf->data + s->init_num;
-
-		/* do the header */
-		*(p++) = SSL3_MT_SERVER_DONE;
-		*(p++) = 0;
-		*(p++) = 0;
-		*(p++) = 0;
-		s->init_num += 4;
-#endif
 
 		/* XDTLS:  set message header ? */
 		msg_len = s->init_num - DTLS1_HM_HEADER_LENGTH;

@@ -77,7 +77,7 @@ $ssltest -bio_pair -server_auth -client_auth -app_verify $CA $extra || exit 1
 echo "Testing ciphersuites"
 for protocol in SSLv3 TLSv1.2; do
   echo "Testing ciphersuites for $protocol"
-  for cipher in `$openssl ciphers "RSA+$protocol" | tr ':' ' '`; do
+  for cipher in `$openssl ciphers "$protocol+aRSA" | tr ':' ' '`; do
     echo "Testing $cipher"
     prot=""
     if [ $protocol = "SSLv3" ] ; then
@@ -85,8 +85,8 @@ for protocol in SSLv3 TLSv1.2; do
     fi
     $ssltest -cipher $cipher $prot
     if [ $? -ne 0 ] ; then
-	  echo "Failed $cipher"
-	  exit 1
+      echo "Failed $cipher"
+      exit 1
     fi
   done
 done
@@ -138,8 +138,8 @@ for protocol in SSLv3; do
     echo "Testing $cipher"
     $ssltest -cipher $cipher -dtls1
     if [ $? -ne 0 ] ; then
-	  echo "Failed $cipher"
-	  exit 1
+      echo "Failed $cipher"
+      exit 1
     fi
   done
 done
@@ -155,3 +155,22 @@ $ssltest -bio_pair -tls1 -npn_client -npn_server_reject || exit 1
 $ssltest -bio_pair -tls1 -npn_client -npn_server || exit 1
 $ssltest -bio_pair -tls1 -npn_client -npn_server -num 2 || exit 1
 $ssltest -bio_pair -tls1 -npn_client -npn_server -num 2 -reuse || exit 1
+
+#
+# ALPN tests
+#
+echo "Testing ALPN..."
+$ssltest -bio_pair -tls1 -alpn_client foo -alpn_server bar || exit 1
+$ssltest -bio_pair -tls1 -alpn_client foo -alpn_server foo \
+  -alpn_expected foo || exit 1
+$ssltest -bio_pair -tls1 -alpn_client foo,bar -alpn_server foo \
+  -alpn_expected foo || exit 1
+$ssltest -bio_pair -tls1 -alpn_client bar,foo -alpn_server foo \
+  -alpn_expected foo || exit 1
+$ssltest -bio_pair -tls1 -alpn_client bar,foo -alpn_server foo,bar \
+  -alpn_expected foo || exit 1
+$ssltest -bio_pair -tls1 -alpn_client bar,foo -alpn_server bar,foo \
+  -alpn_expected bar || exit 1
+$ssltest -bio_pair -tls1 -alpn_client foo,bar -alpn_server bar,foo \
+  -alpn_expected bar || exit 1
+$ssltest -bio_pair -tls1 -alpn_client baz -alpn_server bar,foo || exit 1
