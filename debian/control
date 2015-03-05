@@ -14,7 +14,7 @@ Homepage: http://www.libressl.org/
 Vcs-Git: http://git.intranet.struktur.de/debian/libressl.git
 Vcs-Browser: http://git.intranet.struktur.de/debian/libressl
 
-Package: libressl-crypto-30
+Package: libressl-crypto-32
 Architecture: any
 Multi-Arch: same
 Pre-Depends:
@@ -30,7 +30,7 @@ Description: SSL library, forked from OpenSSL - crypto library
  .
  This package provides the "-crypto" library.
 
-Package: libressl-ssl-30
+Package: libressl-ssl-32
 Architecture: any
 Multi-Arch: same
 Pre-Depends:
@@ -46,7 +46,7 @@ Description: SSL library, forked from OpenSSL - SSL library
  .
  This package provides the "-ssl" library.
 
-Package: libressl-tls-1
+Package: libressl-tls-3
 Architecture: any
 Multi-Arch: same
 Pre-Depends:
