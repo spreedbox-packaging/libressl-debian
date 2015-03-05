@@ -1,4 +1,4 @@
-/* $OpenBSD: tasn_prn.c,v 1.10 2014/06/12 15:49:27 deraadt Exp $ */
+/* $OpenBSD: tasn_prn.c,v 1.12 2015/02/07 13:19:15 doug Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2000.
  */
@@ -260,11 +260,6 @@ asn1_item_print_ctx(BIO *out, ASN1_VALUE **fld, int indent, const ASN1_ITEM *it,
 		break;
 
 	case ASN1_ITYPE_CHOICE:
-#if 0
-		if (!nohdr &&
-		    !asn1_print_fsname(out, indent, fname, sname, pctx))
-			return 0;
-#endif
 		/* CHOICE type, get selector */
 		i = asn1_get_choice_selector(fld, it);
 		/* This should never happen... */
@@ -306,7 +301,10 @@ asn1_item_print_ctx(BIO *out, ASN1_VALUE **fld, int indent, const ASN1_ITEM *it,
 		/* Print each field entry */
 		for (i = 0, tt = it->templates; i < it->tcount; i++, tt++) {
 			const ASN1_TEMPLATE *seqtt;
+
 			seqtt = asn1_do_adb(fld, tt, 1);
+			if (seqtt == NULL)
+				return 0;
 			tmpfld = asn1_get_field_ptr(fld, seqtt);
 			if (!asn1_template_print_ctx(out, tmpfld, indent + 2,
 			    seqtt, pctx))
@@ -394,11 +392,6 @@ asn1_print_fsname(BIO *out, int indent, const char *fname, const char *sname,
 {
 	static char spaces[] = "                    ";
 	const int nspaces = sizeof(spaces) - 1;
-
-#if 0
-	if (!sname && !fname)
-		return 1;
-#endif
 
 	while (indent > nspaces) {
 		if (BIO_write(out, spaces, nspaces) != nspaces)

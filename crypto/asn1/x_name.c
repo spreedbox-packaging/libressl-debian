@@ -1,4 +1,4 @@
-/* $OpenBSD: x_name.c,v 1.19 2014/07/11 08:44:47 jsing Exp $ */
+/* $OpenBSD: x_name.c,v 1.28 2015/02/14 15:25:08 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -87,13 +87,59 @@ static int i2d_name_canon(STACK_OF(STACK_OF_X509_NAME_ENTRY) *intname,
 static int x509_name_ex_print(BIO *out, ASN1_VALUE **pval, int indent,
     const char *fname, const ASN1_PCTX *pctx);
 
-ASN1_SEQUENCE(X509_NAME_ENTRY) = {
-	ASN1_SIMPLE(X509_NAME_ENTRY, object, ASN1_OBJECT),
-	ASN1_SIMPLE(X509_NAME_ENTRY, value, ASN1_PRINTABLE)
-} ASN1_SEQUENCE_END(X509_NAME_ENTRY)
+static const ASN1_TEMPLATE X509_NAME_ENTRY_seq_tt[] = {
+	{
+		.offset = offsetof(X509_NAME_ENTRY, object),
+		.field_name = "object",
+		.item = &ASN1_OBJECT_it,
+	},
+	{
+		.offset = offsetof(X509_NAME_ENTRY, value),
+		.field_name = "value",
+		.item = &ASN1_PRINTABLE_it,
+	},
+};
 
-IMPLEMENT_ASN1_FUNCTIONS(X509_NAME_ENTRY)
-IMPLEMENT_ASN1_DUP_FUNCTION(X509_NAME_ENTRY)
+const ASN1_ITEM X509_NAME_ENTRY_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = X509_NAME_ENTRY_seq_tt,
+	.tcount = sizeof(X509_NAME_ENTRY_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.size = sizeof(X509_NAME_ENTRY),
+	.sname = "X509_NAME_ENTRY",
+};
+
+
+X509_NAME_ENTRY *
+d2i_X509_NAME_ENTRY(X509_NAME_ENTRY **a, const unsigned char **in, long len)
+{
+	return (X509_NAME_ENTRY *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
+	    &X509_NAME_ENTRY_it);
+}
+
+int
+i2d_X509_NAME_ENTRY(X509_NAME_ENTRY *a, unsigned char **out)
+{
+	return ASN1_item_i2d((ASN1_VALUE *)a, out, &X509_NAME_ENTRY_it);
+}
+
+X509_NAME_ENTRY *
+X509_NAME_ENTRY_new(void)
+{
+	return (X509_NAME_ENTRY *)ASN1_item_new(&X509_NAME_ENTRY_it);
+}
+
+void
+X509_NAME_ENTRY_free(X509_NAME_ENTRY *a)
+{
+	ASN1_item_free((ASN1_VALUE *)a, &X509_NAME_ENTRY_it);
+}
+
+X509_NAME_ENTRY *
+X509_NAME_ENTRY_dup(X509_NAME_ENTRY *x)
+{
+	return ASN1_item_dup(&X509_NAME_ENTRY_it, x);
+}
 
 /* For the "Name" type we need a SEQUENCE OF { SET OF X509_NAME_ENTRY }
  * so declare two template wrappers for this
@@ -123,10 +169,46 @@ const ASN1_EXTERN_FUNCS x509_name_ff = {
 	x509_name_ex_print
 };
 
-IMPLEMENT_EXTERN_ASN1(X509_NAME, V_ASN1_SEQUENCE, x509_name_ff)
+const ASN1_ITEM X509_NAME_it = {
+	.itype = ASN1_ITYPE_EXTERN,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = NULL,
+	.tcount = 0,
+	.funcs = &x509_name_ff,
+	.size = 0,
+	.sname = "X509_NAME",
+};
 
-IMPLEMENT_ASN1_FUNCTIONS(X509_NAME)
-IMPLEMENT_ASN1_DUP_FUNCTION(X509_NAME)
+X509_NAME *
+d2i_X509_NAME(X509_NAME **a, const unsigned char **in, long len)
+{
+	return (X509_NAME *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
+	    &X509_NAME_it);
+}
+
+int
+i2d_X509_NAME(X509_NAME *a, unsigned char **out)
+{
+	return ASN1_item_i2d((ASN1_VALUE *)a, out, &X509_NAME_it);
+}
+
+X509_NAME *
+X509_NAME_new(void)
+{
+	return (X509_NAME *)ASN1_item_new(&X509_NAME_it);
+}
+
+void
+X509_NAME_free(X509_NAME *a)
+{
+	ASN1_item_free((ASN1_VALUE *)a, &X509_NAME_it);
+}
+
+X509_NAME *
+X509_NAME_dup(X509_NAME *x)
+{
+	return ASN1_item_dup(&X509_NAME_it, x);
+}
 
 static int
 x509_name_ex_new(ASN1_VALUE **val, const ASN1_ITEM *it)
@@ -347,7 +429,7 @@ x509_name_canon(X509_NAME *a)
 	STACK_OF(STACK_OF_X509_NAME_ENTRY) *intname = NULL;
 	STACK_OF(X509_NAME_ENTRY) *entries = NULL;
 	X509_NAME_ENTRY *entry, *tmpentry = NULL;
-	int i, set = -1, ret = 0;
+	int i, len, set = -1, ret = 0;
 
 	if (a->canon_enc) {
 		free(a->canon_enc);
@@ -372,7 +454,11 @@ x509_name_canon(X509_NAME *a)
 			set = entry->set;
 		}
 		tmpentry = X509_NAME_ENTRY_new();
+		if (tmpentry == NULL)
+			goto err;
 		tmpentry->object = OBJ_dup(entry->object);
+		if (tmpentry->object == NULL)
+			goto err;
 		if (!asn1_string_canon(tmpentry->value, entry->value))
 			goto err;
 		if (!sk_X509_NAME_ENTRY_push(entries, tmpentry))
@@ -381,16 +467,18 @@ x509_name_canon(X509_NAME *a)
 	}
 
 	/* Finally generate encoding */
-	a->canon_enclen = i2d_name_canon(intname, NULL);
-	p = malloc(a->canon_enclen);
-	if (!p)
+	len = i2d_name_canon(intname, NULL);
+	if (len < 0)
+		goto err;
+	p = malloc(len);
+	if (p == NULL)
 		goto err;
 	a->canon_enc = p;
+	a->canon_enclen = len;
 	i2d_name_canon(intname, &p);
 	ret = 1;
 
 err:
-
 	if (tmpentry)
 		X509_NAME_ENTRY_free(tmpentry);
 	if (intname)
@@ -519,6 +607,3 @@ X509_NAME_set(X509_NAME **xn, X509_NAME *name)
 	}
 	return (*xn != NULL);
 }
-
-IMPLEMENT_STACK_OF(X509_NAME_ENTRY)
-IMPLEMENT_ASN1_SET_OF(X509_NAME_ENTRY)

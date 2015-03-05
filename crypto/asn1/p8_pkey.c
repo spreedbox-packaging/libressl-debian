@@ -1,4 +1,4 @@
-/* $OpenBSD: p8_pkey.c,v 1.11 2014/06/12 15:49:27 deraadt Exp $ */
+/* $OpenBSD: p8_pkey.c,v 1.14 2015/02/11 03:39:51 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -75,14 +75,68 @@ pkey_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it, void *exarg)
 	return 1;
 }
 
-ASN1_SEQUENCE_cb(PKCS8_PRIV_KEY_INFO, pkey_cb) = {
-	ASN1_SIMPLE(PKCS8_PRIV_KEY_INFO, version, ASN1_INTEGER),
-	ASN1_SIMPLE(PKCS8_PRIV_KEY_INFO, pkeyalg, X509_ALGOR),
-	ASN1_SIMPLE(PKCS8_PRIV_KEY_INFO, pkey, ASN1_ANY),
-	ASN1_IMP_SET_OF_OPT(PKCS8_PRIV_KEY_INFO, attributes, X509_ATTRIBUTE, 0)
-} ASN1_SEQUENCE_END_cb(PKCS8_PRIV_KEY_INFO, PKCS8_PRIV_KEY_INFO)
+static const ASN1_AUX PKCS8_PRIV_KEY_INFO_aux = {
+	.asn1_cb = pkey_cb,
+};
+static const ASN1_TEMPLATE PKCS8_PRIV_KEY_INFO_seq_tt[] = {
+	{
+		.offset = offsetof(PKCS8_PRIV_KEY_INFO, version),
+		.field_name = "version",
+		.item = &ASN1_INTEGER_it,
+	},
+	{
+		.offset = offsetof(PKCS8_PRIV_KEY_INFO, pkeyalg),
+		.field_name = "pkeyalg",
+		.item = &X509_ALGOR_it,
+	},
+	{
+		.offset = offsetof(PKCS8_PRIV_KEY_INFO, pkey),
+		.field_name = "pkey",
+		.item = &ASN1_ANY_it,
+	},
+	{
+		.flags = ASN1_TFLG_IMPLICIT | ASN1_TFLG_SET_OF | ASN1_TFLG_OPTIONAL,
+		.offset = offsetof(PKCS8_PRIV_KEY_INFO, attributes),
+		.field_name = "attributes",
+		.item = &X509_ATTRIBUTE_it,
+	},
+};
 
-IMPLEMENT_ASN1_FUNCTIONS(PKCS8_PRIV_KEY_INFO)
+const ASN1_ITEM PKCS8_PRIV_KEY_INFO_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = PKCS8_PRIV_KEY_INFO_seq_tt,
+	.tcount = sizeof(PKCS8_PRIV_KEY_INFO_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = &PKCS8_PRIV_KEY_INFO_aux,
+	.size = sizeof(PKCS8_PRIV_KEY_INFO),
+	.sname = "PKCS8_PRIV_KEY_INFO",
+};
+
+
+PKCS8_PRIV_KEY_INFO *
+d2i_PKCS8_PRIV_KEY_INFO(PKCS8_PRIV_KEY_INFO **a, const unsigned char **in, long len)
+{
+	return (PKCS8_PRIV_KEY_INFO *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
+	    &PKCS8_PRIV_KEY_INFO_it);
+}
+
+int
+i2d_PKCS8_PRIV_KEY_INFO(PKCS8_PRIV_KEY_INFO *a, unsigned char **out)
+{
+	return ASN1_item_i2d((ASN1_VALUE *)a, out, &PKCS8_PRIV_KEY_INFO_it);
+}
+
+PKCS8_PRIV_KEY_INFO *
+PKCS8_PRIV_KEY_INFO_new(void)
+{
+	return (PKCS8_PRIV_KEY_INFO *)ASN1_item_new(&PKCS8_PRIV_KEY_INFO_it);
+}
+
+void
+PKCS8_PRIV_KEY_INFO_free(PKCS8_PRIV_KEY_INFO *a)
+{
+	ASN1_item_free((ASN1_VALUE *)a, &PKCS8_PRIV_KEY_INFO_it);
+}
 
 int
 PKCS8_pkey_set0(PKCS8_PRIV_KEY_INFO *priv, ASN1_OBJECT *aobj, int version,

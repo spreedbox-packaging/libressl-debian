@@ -2,6 +2,7 @@ include $(top_srcdir)/Makefile.am.common
 
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/modes
 AM_CPPFLAGS += -I $(top_srcdir)/crypto/asn1
+AM_CPPFLAGS += -I $(top_srcdir)/ssl
 
 LDADD = $(PLATFORM_LDADD) $(PROG_LDADD)
 LDADD += $(top_builddir)/ssl/libssl.la
@@ -33,12 +34,18 @@ bftest_SOURCES = bftest.c
 TESTS += bntest
 check_PROGRAMS += bntest
 bntest_SOURCES = bntest.c
+TESTS += bytestringtest
+check_PROGRAMS += bytestringtest
+bytestringtest_SOURCES = bytestringtest.c
 TESTS += casttest
 check_PROGRAMS += casttest
 casttest_SOURCES = casttest.c
 TESTS += chachatest
 check_PROGRAMS += chachatest
 chachatest_SOURCES = chachatest.c
+TESTS += cipherstest
+check_PROGRAMS += cipherstest
+cipherstest_SOURCES = cipherstest.c
 TESTS += cts128test
 check_PROGRAMS += cts128test
 cts128test_SOURCES = cts128test.c
@@ -103,6 +110,9 @@ mdc2test_SOURCES = mdc2test.c
 TESTS += mont
 check_PROGRAMS += mont
 mont_SOURCES = mont.c
+TESTS += pbkdf2
+check_PROGRAMS += pbkdf2
+pbkdf2_SOURCES = pbkdf2.c
 if !HOST_WIN
 check_PROGRAMS += pidwraptest
 pidwraptest_SOURCES = pidwraptest.c

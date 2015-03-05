@@ -1,4 +1,4 @@
-/* $OpenBSD: evp.h,v 1.39 2014/07/11 15:28:27 tedu Exp $ */
+/* $OpenBSD: evp.h,v 1.43 2015/02/10 09:52:35 miod Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -154,6 +154,13 @@ struct evp_pkey_st {
 #define EVP_PKEY_MO_ENCRYPT	0x0004
 #define EVP_PKEY_MO_DECRYPT	0x0008
 
+typedef int evp_sign_method(int type, const unsigned char *m,
+    unsigned int m_length, unsigned char *sigret, unsigned int *siglen,
+    void *key);
+typedef int evp_verify_method(int type, const unsigned char *m,
+    unsigned int m_length, const unsigned char *sigbuf, unsigned int siglen,
+    void *key);
+
 #ifndef EVP_MD
 struct env_md_st {
 	int type;
@@ -166,25 +173,14 @@ struct env_md_st {
 	int (*copy)(EVP_MD_CTX *to, const EVP_MD_CTX *from);
 	int (*cleanup)(EVP_MD_CTX *ctx);
 
-	/* FIXME: prototype these some day */
-	int (*sign)(int type, const unsigned char *m, unsigned int m_length,
-	    unsigned char *sigret, unsigned int *siglen, void *key);
-	int (*verify)(int type, const unsigned char *m, unsigned int m_length,
-	    const unsigned char *sigbuf, unsigned int siglen,
-	    void *key);
+	evp_sign_method *sign;
+	evp_verify_method *verify;
 	int required_pkey_type[5]; /*EVP_PKEY_xxx */
 	int block_size;
 	int ctx_size; /* how big does the ctx->md_data need to be */
 	/* control function */
 	int (*md_ctrl)(EVP_MD_CTX *ctx, int cmd, int p1, void *p2);
 } /* EVP_MD */;
-
-typedef int evp_sign_method(int type, const unsigned char *m,
-    unsigned int m_length, unsigned char *sigret, unsigned int *siglen,
-    void *key);
-typedef int evp_verify_method(int type, const unsigned char *m,
-    unsigned int m_length, const unsigned char *sigbuf, unsigned int siglen,
-    void *key);
 
 #define EVP_MD_FLAG_ONESHOT	0x0001 /* digest can only handle a single
 					* block */
@@ -701,10 +697,6 @@ const EVP_CIPHER *EVP_des_cfb1(void);
 const EVP_CIPHER *EVP_des_cfb8(void);
 const EVP_CIPHER *EVP_des_ede_cfb64(void);
 # define EVP_des_ede_cfb EVP_des_ede_cfb64
-#if 0
-const EVP_CIPHER *EVP_des_ede_cfb1(void);
-const EVP_CIPHER *EVP_des_ede_cfb8(void);
-#endif
 const EVP_CIPHER *EVP_des_ede3_cfb64(void);
 # define EVP_des_ede3_cfb EVP_des_ede3_cfb64
 const EVP_CIPHER *EVP_des_ede3_cfb1(void);
@@ -753,13 +745,6 @@ const EVP_CIPHER *EVP_cast5_cbc(void);
 const EVP_CIPHER *EVP_cast5_cfb64(void);
 # define EVP_cast5_cfb EVP_cast5_cfb64
 const EVP_CIPHER *EVP_cast5_ofb(void);
-#endif
-#ifndef OPENSSL_NO_RC5
-const EVP_CIPHER *EVP_rc5_32_12_16_cbc(void);
-const EVP_CIPHER *EVP_rc5_32_12_16_ecb(void);
-const EVP_CIPHER *EVP_rc5_32_12_16_cfb64(void);
-# define EVP_rc5_32_12_16_cfb EVP_rc5_32_12_16_cfb64
-const EVP_CIPHER *EVP_rc5_32_12_16_ofb(void);
 #endif
 #ifndef OPENSSL_NO_AES
 const EVP_CIPHER *EVP_aes_128_ecb(void);
@@ -1361,13 +1346,19 @@ void ERR_load_EVP_strings(void);
 #define EVP_F_EVP_AEAD_CTX_INIT				 180
 #define EVP_F_EVP_AEAD_CTX_OPEN				 190
 #define EVP_F_EVP_AEAD_CTX_SEAL				 191
+#define EVP_F_EVP_BYTESTOKEY				 200
 #define EVP_F_EVP_CIPHERINIT_EX				 123
 #define EVP_F_EVP_CIPHER_CTX_COPY			 163
 #define EVP_F_EVP_CIPHER_CTX_CTRL			 124
 #define EVP_F_EVP_CIPHER_CTX_SET_KEY_LENGTH		 122
+#define EVP_F_EVP_CIPHER_GET_ASN1_IV			 201
+#define EVP_F_EVP_CIPHER_SET_ASN1_IV			 202
 #define EVP_F_EVP_DECRYPTFINAL_EX			 101
+#define EVP_F_EVP_DECRYPTUPDATE				 199
+#define EVP_F_EVP_DIGESTFINAL_EX			 196
 #define EVP_F_EVP_DIGESTINIT_EX				 128
 #define EVP_F_EVP_ENCRYPTFINAL_EX			 127
+#define EVP_F_EVP_ENCRYPTUPDATE				 198
 #define EVP_F_EVP_MD_CTX_COPY_EX			 110
 #define EVP_F_EVP_MD_CTX_CTRL				 195
 #define EVP_F_EVP_MD_SIZE				 162
@@ -1423,6 +1414,7 @@ void ERR_load_EVP_strings(void);
 #define EVP_F_PKCS5_V2_PBKDF2_KEYIVGEN			 164
 #define EVP_F_PKCS8_SET_BROKEN				 112
 #define EVP_F_PKEY_SET_TYPE				 158
+#define EVP_F_RC2_GET_ASN1_TYPE_AND_IV			 197
 #define EVP_F_RC2_MAGIC_TO_METH				 109
 #define EVP_F_RC5_CTRL					 125
 

@@ -1,4 +1,4 @@
-/* $OpenBSD: dsa_asn1.c,v 1.12 2014/07/11 08:44:48 jsing Exp $ */
+/* $OpenBSD: dsa_asn1.c,v 1.15 2015/02/10 05:12:23 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2000.
  */
@@ -57,6 +57,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 
 #include <openssl/asn1.h>
 #include <openssl/asn1t.h>
@@ -83,12 +84,54 @@ sig_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it, void *exarg)
 	return 1;
 }
 
-ASN1_SEQUENCE_cb(DSA_SIG, sig_cb) = {
-	ASN1_SIMPLE(DSA_SIG, r, CBIGNUM),
-	ASN1_SIMPLE(DSA_SIG, s, CBIGNUM)
-} ASN1_SEQUENCE_END_cb(DSA_SIG, DSA_SIG)
+static const ASN1_AUX DSA_SIG_aux = {
+	.app_data = NULL,
+	.flags = 0,
+	.ref_offset = 0,
+	.ref_lock = 0,
+	.asn1_cb = sig_cb,
+	.enc_offset = 0,
+};
+static const ASN1_TEMPLATE DSA_SIG_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(DSA_SIG, r),
+		.field_name = "r",
+		.item = &CBIGNUM_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(DSA_SIG, s),
+		.field_name = "s",
+		.item = &CBIGNUM_it,
+	},
+};
 
-IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(DSA_SIG, DSA_SIG, DSA_SIG)
+const ASN1_ITEM DSA_SIG_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = DSA_SIG_seq_tt,
+	.tcount = sizeof(DSA_SIG_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = &DSA_SIG_aux,
+	.size = sizeof(DSA_SIG),
+	.sname = "DSA_SIG",
+};
+
+
+DSA_SIG *
+d2i_DSA_SIG(DSA_SIG **a, const unsigned char **in, long len)
+{
+	return (DSA_SIG *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
+	    &DSA_SIG_it);
+}
+
+int
+i2d_DSA_SIG(const DSA_SIG *a, unsigned char **out)
+{
+	return ASN1_item_i2d((ASN1_VALUE *)a, out, &DSA_SIG_it);
+}
 
 /* Override the default free and new methods */
 static int
@@ -107,24 +150,138 @@ dsa_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it, void *exarg)
 	return 1;
 }
 
-ASN1_SEQUENCE_cb(DSAPrivateKey, dsa_cb) = {
-	ASN1_SIMPLE(DSA, version, LONG),
-	ASN1_SIMPLE(DSA, p, BIGNUM),
-	ASN1_SIMPLE(DSA, q, BIGNUM),
-	ASN1_SIMPLE(DSA, g, BIGNUM),
-	ASN1_SIMPLE(DSA, pub_key, BIGNUM),
-	ASN1_SIMPLE(DSA, priv_key, BIGNUM)
-} ASN1_SEQUENCE_END_cb(DSA, DSAPrivateKey)
+static const ASN1_AUX DSAPrivateKey_aux = {
+	.app_data = NULL,
+	.flags = 0,
+	.ref_offset = 0,
+	.ref_lock = 0,
+	.asn1_cb = dsa_cb,
+	.enc_offset = 0,
+};
+static const ASN1_TEMPLATE DSAPrivateKey_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(DSA, version),
+		.field_name = "version",
+		.item = &LONG_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(DSA, p),
+		.field_name = "p",
+		.item = &BIGNUM_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(DSA, q),
+		.field_name = "q",
+		.item = &BIGNUM_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(DSA, g),
+		.field_name = "g",
+		.item = &BIGNUM_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(DSA, pub_key),
+		.field_name = "pub_key",
+		.item = &BIGNUM_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(DSA, priv_key),
+		.field_name = "priv_key",
+		.item = &BIGNUM_it,
+	},
+};
 
-IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(DSA, DSAPrivateKey, DSAPrivateKey)
+const ASN1_ITEM DSAPrivateKey_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = DSAPrivateKey_seq_tt,
+	.tcount = sizeof(DSAPrivateKey_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = &DSAPrivateKey_aux,
+	.size = sizeof(DSA),
+	.sname = "DSA",
+};
 
-ASN1_SEQUENCE_cb(DSAparams, dsa_cb) = {
-	ASN1_SIMPLE(DSA, p, BIGNUM),
-	ASN1_SIMPLE(DSA, q, BIGNUM),
-	ASN1_SIMPLE(DSA, g, BIGNUM),
-} ASN1_SEQUENCE_END_cb(DSA, DSAparams)
 
-IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(DSA, DSAparams, DSAparams)
+DSA *
+d2i_DSAPrivateKey(DSA **a, const unsigned char **in, long len)
+{
+	return (DSA *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
+	    &DSAPrivateKey_it);
+}
+
+int
+i2d_DSAPrivateKey(const DSA *a, unsigned char **out)
+{
+	return ASN1_item_i2d((ASN1_VALUE *)a, out, &DSAPrivateKey_it);
+}
+
+static const ASN1_AUX DSAparams_aux = {
+	.app_data = NULL,
+	.flags = 0,
+	.ref_offset = 0,
+	.ref_lock = 0,
+	.asn1_cb = dsa_cb,
+	.enc_offset = 0,
+};
+static const ASN1_TEMPLATE DSAparams_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(DSA, p),
+		.field_name = "p",
+		.item = &BIGNUM_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(DSA, q),
+		.field_name = "q",
+		.item = &BIGNUM_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(DSA, g),
+		.field_name = "g",
+		.item = &BIGNUM_it,
+	},
+};
+
+const ASN1_ITEM DSAparams_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = DSAparams_seq_tt,
+	.tcount = sizeof(DSAparams_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = &DSAparams_aux,
+	.size = sizeof(DSA),
+	.sname = "DSA",
+};
+
+
+DSA *
+d2i_DSAparams(DSA **a, const unsigned char **in, long len)
+{
+	return (DSA *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
+	    &DSAparams_it);
+}
+
+int
+i2d_DSAparams(const DSA *a, unsigned char **out)
+{
+	return ASN1_item_i2d((ASN1_VALUE *)a, out, &DSAparams_it);
+}
 
 /*
  * DSA public key is a bit trickier... its effectively a CHOICE type
@@ -133,19 +290,95 @@ IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(DSA, DSAparams, DSAparams)
  * in a SEQUENCE
  */
 
-ASN1_SEQUENCE(dsa_pub_internal) = {
-	ASN1_SIMPLE(DSA, pub_key, BIGNUM),
-	ASN1_SIMPLE(DSA, p, BIGNUM),
-	ASN1_SIMPLE(DSA, q, BIGNUM),
-	ASN1_SIMPLE(DSA, g, BIGNUM)
-} ASN1_SEQUENCE_END_name(DSA, dsa_pub_internal)
+static const ASN1_TEMPLATE dsa_pub_internal_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(DSA, pub_key),
+		.field_name = "pub_key",
+		.item = &BIGNUM_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(DSA, p),
+		.field_name = "p",
+		.item = &BIGNUM_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(DSA, q),
+		.field_name = "q",
+		.item = &BIGNUM_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(DSA, g),
+		.field_name = "g",
+		.item = &BIGNUM_it,
+	},
+};
 
-ASN1_CHOICE_cb(DSAPublicKey, dsa_cb) = {
-	ASN1_SIMPLE(DSA, pub_key, BIGNUM),
-	ASN1_EX_COMBINE(0, 0, dsa_pub_internal)
-} ASN1_CHOICE_END_cb(DSA, DSAPublicKey, write_params)
+const ASN1_ITEM dsa_pub_internal_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = dsa_pub_internal_seq_tt,
+	.tcount = sizeof(dsa_pub_internal_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(DSA),
+	.sname = "DSA",
+};
 
-IMPLEMENT_ASN1_ENCODE_FUNCTIONS_const_fname(DSA, DSAPublicKey, DSAPublicKey)
+static const ASN1_AUX DSAPublicKey_aux = {
+	.app_data = NULL,
+	.flags = 0,
+	.ref_offset = 0,
+	.ref_lock = 0,
+	.asn1_cb = dsa_cb,
+	.enc_offset = 0,
+};
+static const ASN1_TEMPLATE DSAPublicKey_ch_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(DSA, pub_key),
+		.field_name = "pub_key",
+		.item = &BIGNUM_it,
+	},
+	{
+		.flags = 0 | ASN1_TFLG_COMBINE,
+		.tag = 0,
+		.offset = 0,
+		.field_name = NULL,
+		.item = &dsa_pub_internal_it,
+	},
+};
+
+const ASN1_ITEM DSAPublicKey_it = {
+	.itype = ASN1_ITYPE_CHOICE,
+	.utype = offsetof(DSA, write_params),
+	.templates = DSAPublicKey_ch_tt,
+	.tcount = sizeof(DSAPublicKey_ch_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = &DSAPublicKey_aux,
+	.size = sizeof(DSA),
+	.sname = "DSA",
+};
+
+
+DSA *
+d2i_DSAPublicKey(DSA **a, const unsigned char **in, long len)
+{
+	return (DSA *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
+	    &DSAPublicKey_it);
+}
+
+int
+i2d_DSAPublicKey(const DSA *a, unsigned char **out)
+{
+	return ASN1_item_i2d((ASN1_VALUE *)a, out, &DSAPublicKey_it);
+}
 
 DSA *
 DSAparams_dup(DSA *dsa)
@@ -181,15 +414,26 @@ DSA_verify(int type, const unsigned char *dgst, int dgst_len,
     const unsigned char *sigbuf, int siglen, DSA *dsa)
 {
 	DSA_SIG *s;
+	unsigned char *der = NULL;
+	const unsigned char *p = sigbuf;
+	int derlen = -1;
 	int ret = -1;
 
 	s = DSA_SIG_new();
 	if (s == NULL)
 		return ret;
-	if (d2i_DSA_SIG(&s, &sigbuf, siglen) == NULL)
+	if (d2i_DSA_SIG(&s, &p, siglen) == NULL)
+		goto err;
+	/* Ensure signature uses DER and doesn't have trailing garbage */
+	derlen = i2d_DSA_SIG(s, &der);
+	if (derlen != siglen || memcmp(sigbuf, der, derlen))
 		goto err;
 	ret = DSA_do_verify(dgst, dgst_len, s, dsa);
 err:
+	if (derlen > 0) {
+		explicit_bzero(der, derlen);
+		free(der);
+	}
 	DSA_SIG_free(s);
 	return ret;
 }

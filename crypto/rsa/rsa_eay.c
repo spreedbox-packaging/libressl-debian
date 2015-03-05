@@ -1,4 +1,4 @@
-/* $OpenBSD: rsa_eay.c,v 1.35 2014/07/11 15:21:51 miod Exp $ */
+/* $OpenBSD: rsa_eay.c,v 1.37 2015/02/09 15:49:22 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -181,7 +181,7 @@ RSA_eay_public_encrypt(int flen, const unsigned char *from, unsigned char *to,
 	ret = BN_CTX_get(ctx);
 	num = BN_num_bytes(rsa->n);
 	buf = malloc(num);
-	if (!f || !ret || !buf) {
+	if (f == NULL || ret == NULL || buf == NULL) {
 		RSAerr(RSA_F_RSA_EAY_PUBLIC_ENCRYPT, ERR_R_MALLOC_FAILURE);
 		goto err;
 	}
@@ -366,7 +366,7 @@ RSA_eay_private_encrypt(int flen, const unsigned char *from, unsigned char *to,
 	ret = BN_CTX_get(ctx);
 	num = BN_num_bytes(rsa->n);
 	buf = malloc(num);
-	if (!f || !ret || !buf) {
+	if (f == NULL || ret == NULL || buf == NULL) {
 		RSAerr(RSA_F_RSA_EAY_PRIVATE_ENCRYPT, ERR_R_MALLOC_FAILURE);
 		goto err;
 	}
@@ -730,6 +730,10 @@ RSA_eay_mod_exp(BIGNUM *r0, const BIGNUM *I, RSA *rsa, BN_CTX *ctx)
 	r1 = BN_CTX_get(ctx);
 	m1 = BN_CTX_get(ctx);
 	vrfy = BN_CTX_get(ctx);
+	if (r1 == NULL || m1 == NULL || vrfy == NULL) {
+		RSAerr(RSA_F_RSA_EAY_MOD_EXP, ERR_R_MALLOC_FAILURE);
+		goto err;
+	}
 
 	{
 		BIGNUM local_p, local_q;
