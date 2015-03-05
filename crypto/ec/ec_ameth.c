@@ -1,4 +1,4 @@
-/* $OpenBSD: ec_ameth.c,v 1.13 2014/07/13 15:47:51 logan Exp $ */
+/* $OpenBSD: ec_ameth.c,v 1.15 2015/02/11 03:55:42 beck Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2006.
  */

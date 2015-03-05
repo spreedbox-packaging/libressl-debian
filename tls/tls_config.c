@@ -1,4 +1,4 @@
-/* $OpenBSD: tls_config.c,v 1.14 2014/10/03 14:14:40 tedu Exp $ */
+/* $OpenBSD: tls_config.c,v 1.8 2015/02/22 14:59:37 jsing Exp $ */
 /*
  * Copyright (c) 2014 Joel Sing <jsing@openbsd.org>
  *
@@ -15,6 +15,7 @@
  * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <ctype.h>
 #include <errno.h>
 #include <stdlib.h>
 
@@ -67,17 +68,25 @@ tls_config_new(void)
 	/*
 	 * Default configuration.
 	 */
-	if (tls_config_set_ca_file(config, _PATH_SSL_CA_FILE) != 0) {
-		tls_config_free(config);
-		return (NULL);
-	}
-	tls_config_set_ecdhcurve(config, "auto");
+	if (tls_config_set_ca_file(config, _PATH_SSL_CA_FILE) != 0)
+		goto err;
+	if (tls_config_set_dheparams(config, "none") != 0)
+		goto err;
+	if (tls_config_set_ecdhecurve(config, "auto") != 0)
+		goto err;
+	if (tls_config_set_ciphers(config, "secure") != 0)
+		goto err;
+
 	tls_config_set_protocols(config, TLS_PROTOCOLS_DEFAULT);
 	tls_config_set_verify_depth(config, 6);
 	
 	tls_config_verify(config);
 
 	return (config);
+
+err:
+	tls_config_free(config);
+	return (NULL);
 }
 
 void
@@ -102,8 +111,67 @@ tls_config_free(struct tls_config *config)
 void
 tls_config_clear_keys(struct tls_config *config)
 {
+	tls_config_set_ca_mem(config, NULL, 0);
 	tls_config_set_cert_mem(config, NULL, 0);
 	tls_config_set_key_mem(config, NULL, 0);
+}
+
+int
+tls_config_parse_protocols(uint32_t *protocols, const char *protostr)
+{
+	uint32_t proto, protos = 0;
+	char *s, *p, *q;
+	int negate;
+
+	if ((s = strdup(protostr)) == NULL)
+		return (-1);
+
+	q = s;
+	while ((p = strsep(&q, ",:")) != NULL) {
+		while (*p == ' ' || *p == '\t')
+			p++;
+
+		negate = 0;
+		if (*p == '!') {
+			negate = 1;
+			p++;
+		}
+
+		if (negate && protos == 0)
+			protos = TLS_PROTOCOLS_ALL;
+
+		proto = 0;
+		if (strcasecmp(p, "all") == 0 ||
+		    strcasecmp(p, "legacy") == 0)
+			proto = TLS_PROTOCOLS_ALL;
+		else if (strcasecmp(p, "default") == 0 ||
+		    strcasecmp(p, "secure") == 0)
+			proto = TLS_PROTOCOLS_DEFAULT;
+		if (strcasecmp(p, "tlsv1") == 0)
+			proto = TLS_PROTOCOL_TLSv1;
+		else if (strcasecmp(p, "tlsv1.0") == 0)
+			proto = TLS_PROTOCOL_TLSv1_0;
+		else if (strcasecmp(p, "tlsv1.1") == 0)
+			proto = TLS_PROTOCOL_TLSv1_1;
+		else if (strcasecmp(p, "tlsv1.2") == 0)
+			proto = TLS_PROTOCOL_TLSv1_2;
+
+		if (proto == 0) {
+			free(s);
+			return (-1);
+		}
+
+		if (negate)
+			protos &= ~proto;
+		else
+			protos |= proto;
+	}
+
+	*protocols = protos;
+
+	free(s);
+
+	return (0);
 }
 
 int
@@ -116,6 +184,12 @@ int
 tls_config_set_ca_path(struct tls_config *config, const char *ca_path)
 {
 	return set_string(&config->ca_path, ca_path);
+}
+
+int
+tls_config_set_ca_mem(struct tls_config *config, const uint8_t *ca, size_t len)
+{
+	return set_mem(&config->ca_mem, &config->ca_len, ca, len);
 }
 
 int
@@ -134,22 +208,49 @@ tls_config_set_cert_mem(struct tls_config *config, const uint8_t *cert,
 int
 tls_config_set_ciphers(struct tls_config *config, const char *ciphers)
 {
+	if (ciphers == NULL ||
+	    strcasecmp(ciphers, "default") == 0 ||
+	    strcasecmp(ciphers, "secure") == 0)
+		ciphers = TLS_CIPHERS_DEFAULT;
+	else if (strcasecmp(ciphers, "compat") == 0 ||
+	    strcasecmp(ciphers, "legacy") == 0)
+		ciphers = TLS_CIPHERS_COMPAT;
+
 	return set_string(&config->ciphers, ciphers);
 }
 
 int
-tls_config_set_ecdhcurve(struct tls_config *config, const char *name)
+tls_config_set_dheparams(struct tls_config *config, const char *params)
+{
+	int keylen;
+
+	if (params == NULL || strcasecmp(params, "none") == 0)
+		keylen = 0;
+	else if (strcasecmp(params, "auto") == 0)
+		keylen = -1;
+	else if (strcasecmp(params, "legacy") == 0)
+		keylen = 1024;
+	else
+		return (-1);
+
+	config->dheparams = keylen;
+
+	return (0);
+}
+
+int
+tls_config_set_ecdhecurve(struct tls_config *config, const char *name)
 {
 	int nid;
 
-	if (name == NULL)
+	if (name == NULL || strcasecmp(name, "none") == 0)
 		nid = NID_undef;
 	else if (strcasecmp(name, "auto") == 0)
 		nid = -1;
 	else if ((nid = OBJ_txt2nid(name)) == NID_undef)
 		return (-1);
 
-	config->ecdhcurve = nid;
+	config->ecdhecurve = nid;
 
 	return (0);
 }
@@ -182,20 +283,20 @@ tls_config_set_verify_depth(struct tls_config *config, int verify_depth)
 }
 
 void
-tls_config_insecure_noverifyhost(struct tls_config *config)
-{
-	config->verify_host = 0;
-}
-
-void
 tls_config_insecure_noverifycert(struct tls_config *config)
 {
 	config->verify_cert = 0;
 }
 
 void
+tls_config_insecure_noverifyname(struct tls_config *config)
+{
+	config->verify_name = 0;
+}
+
+void
 tls_config_verify(struct tls_config *config)
 {
-	config->verify_host = 1;
 	config->verify_cert = 1;
+	config->verify_name = 1;
 }

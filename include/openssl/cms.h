@@ -1,4 +1,4 @@
-/* $OpenBSD: cms.h,v 1.4 2014/06/12 15:49:28 deraadt Exp $ */
+/* $OpenBSD: cms.h,v 1.6 2015/02/11 03:55:42 beck Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
  */

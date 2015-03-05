@@ -88,14 +88,15 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 TESTS = aes_wrap$(EXEEXT) asn1test$(EXEEXT) base64test$(EXEEXT) \
-	bftest$(EXEEXT) bntest$(EXEEXT) casttest$(EXEEXT) \
-	chachatest$(EXEEXT) cts128test$(EXEEXT) destest$(EXEEXT) \
-	dhtest$(EXEEXT) dsatest$(EXEEXT) ecdhtest$(EXEEXT) \
-	ecdsatest$(EXEEXT) ectest$(EXEEXT) enginetest$(EXEEXT) \
-	$(am__EXEEXT_2) exptest$(EXEEXT) gcm128test$(EXEEXT) \
-	gost2814789t$(EXEEXT) hmactest$(EXEEXT) ideatest$(EXEEXT) \
-	igetest$(EXEEXT) md4test$(EXEEXT) md5test$(EXEEXT) \
-	mdc2test$(EXEEXT) mont$(EXEEXT) pkcs7test$(EXEEXT) \
+	bftest$(EXEEXT) bntest$(EXEEXT) bytestringtest$(EXEEXT) \
+	casttest$(EXEEXT) chachatest$(EXEEXT) cipherstest$(EXEEXT) \
+	cts128test$(EXEEXT) destest$(EXEEXT) dhtest$(EXEEXT) \
+	dsatest$(EXEEXT) ecdhtest$(EXEEXT) ecdsatest$(EXEEXT) \
+	ectest$(EXEEXT) enginetest$(EXEEXT) $(am__EXEEXT_2) \
+	exptest$(EXEEXT) gcm128test$(EXEEXT) gost2814789t$(EXEEXT) \
+	hmactest$(EXEEXT) ideatest$(EXEEXT) igetest$(EXEEXT) \
+	md4test$(EXEEXT) md5test$(EXEEXT) mdc2test$(EXEEXT) \
+	mont$(EXEEXT) pbkdf2$(EXEEXT) pkcs7test$(EXEEXT) \
 	poly1305test$(EXEEXT) randtest$(EXEEXT) rc2test$(EXEEXT) \
 	rc4test$(EXEEXT) rmdtest$(EXEEXT) sha1test$(EXEEXT) \
 	sha256test$(EXEEXT) sha512test$(EXEEXT) shatest$(EXEEXT) \
@@ -103,14 +104,15 @@ TESTS = aes_wrap$(EXEEXT) asn1test$(EXEEXT) base64test$(EXEEXT) \
 	pq_test.sh ssltest.sh $(am__append_6)
 check_PROGRAMS = aeadtest$(EXEEXT) aes_wrap$(EXEEXT) $(am__EXEEXT_1) \
 	asn1test$(EXEEXT) base64test$(EXEEXT) bftest$(EXEEXT) \
-	bntest$(EXEEXT) casttest$(EXEEXT) chachatest$(EXEEXT) \
-	cts128test$(EXEEXT) destest$(EXEEXT) dhtest$(EXEEXT) \
-	dsatest$(EXEEXT) ecdhtest$(EXEEXT) ecdsatest$(EXEEXT) \
-	ectest$(EXEEXT) enginetest$(EXEEXT) evptest$(EXEEXT) \
-	$(am__EXEEXT_2) exptest$(EXEEXT) gcm128test$(EXEEXT) \
-	gost2814789t$(EXEEXT) hmactest$(EXEEXT) ideatest$(EXEEXT) \
-	igetest$(EXEEXT) md4test$(EXEEXT) md5test$(EXEEXT) \
-	mdc2test$(EXEEXT) mont$(EXEEXT) $(am__EXEEXT_3) \
+	bntest$(EXEEXT) bytestringtest$(EXEEXT) casttest$(EXEEXT) \
+	chachatest$(EXEEXT) cipherstest$(EXEEXT) cts128test$(EXEEXT) \
+	destest$(EXEEXT) dhtest$(EXEEXT) dsatest$(EXEEXT) \
+	ecdhtest$(EXEEXT) ecdsatest$(EXEEXT) ectest$(EXEEXT) \
+	enginetest$(EXEEXT) evptest$(EXEEXT) $(am__EXEEXT_2) \
+	exptest$(EXEEXT) gcm128test$(EXEEXT) gost2814789t$(EXEEXT) \
+	hmactest$(EXEEXT) ideatest$(EXEEXT) igetest$(EXEEXT) \
+	md4test$(EXEEXT) md5test$(EXEEXT) mdc2test$(EXEEXT) \
+	mont$(EXEEXT) pbkdf2$(EXEEXT) $(am__EXEEXT_3) \
 	pkcs7test$(EXEEXT) poly1305test$(EXEEXT) pq_test$(EXEEXT) \
 	randtest$(EXEEXT) rc2test$(EXEEXT) rc4test$(EXEEXT) \
 	rmdtest$(EXEEXT) sha1test$(EXEEXT) sha256test$(EXEEXT) \
@@ -186,6 +188,12 @@ bntest_LDADD = $(LDADD)
 bntest_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(top_builddir)/ssl/libssl.la \
 	$(top_builddir)/crypto/libcrypto.la
+am_bytestringtest_OBJECTS = bytestringtest.$(OBJEXT)
+bytestringtest_OBJECTS = $(am_bytestringtest_OBJECTS)
+bytestringtest_LDADD = $(LDADD)
+bytestringtest_DEPENDENCIES = $(am__DEPENDENCIES_1) \
+	$(am__DEPENDENCIES_1) $(top_builddir)/ssl/libssl.la \
+	$(top_builddir)/crypto/libcrypto.la
 am_casttest_OBJECTS = casttest.$(OBJEXT)
 casttest_OBJECTS = $(am_casttest_OBJECTS)
 casttest_LDADD = $(LDADD)
@@ -196,6 +204,12 @@ am_chachatest_OBJECTS = chachatest.$(OBJEXT)
 chachatest_OBJECTS = $(am_chachatest_OBJECTS)
 chachatest_LDADD = $(LDADD)
 chachatest_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(top_builddir)/ssl/libssl.la \
+	$(top_builddir)/crypto/libcrypto.la
+am_cipherstest_OBJECTS = cipherstest.$(OBJEXT)
+cipherstest_OBJECTS = $(am_cipherstest_OBJECTS)
+cipherstest_LDADD = $(LDADD)
+cipherstest_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(top_builddir)/ssl/libssl.la \
 	$(top_builddir)/crypto/libcrypto.la
 am_cts128test_OBJECTS = cts128test.$(OBJEXT)
@@ -319,6 +333,12 @@ am_mont_OBJECTS = mont.$(OBJEXT)
 mont_OBJECTS = $(am_mont_OBJECTS)
 mont_LDADD = $(LDADD)
 mont_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
+	$(top_builddir)/ssl/libssl.la \
+	$(top_builddir)/crypto/libcrypto.la
+am_pbkdf2_OBJECTS = pbkdf2.$(OBJEXT)
+pbkdf2_OBJECTS = $(am_pbkdf2_OBJECTS)
+pbkdf2_LDADD = $(LDADD)
+pbkdf2_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
 	$(top_builddir)/ssl/libssl.la \
 	$(top_builddir)/crypto/libcrypto.la
 am__pidwraptest_SOURCES_DIST = pidwraptest.c
@@ -449,7 +469,8 @@ am__v_CCLD_1 =
 SOURCES = $(aeadtest_SOURCES) $(aes_wrap_SOURCES) \
 	$(arc4randomforktest_SOURCES) $(asn1test_SOURCES) \
 	$(base64test_SOURCES) $(bftest_SOURCES) $(bntest_SOURCES) \
-	$(casttest_SOURCES) $(chachatest_SOURCES) \
+	$(bytestringtest_SOURCES) $(casttest_SOURCES) \
+	$(chachatest_SOURCES) $(cipherstest_SOURCES) \
 	$(cts128test_SOURCES) $(destest_SOURCES) $(dhtest_SOURCES) \
 	$(dsatest_SOURCES) $(ecdhtest_SOURCES) $(ecdsatest_SOURCES) \
 	$(ectest_SOURCES) $(enginetest_SOURCES) $(evptest_SOURCES) \
@@ -457,16 +478,17 @@ SOURCES = $(aeadtest_SOURCES) $(aes_wrap_SOURCES) \
 	$(gcm128test_SOURCES) $(gost2814789t_SOURCES) \
 	$(hmactest_SOURCES) $(ideatest_SOURCES) $(igetest_SOURCES) \
 	$(md4test_SOURCES) $(md5test_SOURCES) $(mdc2test_SOURCES) \
-	$(mont_SOURCES) $(pidwraptest_SOURCES) $(pkcs7test_SOURCES) \
-	$(poly1305test_SOURCES) $(pq_test_SOURCES) $(randtest_SOURCES) \
-	$(rc2test_SOURCES) $(rc4test_SOURCES) $(rmdtest_SOURCES) \
-	$(sha1test_SOURCES) $(sha256test_SOURCES) \
-	$(sha512test_SOURCES) $(shatest_SOURCES) $(ssltest_SOURCES) \
-	$(timingsafe_SOURCES) $(utf8test_SOURCES)
+	$(mont_SOURCES) $(pbkdf2_SOURCES) $(pidwraptest_SOURCES) \
+	$(pkcs7test_SOURCES) $(poly1305test_SOURCES) \
+	$(pq_test_SOURCES) $(randtest_SOURCES) $(rc2test_SOURCES) \
+	$(rc4test_SOURCES) $(rmdtest_SOURCES) $(sha1test_SOURCES) \
+	$(sha256test_SOURCES) $(sha512test_SOURCES) $(shatest_SOURCES) \
+	$(ssltest_SOURCES) $(timingsafe_SOURCES) $(utf8test_SOURCES)
 DIST_SOURCES = $(aeadtest_SOURCES) $(aes_wrap_SOURCES) \
 	$(am__arc4randomforktest_SOURCES_DIST) $(asn1test_SOURCES) \
 	$(base64test_SOURCES) $(bftest_SOURCES) $(bntest_SOURCES) \
-	$(casttest_SOURCES) $(chachatest_SOURCES) \
+	$(bytestringtest_SOURCES) $(casttest_SOURCES) \
+	$(chachatest_SOURCES) $(cipherstest_SOURCES) \
 	$(cts128test_SOURCES) $(destest_SOURCES) $(dhtest_SOURCES) \
 	$(dsatest_SOURCES) $(ecdhtest_SOURCES) $(ecdsatest_SOURCES) \
 	$(ectest_SOURCES) $(enginetest_SOURCES) $(evptest_SOURCES) \
@@ -474,12 +496,13 @@ DIST_SOURCES = $(aeadtest_SOURCES) $(aes_wrap_SOURCES) \
 	$(gcm128test_SOURCES) $(gost2814789t_SOURCES) \
 	$(hmactest_SOURCES) $(ideatest_SOURCES) $(igetest_SOURCES) \
 	$(md4test_SOURCES) $(md5test_SOURCES) $(mdc2test_SOURCES) \
-	$(mont_SOURCES) $(am__pidwraptest_SOURCES_DIST) \
-	$(pkcs7test_SOURCES) $(poly1305test_SOURCES) \
-	$(pq_test_SOURCES) $(randtest_SOURCES) $(rc2test_SOURCES) \
-	$(rc4test_SOURCES) $(rmdtest_SOURCES) $(sha1test_SOURCES) \
-	$(sha256test_SOURCES) $(sha512test_SOURCES) $(shatest_SOURCES) \
-	$(ssltest_SOURCES) $(timingsafe_SOURCES) $(utf8test_SOURCES)
+	$(mont_SOURCES) $(pbkdf2_SOURCES) \
+	$(am__pidwraptest_SOURCES_DIST) $(pkcs7test_SOURCES) \
+	$(poly1305test_SOURCES) $(pq_test_SOURCES) $(randtest_SOURCES) \
+	$(rc2test_SOURCES) $(rc4test_SOURCES) $(rmdtest_SOURCES) \
+	$(sha1test_SOURCES) $(sha256test_SOURCES) \
+	$(sha512test_SOURCES) $(shatest_SOURCES) $(ssltest_SOURCES) \
+	$(timingsafe_SOURCES) $(utf8test_SOURCES)
 am__can_run_installinfo = \
   case $$AM_UPDATE_INFO_DIR in \
     n|no|NO) false;; \
@@ -836,7 +859,8 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CPPFLAGS = -I$(top_srcdir)/include -DLIBRESSL_INTERNAL -I \
-	$(top_srcdir)/crypto/modes -I $(top_srcdir)/crypto/asn1
+	$(top_srcdir)/crypto/modes -I $(top_srcdir)/crypto/asn1 -I \
+	$(top_srcdir)/ssl
 LDADD = $(PLATFORM_LDADD) $(PROG_LDADD) $(top_builddir)/ssl/libssl.la \
 	$(top_builddir)/crypto/libcrypto.la
 EXTRA_DIST = aeadtest.sh evptest.sh pq_test.sh ssltest.sh \
@@ -850,8 +874,10 @@ asn1test_SOURCES = asn1test.c
 base64test_SOURCES = base64test.c
 bftest_SOURCES = bftest.c
 bntest_SOURCES = bntest.c
+bytestringtest_SOURCES = bytestringtest.c
 casttest_SOURCES = casttest.c
 chachatest_SOURCES = chachatest.c
+cipherstest_SOURCES = cipherstest.c
 cts128test_SOURCES = cts128test.c
 destest_SOURCES = destest.c
 dhtest_SOURCES = dhtest.c
@@ -873,6 +899,7 @@ md4test_SOURCES = md4test.c
 md5test_SOURCES = md5test.c
 mdc2test_SOURCES = mdc2test.c
 mont_SOURCES = mont.c
+pbkdf2_SOURCES = pbkdf2.c
 @HOST_WIN_FALSE@pidwraptest_SOURCES = pidwraptest.c
 pkcs7test_SOURCES = pkcs7test.c
 poly1305test_SOURCES = poly1305test.c
@@ -960,6 +987,10 @@ bntest$(EXEEXT): $(bntest_OBJECTS) $(bntest_DEPENDENCIES) $(EXTRA_bntest_DEPENDE
 	@rm -f bntest$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(bntest_OBJECTS) $(bntest_LDADD) $(LIBS)
 
+bytestringtest$(EXEEXT): $(bytestringtest_OBJECTS) $(bytestringtest_DEPENDENCIES) $(EXTRA_bytestringtest_DEPENDENCIES) 
+	@rm -f bytestringtest$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(bytestringtest_OBJECTS) $(bytestringtest_LDADD) $(LIBS)
+
 casttest$(EXEEXT): $(casttest_OBJECTS) $(casttest_DEPENDENCIES) $(EXTRA_casttest_DEPENDENCIES) 
 	@rm -f casttest$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(casttest_OBJECTS) $(casttest_LDADD) $(LIBS)
@@ -967,6 +998,10 @@ casttest$(EXEEXT): $(casttest_OBJECTS) $(casttest_DEPENDENCIES) $(EXTRA_casttest
 chachatest$(EXEEXT): $(chachatest_OBJECTS) $(chachatest_DEPENDENCIES) $(EXTRA_chachatest_DEPENDENCIES) 
 	@rm -f chachatest$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(chachatest_OBJECTS) $(chachatest_LDADD) $(LIBS)
+
+cipherstest$(EXEEXT): $(cipherstest_OBJECTS) $(cipherstest_DEPENDENCIES) $(EXTRA_cipherstest_DEPENDENCIES) 
+	@rm -f cipherstest$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(cipherstest_OBJECTS) $(cipherstest_LDADD) $(LIBS)
 
 cts128test$(EXEEXT): $(cts128test_OBJECTS) $(cts128test_DEPENDENCIES) $(EXTRA_cts128test_DEPENDENCIES) 
 	@rm -f cts128test$(EXEEXT)
@@ -1048,6 +1083,10 @@ mont$(EXEEXT): $(mont_OBJECTS) $(mont_DEPENDENCIES) $(EXTRA_mont_DEPENDENCIES)
 	@rm -f mont$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(mont_OBJECTS) $(mont_LDADD) $(LIBS)
 
+pbkdf2$(EXEEXT): $(pbkdf2_OBJECTS) $(pbkdf2_DEPENDENCIES) $(EXTRA_pbkdf2_DEPENDENCIES) 
+	@rm -f pbkdf2$(EXEEXT)
+	$(AM_V_CCLD)$(LINK) $(pbkdf2_OBJECTS) $(pbkdf2_LDADD) $(LIBS)
+
 pidwraptest$(EXEEXT): $(pidwraptest_OBJECTS) $(pidwraptest_DEPENDENCIES) $(EXTRA_pidwraptest_DEPENDENCIES) 
 	@rm -f pidwraptest$(EXEEXT)
 	$(AM_V_CCLD)$(LINK) $(pidwraptest_OBJECTS) $(pidwraptest_LDADD) $(LIBS)
@@ -1121,8 +1160,10 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/base64test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bftest.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bntest.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bytestringtest.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/casttest.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/chachatest.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cipherstest.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cts128test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/destest.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dhtest.Po@am__quote@
@@ -1144,6 +1185,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mdc2test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/memmem.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mont.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pbkdf2.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pidwraptest.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pkcs7test.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/poly1305test.Po@am__quote@
@@ -1418,6 +1460,13 @@ bntest.log: bntest$(EXEEXT)
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
 	"$$tst" $(AM_TESTS_FD_REDIRECT)
+bytestringtest.log: bytestringtest$(EXEEXT)
+	@p='bytestringtest$(EXEEXT)'; \
+	b='bytestringtest'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
 casttest.log: casttest$(EXEEXT)
 	@p='casttest$(EXEEXT)'; \
 	b='casttest'; \
@@ -1428,6 +1477,13 @@ casttest.log: casttest$(EXEEXT)
 chachatest.log: chachatest$(EXEEXT)
 	@p='chachatest$(EXEEXT)'; \
 	b='chachatest'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+cipherstest.log: cipherstest$(EXEEXT)
+	@p='cipherstest$(EXEEXT)'; \
+	b='cipherstest'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
@@ -1561,6 +1617,13 @@ mdc2test.log: mdc2test$(EXEEXT)
 mont.log: mont$(EXEEXT)
 	@p='mont$(EXEEXT)'; \
 	b='mont'; \
+	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
+	--log-file $$b.log --trs-file $$b.trs \
+	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \
+	"$$tst" $(AM_TESTS_FD_REDIRECT)
+pbkdf2.log: pbkdf2$(EXEEXT)
+	@p='pbkdf2$(EXEEXT)'; \
+	b='pbkdf2'; \
 	$(am__check_pre) $(LOG_DRIVER) --test-name "$$f" \
 	--log-file $$b.log --trs-file $$b.trs \
 	$(am__common_driver_flags) $(AM_LOG_DRIVER_FLAGS) $(LOG_DRIVER_FLAGS) -- $(LOG_COMPILE) \

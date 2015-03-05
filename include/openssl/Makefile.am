@@ -56,7 +56,6 @@ opensslinclude_HEADERS += poly1305.h
 opensslinclude_HEADERS += rand.h
 opensslinclude_HEADERS += rc2.h
 opensslinclude_HEADERS += rc4.h
-opensslinclude_HEADERS += rc5.h
 opensslinclude_HEADERS += ripemd.h
 opensslinclude_HEADERS += rsa.h
 opensslinclude_HEADERS += safestack.h

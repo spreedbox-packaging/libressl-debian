@@ -1,4 +1,4 @@
-/* $OpenBSD: eng_list.c,v 1.14 2014/07/10 22:45:57 jsing Exp $ */
+/* $OpenBSD: eng_list.c,v 1.16 2015/02/07 13:19:15 doug Exp $ */
 /* Written by Geoff Thorpe (geoff@geoffthorpe.net) for the OpenSSL
  * project 2000.
  */
@@ -65,6 +65,8 @@
 #include <unistd.h>
 
 #include <openssl/opensslconf.h>
+
+#include <openssl/err.h>
 
 #include "cryptlib.h"
 #include "eng_int.h"
@@ -378,14 +380,7 @@ ENGINE_by_id(const char *id)
 		}
 	}
 	CRYPTO_w_unlock(CRYPTO_LOCK_ENGINE);
-#if 0
-	if (iterator == NULL) {
-		ENGINEerr(ENGINE_F_ENGINE_BY_ID,
-		    ENGINE_R_NO_SUCH_ENGINE);
-		ERR_asprintf_error_data("id=%s", id);
-	}
-	return iterator;
-#else
+
 	/* EEK! Experimental code starts */
 	if (iterator)
 		return iterator;
@@ -415,7 +410,6 @@ notfound:
 	ERR_asprintf_error_data("id=%s", id);
 	return NULL;
 	/* EEK! Experimental code ends */
-#endif
 }
 
 int

@@ -1,25 +1,25 @@
-/* $OpenBSD$ */
+/* $OpenBSD: by_mem.c,v 1.2 2015/01/22 11:16:56 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
  * This package is an SSL implementation written
  * by Eric Young (eay@cryptsoft.com).
  * The implementation was written so as to conform with Netscapes SSL.
- * 
+ *
  * This library is free for commercial and non-commercial use as long as
  * the following conditions are aheared to.  The following conditions
  * apply to all code found in this distribution, be it the RC4, RSA,
  * lhash, DES, etc., code; not just the SSL code.  The SSL documentation
  * included with this distribution is covered by the same copyright terms
  * except that the holder is Tim Hudson (tjh@cryptsoft.com).
- * 
+ *
  * Copyright remains Eric Young's, and as such any Copyright notices in
  * the code are not to be removed.
  * If this package is used in a product, Eric Young should be given attribution
  * as the author of the parts of the library used.
  * This can be in the form of a textual message at program startup or
  * in documentation (online or textual) provided with the package.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -34,10 +34,10 @@
  *     Eric Young (eay@cryptsoft.com)"
  *    The word 'cryptographic' can be left out if the rouines from the library
  *    being used are not cryptographic related :-).
- * 4. If you include any Windows specific code (or a derivative thereof) from 
+ * 4. If you include any Windows specific code (or a derivative thereof) from
  *    the apps directory (application code) you must include an acknowledgement:
  *    "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -49,70 +49,90 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- * 
+ *
  * The licence and distribution terms for any publically available version or
  * derivative of this code cannot be changed.  i.e. this code cannot simply be
  * copied and put under another distribution licence
  * [including the GNU Public Licence.]
  */
 
-#ifndef HEADER_RC5_H
-#define HEADER_RC5_H
+#include <sys/uio.h>
+#include <errno.h>
+#include <stdio.h>
+#include <time.h>
+#include <unistd.h>
 
-#include <openssl/opensslconf.h> /* OPENSSL_NO_RC5 */
+#include <openssl/buffer.h>
+#include <openssl/err.h>
+#include <openssl/pem.h>
+#include <openssl/lhash.h>
+#include <openssl/x509.h>
 
-#ifdef  __cplusplus
-extern "C" {
-#endif
+static int by_mem_ctrl(X509_LOOKUP *, int, const char *, long, char **);
 
-#ifdef OPENSSL_NO_RC5
-#error RC5 is disabled.
-#endif
+static X509_LOOKUP_METHOD x509_mem_lookup = {
+	.name = "Load cert from memory",
+	.new_item = NULL,
+	.free = NULL,
+	.init = NULL,
+	.shutdown = NULL,
+	.ctrl = by_mem_ctrl,
+	.get_by_subject = NULL,
+	.get_by_issuer_serial = NULL,
+	.get_by_fingerprint = NULL,
+	.get_by_alias = NULL,
+};
 
-#define RC5_ENCRYPT	1
-#define RC5_DECRYPT	0
-
-/* 32 bit.  For Alpha, things may get weird */
-#define RC5_32_INT unsigned long
-
-#define RC5_32_BLOCK		8
-#define RC5_32_KEY_LENGTH	16 /* This is a default, max is 255 */
-
-/* This are the only values supported.  Tweak the code if you want more
- * The most supported modes will be
- * RC5-32/12/16
- * RC5-32/16/8
- */
-#define RC5_8_ROUNDS	8
-#define RC5_12_ROUNDS	12
-#define RC5_16_ROUNDS	16
-
-typedef struct rc5_key_st
-	{
-	/* Number of rounds */
-	int rounds;
-	RC5_32_INT data[2*(RC5_16_ROUNDS+1)];
-	} RC5_32_KEY;
-
- 
-void RC5_32_set_key(RC5_32_KEY *key, int len, const unsigned char *data,
-	int rounds);
-void RC5_32_ecb_encrypt(const unsigned char *in,unsigned char *out,RC5_32_KEY *key,
-	int enc);
-void RC5_32_encrypt(unsigned long *data,RC5_32_KEY *key);
-void RC5_32_decrypt(unsigned long *data,RC5_32_KEY *key);
-void RC5_32_cbc_encrypt(const unsigned char *in, unsigned char *out,
-			long length, RC5_32_KEY *ks, unsigned char *iv,
-			int enc);
-void RC5_32_cfb64_encrypt(const unsigned char *in, unsigned char *out,
-			  long length, RC5_32_KEY *schedule,
-			  unsigned char *ivec, int *num, int enc);
-void RC5_32_ofb64_encrypt(const unsigned char *in, unsigned char *out,
-			  long length, RC5_32_KEY *schedule,
-			  unsigned char *ivec, int *num);
-
-#ifdef  __cplusplus
+X509_LOOKUP_METHOD *
+X509_LOOKUP_mem(void)
+{
+	return (&x509_mem_lookup);
 }
-#endif
 
-#endif
+static int
+by_mem_ctrl(X509_LOOKUP *lu, int cmd, const char *buf,
+    long type, char **ret)
+{
+	STACK_OF(X509_INFO)	*inf = NULL;
+	const struct iovec	*iov;
+	X509_INFO		*itmp;
+	BIO			*in = NULL;
+	int			 i, count = 0, ok = 0;
+
+	iov = (const struct iovec *)buf;
+
+	if (!(cmd == X509_L_MEM && type == X509_FILETYPE_PEM))
+		goto done;
+
+	if ((in = BIO_new_mem_buf(iov->iov_base, iov->iov_len)) == NULL)
+		goto done;
+
+	if ((inf = PEM_X509_INFO_read_bio(in, NULL, NULL, NULL)) == NULL)
+		goto done;
+
+	for (i = 0; i < sk_X509_INFO_num(inf); i++) {
+		itmp = sk_X509_INFO_value(inf, i);
+		if (itmp->x509) {
+			ok = X509_STORE_add_cert(lu->store_ctx, itmp->x509);
+			if (!ok)
+				goto done;
+			count++;
+		}
+		if (itmp->crl) {
+			ok = X509_STORE_add_crl(lu->store_ctx, itmp->crl);
+			if (!ok)
+				goto done;
+			count++;
+		}
+	}
+
+	ok = count != 0;
+ done:
+	if (count == 0)
+		X509err(X509_F_X509_LOAD_CERT_CRL_FILE,ERR_R_PEM_LIB);
+	if (inf != NULL)
+		sk_X509_INFO_pop_free(inf, X509_INFO_free);
+	if (in != NULL)
+		BIO_free(in);
+	return (ok);
+}

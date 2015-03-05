@@ -132,7 +132,8 @@ am__uninstall_files_from_dir = { \
 am__installdirs = "$(DESTDIR)$(libdir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 libssl_la_DEPENDENCIES = ../crypto/libcrypto.la
-am_libssl_la_OBJECTS = libssl_la-bio_ssl.lo libssl_la-d1_both.lo \
+am_libssl_la_OBJECTS = libssl_la-bio_ssl.lo libssl_la-bs_ber.lo \
+	libssl_la-bs_cbb.lo libssl_la-bs_cbs.lo libssl_la-d1_both.lo \
 	libssl_la-d1_clnt.lo libssl_la-d1_enc.lo libssl_la-d1_lib.lo \
 	libssl_la-d1_meth.lo libssl_la-d1_pkt.lo libssl_la-d1_srtp.lo \
 	libssl_la-d1_srvr.lo libssl_la-pqueue.lo libssl_la-s23_clnt.lo \
@@ -350,14 +351,15 @@ EXTRA_DIST = VERSION
 libssl_la_LDFLAGS = -version-info @LIBSSL_VERSION@ -no-undefined
 libssl_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
 libssl_la_LIBADD = ../crypto/libcrypto.la
-libssl_la_SOURCES = bio_ssl.c d1_both.c d1_clnt.c d1_enc.c d1_lib.c \
-	d1_meth.c d1_pkt.c d1_srtp.c d1_srvr.c pqueue.c s23_clnt.c \
-	s23_lib.c s23_meth.c s23_pkt.c s23_srvr.c s3_both.c s3_cbc.c \
-	s3_clnt.c s3_enc.c s3_lib.c s3_meth.c s3_pkt.c s3_srvr.c \
-	ssl_algs.c ssl_asn1.c ssl_cert.c ssl_ciph.c ssl_err.c \
-	ssl_err2.c ssl_lib.c ssl_rsa.c ssl_sess.c ssl_stat.c ssl_txt.c \
-	t1_clnt.c t1_enc.c t1_lib.c t1_meth.c t1_reneg.c t1_srvr.c
-noinst_HEADERS = srtp.h ssl_locl.h
+libssl_la_SOURCES = bio_ssl.c bs_ber.c bs_cbb.c bs_cbs.c d1_both.c \
+	d1_clnt.c d1_enc.c d1_lib.c d1_meth.c d1_pkt.c d1_srtp.c \
+	d1_srvr.c pqueue.c s23_clnt.c s23_lib.c s23_meth.c s23_pkt.c \
+	s23_srvr.c s3_both.c s3_cbc.c s3_clnt.c s3_enc.c s3_lib.c \
+	s3_meth.c s3_pkt.c s3_srvr.c ssl_algs.c ssl_asn1.c ssl_cert.c \
+	ssl_ciph.c ssl_err.c ssl_err2.c ssl_lib.c ssl_rsa.c ssl_sess.c \
+	ssl_stat.c ssl_txt.c t1_clnt.c t1_enc.c t1_lib.c t1_meth.c \
+	t1_reneg.c t1_srvr.c
+noinst_HEADERS = srtp.h ssl_locl.h bytestring.h
 all: all-am
 
 .SUFFIXES:
@@ -438,6 +440,9 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-bio_ssl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-bs_ber.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-bs_cbb.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-bs_cbs.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-d1_both.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-d1_clnt.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-d1_enc.Plo@am__quote@
@@ -508,6 +513,27 @@ libssl_la-bio_ssl.lo: bio_ssl.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bio_ssl.c' object='libssl_la-bio_ssl.lo' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-bio_ssl.lo `test -f 'bio_ssl.c' || echo '$(srcdir)/'`bio_ssl.c
+
+libssl_la-bs_ber.lo: bs_ber.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-bs_ber.lo -MD -MP -MF $(DEPDIR)/libssl_la-bs_ber.Tpo -c -o libssl_la-bs_ber.lo `test -f 'bs_ber.c' || echo '$(srcdir)/'`bs_ber.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-bs_ber.Tpo $(DEPDIR)/libssl_la-bs_ber.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bs_ber.c' object='libssl_la-bs_ber.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-bs_ber.lo `test -f 'bs_ber.c' || echo '$(srcdir)/'`bs_ber.c
+
+libssl_la-bs_cbb.lo: bs_cbb.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-bs_cbb.lo -MD -MP -MF $(DEPDIR)/libssl_la-bs_cbb.Tpo -c -o libssl_la-bs_cbb.lo `test -f 'bs_cbb.c' || echo '$(srcdir)/'`bs_cbb.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-bs_cbb.Tpo $(DEPDIR)/libssl_la-bs_cbb.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bs_cbb.c' object='libssl_la-bs_cbb.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-bs_cbb.lo `test -f 'bs_cbb.c' || echo '$(srcdir)/'`bs_cbb.c
+
+libssl_la-bs_cbs.lo: bs_cbs.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-bs_cbs.lo -MD -MP -MF $(DEPDIR)/libssl_la-bs_cbs.Tpo -c -o libssl_la-bs_cbs.lo `test -f 'bs_cbs.c' || echo '$(srcdir)/'`bs_cbs.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-bs_cbs.Tpo $(DEPDIR)/libssl_la-bs_cbs.Plo
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bs_cbs.c' object='libssl_la-bs_cbs.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-bs_cbs.lo `test -f 'bs_cbs.c' || echo '$(srcdir)/'`bs_cbs.c
 
 libssl_la-d1_both.lo: d1_both.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-d1_both.lo -MD -MP -MF $(DEPDIR)/libssl_la-d1_both.Tpo -c -o libssl_la-d1_both.lo `test -f 'd1_both.c' || echo '$(srcdir)/'`d1_both.c

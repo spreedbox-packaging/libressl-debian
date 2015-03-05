@@ -53,12 +53,6 @@ case $host_os in
 	*) ;;
 esac
 
-case $host_cpu in
-	*sparc*)
-		CFLAGS="$CFLAGS -D__STRICT_ALIGNMENT"
-		;;
-esac
-
 AM_CONDITIONAL([HOST_DARWIN],  [test x$HOST_OS = xdarwin])
 AM_CONDITIONAL([HOST_FREEBSD], [test x$HOST_OS = xfreebsd])
 AM_CONDITIONAL([HOST_HPUX],    [test x$HOST_OS = xhpux])
@@ -104,6 +98,11 @@ AC_ARG_ENABLE([hardening],
 			[Disable options to frustrate memory corruption exploits])],
 	[], [enable_hardening=yes])
 
+AC_ARG_ENABLE([windows-ssp],
+	[AS_HELP_STRING([--enable-windows-ssp],
+			[Enable building the stack smashing protection on
+			 Windows. This currently distributing libssp-0.dll.])])
+
 AC_DEFUN([CHECK_CFLAG], [
 	 AC_LANG_ASSERT(C)
 	 AC_MSG_CHECKING([if $saved_CC supports "$1"])
@@ -148,16 +147,26 @@ AS_IF([test "x$enable_hardening" = "xyes"], [
 	# Enable read only relocations
 	CHECK_LDFLAG([[-Wl,-z,relro]])
 	CHECK_LDFLAG([[-Wl,-z,now]])
-])
 
-# Use stack-protector-strong if available; if not, fallback to
-# stack-protector-all which is considered to be overkill
-AS_IF([test "x$enable_hardening" = "xyes" -a "x$HOST_OS" != "xwin"], [
-	CHECK_CFLAG([[-fstack-protector-strong]],
-		CHECK_CFLAG([[-fstack-protector-all]],
-			AC_MSG_WARN([compiler does not appear to support stack protection])
+	# Windows security flags
+	AS_IF([test "x$HOST_OS" = "xwin"], [
+		CHECK_LDFLAG([[-Wl,--nxcompat]])
+		CHECK_LDFLAG([[-Wl,--dynamicbase]])
+		CHECK_LDFLAG([[-Wl,--high-entropy-va]])
+	])
+
+	# Use stack-protector-strong if available; if not, fallback to
+	# stack-protector-all which is considered to be overkill
+	AS_IF([test "x$enable_windows_ssp" = "xyes" -o "x$HOST_OS" != "xwin"], [
+		CHECK_CFLAG([[-fstack-protector-strong]],
+			CHECK_CFLAG([[-fstack-protector-all]],
+				AC_MSG_WARN([compiler does not appear to support stack protection])
+			)
 		)
-	)
+		AS_IF([test "x$HOST_OS" = "xwin"], [
+			AC_SEARCH_LIBS([__stack_chk_guard],[ssp])
+		])
+	])
 ])
 
 
@@ -196,7 +205,8 @@ LDFLAGS="$LDFLAGS $CLANG_FLAGS"
 
 AC_CHECK_FUNCS([arc4random_buf asprintf explicit_bzero funopen getauxval])
 AC_CHECK_FUNCS([getentropy issetugid memmem poll reallocarray])
-AC_CHECK_FUNCS([strlcat strlcpy strndup strnlen strtonum])
+AC_CHECK_FUNCS([strlcat strlcpy strndup strnlen strsep strtonum])
+AC_CHECK_FUNCS([symlink])
 AC_CHECK_FUNCS([timingsafe_bcmp timingsafe_memcmp])
 
 # Share test results with automake
@@ -212,9 +222,11 @@ AM_CONDITIONAL([HAVE_STRLCAT], [test "x$ac_cv_func_strlcat" = xyes])
 AM_CONDITIONAL([HAVE_STRLCPY], [test "x$ac_cv_func_strlcpy" = xyes])
 AM_CONDITIONAL([HAVE_STRNDUP], [test "x$ac_cv_func_strndup" = xyes])
 AM_CONDITIONAL([HAVE_STRNLEN], [test "x$ac_cv_func_strnlen" = xyes])
+AM_CONDITIONAL([HAVE_STRSEP], [test "x$ac_cv_func_strsep" = xyes])
 AM_CONDITIONAL([HAVE_STRTONUM], [test "x$ac_cv_func_strtonum" = xyes])
 AM_CONDITIONAL([HAVE_TIMINGSAFE_BCMP], [test "x$ac_cv_func_timingsafe_bcmp" = xyes])
 AM_CONDITIONAL([HAVE_TIMINGSAFE_MEMCMP], [test "x$ac_cv_func_timingsafe_memcmp" = xyes])
+AM_CONDITIONAL([BUILD_CERTHASH], [test "x$ac_cv_func_symlink" = xyes])
 
 # overrides for arc4random_buf implementations with known issues
 AM_CONDITIONAL([HAVE_ARC4RANDOM_BUF],
@@ -222,6 +234,11 @@ AM_CONDITIONAL([HAVE_ARC4RANDOM_BUF],
 	   -a "x$HOST_OS" != xfreebsd \
 	   -a "x$HOST_OS" != xnetbsd \
 	   -a "x$ac_cv_func_arc4random_buf" = xyes])
+
+# overrides for issetugid implementations with known issues
+AM_CONDITIONAL([HAVE_ISSETUGID],
+       [test "x$HOST_OS" != xdarwin \
+	  -a "x$ac_cv_func_issetugid" = xyes])
 
 AC_CACHE_CHECK([whether va_copy exists], ac_cv_have_va_copy, [
 	AC_LINK_IFELSE([AC_LANG_PROGRAM([[
@@ -265,6 +282,23 @@ AC_ARG_WITH([enginesdir],
 AC_ARG_ENABLE([asm],
 	AS_HELP_STRING([--disable-asm], [Disable assembly]))
 AM_CONDITIONAL([OPENSSL_NO_ASM], [test "x$enable_asm" = "xno"])
+
+old_cflags=$CFLAGS
+CFLAGS="$old_cflags -I$srcdir/include"
+AC_TRY_COMPILE([#include "$srcdir/crypto/modes/modes_lcl.h"],
+	       [int a = 0; BSWAP4(a);],
+	       BSWAP4=yes, BSWAP4=no)
+CFLAGS="$old_cflags"
+
+case $host_cpu in
+	*sparc*)
+		CFLAGS="$CFLAGS -D__STRICT_ALIGNMENT"
+		;;
+	*arm*)
+		AS_IF([test "x$BSWAP4" = "xyes"],,
+		    CFLAGS="$old_cflags -D__STRICT_ALIGNMENT")
+		;;
+esac
 
 AM_CONDITIONAL([HOST_ASM_ELF_X86_64],
     [test "x$HOST_ABI" = "xelf" -a "$host_cpu" = "x86_64" -a "x$enable_asm" != "xno"])

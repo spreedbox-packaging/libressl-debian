@@ -1,4 +1,4 @@
-/* $OpenBSD: x_attrib.c,v 1.8 2014/06/12 15:49:27 deraadt Exp $ */
+/* $OpenBSD: x_attrib.c,v 1.12 2015/02/10 05:25:45 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -82,19 +82,92 @@
  * SET OF structure.
  */
 
-ASN1_CHOICE(X509_ATTRIBUTE_SET) = {
-	ASN1_SET_OF(X509_ATTRIBUTE, value.set, ASN1_ANY),
-	ASN1_SIMPLE(X509_ATTRIBUTE, value.single, ASN1_ANY)
-} ASN1_CHOICE_END_selector(X509_ATTRIBUTE, X509_ATTRIBUTE_SET, single)
+static const ASN1_TEMPLATE X509_ATTRIBUTE_SET_ch_tt[] = {
+	{
+		.flags = ASN1_TFLG_SET_OF,
+		.tag = 0,
+		.offset = offsetof(X509_ATTRIBUTE, value.set),
+		.field_name = "value.set",
+		.item = &ASN1_ANY_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(X509_ATTRIBUTE, value.single),
+		.field_name = "value.single",
+		.item = &ASN1_ANY_it,
+	},
+};
 
-ASN1_SEQUENCE(X509_ATTRIBUTE) = {
-	ASN1_SIMPLE(X509_ATTRIBUTE, object, ASN1_OBJECT),
+const ASN1_ITEM X509_ATTRIBUTE_SET_it = {
+	.itype = ASN1_ITYPE_CHOICE,
+	.utype = offsetof(X509_ATTRIBUTE, single),
+	.templates = X509_ATTRIBUTE_SET_ch_tt,
+	.tcount = sizeof(X509_ATTRIBUTE_SET_ch_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(X509_ATTRIBUTE),
+	.sname = "X509_ATTRIBUTE",
+};
+
+static const ASN1_TEMPLATE X509_ATTRIBUTE_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(X509_ATTRIBUTE, object),
+		.field_name = "object",
+		.item = &ASN1_OBJECT_it,
+	},
 	/* CHOICE type merged with parent */
-	ASN1_EX_COMBINE(0, 0, X509_ATTRIBUTE_SET)
-} ASN1_SEQUENCE_END(X509_ATTRIBUTE)
+	{
+		.flags = 0 | ASN1_TFLG_COMBINE,
+		.tag = 0,
+		.offset = 0,
+		.field_name = NULL,
+		.item = &X509_ATTRIBUTE_SET_it,
+	},
+};
 
-IMPLEMENT_ASN1_FUNCTIONS(X509_ATTRIBUTE)
-IMPLEMENT_ASN1_DUP_FUNCTION(X509_ATTRIBUTE)
+const ASN1_ITEM X509_ATTRIBUTE_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = X509_ATTRIBUTE_seq_tt,
+	.tcount = sizeof(X509_ATTRIBUTE_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(X509_ATTRIBUTE),
+	.sname = "X509_ATTRIBUTE",
+};
+
+
+X509_ATTRIBUTE *
+d2i_X509_ATTRIBUTE(X509_ATTRIBUTE **a, const unsigned char **in, long len)
+{
+	return (X509_ATTRIBUTE *)ASN1_item_d2i((ASN1_VALUE **)a, in, len,
+	    &X509_ATTRIBUTE_it);
+}
+
+int
+i2d_X509_ATTRIBUTE(X509_ATTRIBUTE *a, unsigned char **out)
+{
+	return ASN1_item_i2d((ASN1_VALUE *)a, out, &X509_ATTRIBUTE_it);
+}
+
+X509_ATTRIBUTE *
+X509_ATTRIBUTE_new(void)
+{
+	return (X509_ATTRIBUTE *)ASN1_item_new(&X509_ATTRIBUTE_it);
+}
+
+void
+X509_ATTRIBUTE_free(X509_ATTRIBUTE *a)
+{
+	ASN1_item_free((ASN1_VALUE *)a, &X509_ATTRIBUTE_it);
+}
+
+X509_ATTRIBUTE *
+X509_ATTRIBUTE_dup(X509_ATTRIBUTE *x)
+{
+	return ASN1_item_dup(&X509_ATTRIBUTE_it, x);
+}
 
 X509_ATTRIBUTE *
 X509_ATTRIBUTE_create(int nid, int atrtype, void *value)

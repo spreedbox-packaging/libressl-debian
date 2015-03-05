@@ -1,4 +1,4 @@
-/* $OpenBSD: tls1.h,v 1.22 2014/11/18 05:33:43 miod Exp $ */
+/* $OpenBSD: tls1.h,v 1.24 2015/02/12 03:45:25 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -187,6 +187,7 @@ extern "C" {
 #define TLS1_AD_PROTOCOL_VERSION	70	/* fatal */
 #define TLS1_AD_INSUFFICIENT_SECURITY	71	/* fatal */
 #define TLS1_AD_INTERNAL_ERROR		80	/* fatal */
+#define TLS1_AD_INAPPROPRIATE_FALLBACK	86	/* fatal */
 #define TLS1_AD_USER_CANCELLED		90
 #define TLS1_AD_NO_RENEGOTIATION	100
 /* Codes 110-114 are from RFC 3546. */
@@ -252,10 +253,8 @@ extern "C" {
 /* Temporary extension type */
 #define TLSEXT_TYPE_renegotiate                 0xff01
 
-#ifndef OPENSSL_NO_NEXTPROTONEG
 /* This is not an IANA defined extension number */
 #define TLSEXT_TYPE_next_proto_neg		13172
-#endif
 
 /* NameType value from RFC 3546. */
 #define TLSEXT_NAMETYPE_host_name 0

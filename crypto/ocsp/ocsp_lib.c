@@ -1,4 +1,4 @@
-/* $OpenBSD: ocsp_lib.c,v 1.15 2014/07/13 16:03:09 beck Exp $ */
+/* $OpenBSD: ocsp_lib.c,v 1.17 2015/02/10 04:21:50 jsing Exp $ */
 /* Written by Tom Titchener <Tom_Titchener@groove.net> for the OpenSSL
  * project. */
 
@@ -274,4 +274,9 @@ err:
 	return 0;
 }
 
-IMPLEMENT_ASN1_DUP_FUNCTION(OCSP_CERTID)
+
+OCSP_CERTID *
+OCSP_CERTID_dup(OCSP_CERTID *x)
+{
+	return ASN1_item_dup(&OCSP_CERTID_it, x);
+}
