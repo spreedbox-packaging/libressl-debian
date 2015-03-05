@@ -1,4 +1,4 @@
-/* $OpenBSD: dh_gen.c,v 1.12 2014/07/09 13:26:47 miod Exp $ */
+/* $OpenBSD: dh_gen.c,v 1.14 2015/02/07 13:19:15 doug Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -115,9 +115,9 @@ dh_builtin_genparams(DH *ret, int prime_len, int generator, BN_GENCB *cb)
 	if (ctx == NULL)
 		goto err;
 	BN_CTX_start(ctx);
-	t1 = BN_CTX_get(ctx);
-	t2 = BN_CTX_get(ctx);
-	if (t1 == NULL || t2 == NULL)
+	if ((t1 = BN_CTX_get(ctx)) == NULL)
+		goto err;
+	if ((t2 = BN_CTX_get(ctx)) == NULL)
 		goto err;
 
 	/* Make sure 'ret' has the necessary elements */
@@ -136,14 +136,6 @@ dh_builtin_genparams(DH *ret, int prime_len, int generator, BN_GENCB *cb)
 		if (!BN_set_word(t2, 11))
 			goto err;
 		g = 2;
-#if 0 /* does not work for safe primes */
-	} else if (generator == DH_GENERATOR_3) {
-		if (!BN_set_word(t1, 12))
-			goto err;
-		if (!BN_set_word(t2, 5))
-			goto err;
-		g = 3;
-#endif
 	} else if (generator == DH_GENERATOR_5) {
 		if (!BN_set_word(t1, 10))
 			goto err;

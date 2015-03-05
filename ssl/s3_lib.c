@@ -1,4 +1,4 @@
-/* $OpenBSD: s3_lib.c,v 1.90 2014/12/14 16:07:26 jsing Exp $ */
+/* $OpenBSD: s3_lib.c,v 1.94 2015/02/07 05:46:01 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -1950,7 +1950,14 @@ ssl3_get_cipher_by_id(unsigned int id)
 	cp = OBJ_bsearch_ssl_cipher_id(&c, ssl3_ciphers, SSL3_NUM_CIPHERS);
 	if (cp != NULL && cp->valid == 1)
 		return (cp);
+
 	return (NULL);
+}
+
+const SSL_CIPHER *
+ssl3_get_cipher_by_value(uint16_t value)
+{
+	return ssl3_get_cipher_by_id(SSL3_CK_ID | value);
 }
 
 uint16_t
@@ -2519,7 +2526,31 @@ ssl3_ctx_callback_ctrl(SSL_CTX *ctx, int cmd, void (*fp)(void))
 	return (1);
 }
 
-SSL_CIPHER *ssl3_choose_cipher(SSL *s, STACK_OF(SSL_CIPHER) *clnt,
+/*
+ * This function needs to check if the ciphers required are actually available.
+ */
+const SSL_CIPHER *
+ssl3_get_cipher_by_char(const unsigned char *p)
+{
+	uint16_t cipher_value;
+
+	n2s(p, cipher_value);
+	return ssl3_get_cipher_by_value(cipher_value);
+}
+
+int
+ssl3_put_cipher_by_char(const SSL_CIPHER *c, unsigned char *p)
+{
+	if (p != NULL) {
+		if ((c->id & ~SSL3_CK_VALUE_MASK) != SSL3_CK_ID)
+			return (0);
+		s2n(ssl3_cipher_get_value(c), p); 
+	}
+	return (2);
+}
+
+SSL_CIPHER *
+ssl3_choose_cipher(SSL *s, STACK_OF(SSL_CIPHER) *clnt,
     STACK_OF(SSL_CIPHER) *srvr)
 {
 	unsigned long alg_k, alg_a, mask_k, mask_a;
@@ -2819,15 +2850,15 @@ ssl3_renegotiate_check(SSL *s)
 	return (ret);
 }
 /*
- * If we are using TLS v1.2 or later and default SHA1+MD5 algorithms switch
- * to new SHA256 PRF and handshake macs
+ * If we are using default SHA1+MD5 algorithms switch to new SHA256 PRF
+ * and handshake macs if required.
  */
 long
 ssl_get_algorithm2(SSL *s)
 {
 	long	alg2 = s->s3->tmp.new_cipher->algorithm2;
 
-	if (s->method->version == TLS1_2_VERSION &&
+	if (s->method->ssl3_enc->enc_flags & SSL_ENC_FLAG_SHA256_PRF &&
 	    alg2 == (SSL_HANDSHAKE_MAC_DEFAULT|TLS1_PRF))
 		return SSL_HANDSHAKE_MAC_SHA256 | TLS1_PRF_SHA256;
 	return alg2;

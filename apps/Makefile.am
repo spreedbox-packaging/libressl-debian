@@ -57,6 +57,12 @@ openssl_SOURCES += verify.c
 openssl_SOURCES += version.c
 openssl_SOURCES += x509.c
 
+if BUILD_CERTHASH
+openssl_SOURCES += certhash.c
+else
+openssl_SOURCES += certhash_disabled.c
+endif
+
 if HOST_WIN
 openssl_SOURCES += apps_win.c
 else

@@ -90,10 +90,12 @@ POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
 bin_PROGRAMS = openssl$(EXEEXT)
-@HOST_WIN_TRUE@am__append_1 = apps_win.c
-@HOST_WIN_FALSE@am__append_2 = apps_posix.c
-@HAVE_POLL_FALSE@@HOST_WIN_TRUE@am__append_3 = poll_win.c
-@HAVE_STRTONUM_FALSE@am__append_4 = strtonum.c
+@BUILD_CERTHASH_TRUE@am__append_1 = certhash.c
+@BUILD_CERTHASH_FALSE@am__append_2 = certhash_disabled.c
+@HOST_WIN_TRUE@am__append_3 = apps_win.c
+@HOST_WIN_FALSE@am__append_4 = apps_posix.c
+@HAVE_POLL_FALSE@@HOST_WIN_TRUE@am__append_5 = poll_win.c
+@HAVE_STRTONUM_FALSE@am__append_6 = strtonum.c
 subdir = apps
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
@@ -116,12 +118,16 @@ am__openssl_SOURCES_DIST = apps.c asn1pars.c ca.c ciphers.c cms.c \
 	pkcs8.c pkey.c pkeyparam.c pkeyutl.c prime.c rand.c req.c \
 	rsa.c rsautl.c s_cb.c s_client.c s_server.c s_socket.c \
 	s_time.c sess_id.c smime.c speed.c spkac.c ts.c verify.c \
-	version.c x509.c apps_win.c apps_posix.c poll_win.c strtonum.c
-@HOST_WIN_TRUE@am__objects_1 = openssl-apps_win.$(OBJEXT)
-@HOST_WIN_FALSE@am__objects_2 = openssl-apps_posix.$(OBJEXT)
-@HAVE_POLL_FALSE@@HOST_WIN_TRUE@am__objects_3 =  \
+	version.c x509.c certhash.c certhash_disabled.c apps_win.c \
+	apps_posix.c poll_win.c strtonum.c
+@BUILD_CERTHASH_TRUE@am__objects_1 = openssl-certhash.$(OBJEXT)
+@BUILD_CERTHASH_FALSE@am__objects_2 =  \
+@BUILD_CERTHASH_FALSE@	openssl-certhash_disabled.$(OBJEXT)
+@HOST_WIN_TRUE@am__objects_3 = openssl-apps_win.$(OBJEXT)
+@HOST_WIN_FALSE@am__objects_4 = openssl-apps_posix.$(OBJEXT)
+@HAVE_POLL_FALSE@@HOST_WIN_TRUE@am__objects_5 =  \
 @HAVE_POLL_FALSE@@HOST_WIN_TRUE@	openssl-poll_win.$(OBJEXT)
-@HAVE_STRTONUM_FALSE@am__objects_4 = openssl-strtonum.$(OBJEXT)
+@HAVE_STRTONUM_FALSE@am__objects_6 = openssl-strtonum.$(OBJEXT)
 am_openssl_OBJECTS = openssl-apps.$(OBJEXT) openssl-asn1pars.$(OBJEXT) \
 	openssl-ca.$(OBJEXT) openssl-ciphers.$(OBJEXT) \
 	openssl-cms.$(OBJEXT) openssl-crl.$(OBJEXT) \
@@ -147,7 +153,8 @@ am_openssl_OBJECTS = openssl-apps.$(OBJEXT) openssl-asn1pars.$(OBJEXT) \
 	openssl-spkac.$(OBJEXT) openssl-ts.$(OBJEXT) \
 	openssl-verify.$(OBJEXT) openssl-version.$(OBJEXT) \
 	openssl-x509.$(OBJEXT) $(am__objects_1) $(am__objects_2) \
-	$(am__objects_3) $(am__objects_4)
+	$(am__objects_3) $(am__objects_4) $(am__objects_5) \
+	$(am__objects_6)
 openssl_OBJECTS = $(am_openssl_OBJECTS)
 am__DEPENDENCIES_1 =
 openssl_DEPENDENCIES = $(am__DEPENDENCIES_1) $(am__DEPENDENCIES_1) \
@@ -360,7 +367,7 @@ openssl_SOURCES = apps.c asn1pars.c ca.c ciphers.c cms.c crl.c \
 	rsautl.c s_cb.c s_client.c s_server.c s_socket.c s_time.c \
 	sess_id.c smime.c speed.c spkac.c ts.c verify.c version.c \
 	x509.c $(am__append_1) $(am__append_2) $(am__append_3) \
-	$(am__append_4)
+	$(am__append_4) $(am__append_5) $(am__append_6)
 noinst_HEADERS = apps.h progs.h s_apps.h testdsa.h testrsa.h \
 	timeouts.h openssl.cnf
 all: all-am
@@ -462,6 +469,8 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-apps_win.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-asn1pars.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-ca.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-certhash.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-certhash_disabled.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-ciphers.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-cms.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/openssl-crl.Po@am__quote@
@@ -1220,6 +1229,34 @@ openssl-x509.obj: x509.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='x509.c' object='openssl-x509.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -c -o openssl-x509.obj `if test -f 'x509.c'; then $(CYGPATH_W) 'x509.c'; else $(CYGPATH_W) '$(srcdir)/x509.c'; fi`
+
+openssl-certhash.o: certhash.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -MT openssl-certhash.o -MD -MP -MF $(DEPDIR)/openssl-certhash.Tpo -c -o openssl-certhash.o `test -f 'certhash.c' || echo '$(srcdir)/'`certhash.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openssl-certhash.Tpo $(DEPDIR)/openssl-certhash.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='certhash.c' object='openssl-certhash.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -c -o openssl-certhash.o `test -f 'certhash.c' || echo '$(srcdir)/'`certhash.c
+
+openssl-certhash.obj: certhash.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -MT openssl-certhash.obj -MD -MP -MF $(DEPDIR)/openssl-certhash.Tpo -c -o openssl-certhash.obj `if test -f 'certhash.c'; then $(CYGPATH_W) 'certhash.c'; else $(CYGPATH_W) '$(srcdir)/certhash.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openssl-certhash.Tpo $(DEPDIR)/openssl-certhash.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='certhash.c' object='openssl-certhash.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -c -o openssl-certhash.obj `if test -f 'certhash.c'; then $(CYGPATH_W) 'certhash.c'; else $(CYGPATH_W) '$(srcdir)/certhash.c'; fi`
+
+openssl-certhash_disabled.o: certhash_disabled.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -MT openssl-certhash_disabled.o -MD -MP -MF $(DEPDIR)/openssl-certhash_disabled.Tpo -c -o openssl-certhash_disabled.o `test -f 'certhash_disabled.c' || echo '$(srcdir)/'`certhash_disabled.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openssl-certhash_disabled.Tpo $(DEPDIR)/openssl-certhash_disabled.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='certhash_disabled.c' object='openssl-certhash_disabled.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -c -o openssl-certhash_disabled.o `test -f 'certhash_disabled.c' || echo '$(srcdir)/'`certhash_disabled.c
+
+openssl-certhash_disabled.obj: certhash_disabled.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -MT openssl-certhash_disabled.obj -MD -MP -MF $(DEPDIR)/openssl-certhash_disabled.Tpo -c -o openssl-certhash_disabled.obj `if test -f 'certhash_disabled.c'; then $(CYGPATH_W) 'certhash_disabled.c'; else $(CYGPATH_W) '$(srcdir)/certhash_disabled.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/openssl-certhash_disabled.Tpo $(DEPDIR)/openssl-certhash_disabled.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='certhash_disabled.c' object='openssl-certhash_disabled.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -c -o openssl-certhash_disabled.obj `if test -f 'certhash_disabled.c'; then $(CYGPATH_W) 'certhash_disabled.c'; else $(CYGPATH_W) '$(srcdir)/certhash_disabled.c'; fi`
 
 openssl-apps_win.o: apps_win.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(openssl_CFLAGS) $(CFLAGS) -MT openssl-apps_win.o -MD -MP -MF $(DEPDIR)/openssl-apps_win.Tpo -c -o openssl-apps_win.o `test -f 'apps_win.c' || echo '$(srcdir)/'`apps_win.c

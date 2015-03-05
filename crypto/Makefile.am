@@ -103,6 +103,9 @@ endif
 if HOST_HPUX
 libcompat_la_SOURCES += compat/issetugid_hpux.c
 endif
+if HOST_DARWIN
+libcompat_la_SOURCES += compat/issetugid_osx.c
+endif
 if HOST_WIN
 libcompat_la_SOURCES += compat/issetugid_win.c
 endif
@@ -495,8 +498,6 @@ libcrypto_la_SOURCES += evp/bio_b64.c
 libcrypto_la_SOURCES += evp/bio_enc.c
 libcrypto_la_SOURCES += evp/bio_md.c
 libcrypto_la_SOURCES += evp/c_all.c
-libcrypto_la_SOURCES += evp/c_allc.c
-libcrypto_la_SOURCES += evp/c_alld.c
 libcrypto_la_SOURCES += evp/digest.c
 libcrypto_la_SOURCES += evp/e_aes.c
 libcrypto_la_SOURCES += evp/e_aes_cbc_hmac_sha1.c
@@ -773,6 +774,7 @@ noinst_HEADERS += whrlpool/wp_locl.h
 # x509
 libcrypto_la_SOURCES += x509/by_dir.c
 libcrypto_la_SOURCES += x509/by_file.c
+libcrypto_la_SOURCES += x509/by_mem.c
 libcrypto_la_SOURCES += x509/x509_att.c
 libcrypto_la_SOURCES += x509/x509_cmp.c
 libcrypto_la_SOURCES += x509/x509_d2.c

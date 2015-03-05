@@ -1,4 +1,4 @@
-/* $OpenBSD: ec_key.c,v 1.8 2014/07/10 22:45:57 jsing Exp $ */
+/* $OpenBSD: ec_key.c,v 1.10 2015/02/08 22:25:03 miod Exp $ */
 /*
  * Written by Nils Larsch for the OpenSSL project.
  */
@@ -277,7 +277,7 @@ EC_KEY_check_key(const EC_KEY * eckey)
 		ECerr(EC_F_EC_KEY_CHECK_KEY, ERR_R_PASSED_NULL_PARAMETER);
 		return 0;
 	}
-	if (EC_POINT_is_at_infinity(eckey->group, eckey->pub_key)) {
+	if (EC_POINT_is_at_infinity(eckey->group, eckey->pub_key) > 0) {
 		ECerr(EC_F_EC_KEY_CHECK_KEY, EC_R_POINT_AT_INFINITY);
 		goto err;
 	}
@@ -287,7 +287,7 @@ EC_KEY_check_key(const EC_KEY * eckey)
 		goto err;
 
 	/* testing whether the pub_key is on the elliptic curve */
-	if (!EC_POINT_is_on_curve(eckey->group, eckey->pub_key, ctx)) {
+	if (EC_POINT_is_on_curve(eckey->group, eckey->pub_key, ctx) <= 0) {
 		ECerr(EC_F_EC_KEY_CHECK_KEY, EC_R_POINT_IS_NOT_ON_CURVE);
 		goto err;
 	}
@@ -301,7 +301,7 @@ EC_KEY_check_key(const EC_KEY * eckey)
 		ECerr(EC_F_EC_KEY_CHECK_KEY, ERR_R_EC_LIB);
 		goto err;
 	}
-	if (!EC_POINT_is_at_infinity(eckey->group, point)) {
+	if (EC_POINT_is_at_infinity(eckey->group, point) <= 0) {
 		ECerr(EC_F_EC_KEY_CHECK_KEY, EC_R_WRONG_ORDER);
 		goto err;
 	}
@@ -359,8 +359,11 @@ EC_KEY_set_public_key_affine_coordinates(EC_KEY * key, BIGNUM * x, BIGNUM * y)
 	if (tmp_nid == NID_X9_62_characteristic_two_field)
 		is_char_two = 1;
 
-	tx = BN_CTX_get(ctx);
-	ty = BN_CTX_get(ctx);
+	if ((tx = BN_CTX_get(ctx)) == NULL)
+		goto err;
+	if ((ty = BN_CTX_get(ctx)) == NULL)
+		goto err;
+
 #ifndef OPENSSL_NO_EC2M
 	if (is_char_two) {
 		if (!EC_POINT_set_affine_coordinates_GF2m(key->group, point,

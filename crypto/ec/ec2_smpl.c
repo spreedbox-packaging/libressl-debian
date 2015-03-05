@@ -1,4 +1,4 @@
-/* $OpenBSD: ec2_smpl.c,v 1.11 2014/07/10 22:45:56 jsing Exp $ */
+/* $OpenBSD: ec2_smpl.c,v 1.13 2015/02/08 22:25:03 miod Exp $ */
 /* ====================================================================
  * Copyright 2002 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
  *
@@ -291,8 +291,7 @@ ec_GF2m_simple_group_check_discriminant(const EC_GROUP * group, BN_CTX * ctx)
 		}
 	}
 	BN_CTX_start(ctx);
-	b = BN_CTX_get(ctx);
-	if (b == NULL)
+	if ((b = BN_CTX_get(ctx)) == NULL)
 		goto err;
 
 	if (!BN_GF2m_mod_arr(b, &group->b, group->poly))
@@ -413,7 +412,7 @@ ec_GF2m_simple_point_get_affine_coordinates(const EC_GROUP *group,
 {
 	int ret = 0;
 
-	if (EC_POINT_is_at_infinity(group, point)) {
+	if (EC_POINT_is_at_infinity(group, point) > 0) {
 		ECerr(EC_F_EC_GF2M_SIMPLE_POINT_GET_AFFINE_COORDINATES, EC_R_POINT_AT_INFINITY);
 		return 0;
 	}
@@ -448,12 +447,12 @@ ec_GF2m_simple_add(const EC_GROUP *group, EC_POINT *r, const EC_POINT *a,
 	BIGNUM *x0, *y0, *x1, *y1, *x2, *y2, *s, *t;
 	int ret = 0;
 
-	if (EC_POINT_is_at_infinity(group, a)) {
+	if (EC_POINT_is_at_infinity(group, a) > 0) {
 		if (!EC_POINT_copy(r, b))
 			return 0;
 		return 1;
 	}
-	if (EC_POINT_is_at_infinity(group, b)) {
+	if (EC_POINT_is_at_infinity(group, b) > 0) {
 		if (!EC_POINT_copy(r, a))
 			return 0;
 		return 1;
@@ -464,15 +463,21 @@ ec_GF2m_simple_add(const EC_GROUP *group, EC_POINT *r, const EC_POINT *a,
 			return 0;
 	}
 	BN_CTX_start(ctx);
-	x0 = BN_CTX_get(ctx);
-	y0 = BN_CTX_get(ctx);
-	x1 = BN_CTX_get(ctx);
-	y1 = BN_CTX_get(ctx);
-	x2 = BN_CTX_get(ctx);
-	y2 = BN_CTX_get(ctx);
-	s = BN_CTX_get(ctx);
-	t = BN_CTX_get(ctx);
-	if (t == NULL)
+	if ((x0 = BN_CTX_get(ctx)) == NULL)
+		goto err;
+	if ((y0 = BN_CTX_get(ctx)) == NULL)
+		goto err;
+	if ((x1 = BN_CTX_get(ctx)) == NULL)
+		goto err;
+	if ((y1 = BN_CTX_get(ctx)) == NULL)
+		goto err;
+	if ((x2 = BN_CTX_get(ctx)) == NULL)
+		goto err;
+	if ((y2 = BN_CTX_get(ctx)) == NULL)
+		goto err;
+	if ((s = BN_CTX_get(ctx)) == NULL)
+		goto err;
+	if ((t = BN_CTX_get(ctx)) == NULL)
 		goto err;
 
 	if (a->Z_is_one) {
@@ -564,7 +569,7 @@ ec_GF2m_simple_dbl(const EC_GROUP *group, EC_POINT *r, const EC_POINT *a,
 int 
 ec_GF2m_simple_invert(const EC_GROUP *group, EC_POINT *point, BN_CTX *ctx)
 {
-	if (EC_POINT_is_at_infinity(group, point) || BN_is_zero(&point->Y))
+	if (EC_POINT_is_at_infinity(group, point) > 0 || BN_is_zero(&point->Y))
 		/* point is its own inverse */
 		return 1;
 
@@ -595,7 +600,7 @@ ec_GF2m_simple_is_on_curve(const EC_GROUP *group, const EC_POINT *point, BN_CTX 
 	int (*field_mul) (const EC_GROUP *, BIGNUM *, const BIGNUM *, const BIGNUM *, BN_CTX *);
 	int (*field_sqr) (const EC_GROUP *, BIGNUM *, const BIGNUM *, BN_CTX *);
 
-	if (EC_POINT_is_at_infinity(group, point))
+	if (EC_POINT_is_at_infinity(group, point) > 0)
 		return 1;
 
 	field_mul = group->meth->field_mul;
@@ -611,9 +616,9 @@ ec_GF2m_simple_is_on_curve(const EC_GROUP *group, const EC_POINT *point, BN_CTX 
 			return -1;
 	}
 	BN_CTX_start(ctx);
-	y2 = BN_CTX_get(ctx);
-	lh = BN_CTX_get(ctx);
-	if (lh == NULL)
+	if ((y2 = BN_CTX_get(ctx)) == NULL)
+		goto err;
+	if ((lh = BN_CTX_get(ctx)) == NULL)
 		goto err;
 
 	/*
@@ -651,16 +656,17 @@ err:
  *   1   not equal
  */
 int 
-ec_GF2m_simple_cmp(const EC_GROUP * group, const EC_POINT * a, const EC_POINT * b, BN_CTX * ctx)
+ec_GF2m_simple_cmp(const EC_GROUP *group, const EC_POINT *a,
+    const EC_POINT *b, BN_CTX *ctx)
 {
 	BIGNUM *aX, *aY, *bX, *bY;
 	BN_CTX *new_ctx = NULL;
 	int ret = -1;
 
-	if (EC_POINT_is_at_infinity(group, a)) {
-		return EC_POINT_is_at_infinity(group, b) ? 0 : 1;
+	if (EC_POINT_is_at_infinity(group, a) > 0) {
+		return EC_POINT_is_at_infinity(group, b) > 0 ? 0 : 1;
 	}
-	if (EC_POINT_is_at_infinity(group, b))
+	if (EC_POINT_is_at_infinity(group, b) > 0)
 		return 1;
 
 	if (a->Z_is_one && b->Z_is_one) {
@@ -672,11 +678,13 @@ ec_GF2m_simple_cmp(const EC_GROUP * group, const EC_POINT * a, const EC_POINT * 
 			return -1;
 	}
 	BN_CTX_start(ctx);
-	aX = BN_CTX_get(ctx);
-	aY = BN_CTX_get(ctx);
-	bX = BN_CTX_get(ctx);
-	bY = BN_CTX_get(ctx);
-	if (bY == NULL)
+	if ((aX = BN_CTX_get(ctx)) == NULL)
+		goto err;
+	if ((aY = BN_CTX_get(ctx)) == NULL)
+		goto err;
+	if ((bX = BN_CTX_get(ctx)) == NULL)
+		goto err;
+	if ((bY = BN_CTX_get(ctx)) == NULL)
 		goto err;
 
 	if (!EC_POINT_get_affine_coordinates_GF2m(group, a, aX, aY, ctx))
@@ -701,7 +709,7 @@ ec_GF2m_simple_make_affine(const EC_GROUP * group, EC_POINT * point, BN_CTX * ct
 	BIGNUM *x, *y;
 	int ret = 0;
 
-	if (point->Z_is_one || EC_POINT_is_at_infinity(group, point))
+	if (point->Z_is_one || EC_POINT_is_at_infinity(group, point) > 0)
 		return 1;
 
 	if (ctx == NULL) {
@@ -710,9 +718,9 @@ ec_GF2m_simple_make_affine(const EC_GROUP * group, EC_POINT * point, BN_CTX * ct
 			return 0;
 	}
 	BN_CTX_start(ctx);
-	x = BN_CTX_get(ctx);
-	y = BN_CTX_get(ctx);
-	if (y == NULL)
+	if ((x = BN_CTX_get(ctx)) == NULL)
+		goto err;
+	if ((y = BN_CTX_get(ctx)) == NULL)
 		goto err;
 
 	if (!EC_POINT_get_affine_coordinates_GF2m(group, point, x, y, ctx))

@@ -342,7 +342,8 @@ SUBDIRS = openssl
 noinst_HEADERS = err.h netdb.h poll.h pqueue.h stdio.h stdlib.h \
 	string.h syslog.h unistd.h win32netcompat.h arpa/inet.h \
 	machine/endian.h netinet/in.h netinet/tcp.h sys/ioctl.h \
-	sys/mman.h sys/select.h sys/socket.h sys/times.h sys/types.h
+	sys/mman.h sys/select.h sys/socket.h sys/times.h sys/types.h \
+	sys/uio.h
 @ENABLE_LIBTLS_TRUE@include_HEADERS = tls.h
 all: all-recursive
 
