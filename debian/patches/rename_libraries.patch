@@ -1,7 +1,7 @@
 Index: libressl/Makefile.am
 ===================================================================
---- libressl.orig/Makefile.am	2015-01-30 10:37:21.000000000 +0100
-+++ libressl/Makefile.am	2015-01-30 10:39:07.000000000 +0100
+--- libressl.orig/Makefile.am	2015-03-05 15:11:45.000000000 +0100
++++ libressl/Makefile.am	2015-03-05 15:13:22.000000000 +0100
 @@ -2,10 +2,10 @@
  ACLOCAL_AMFLAGS = -I m4
  
@@ -14,11 +14,11 @@ Index: libressl/Makefile.am
 +pkgconfig_DATA += libressl-tls.pc
  endif
  
- EXTRA_DIST = VERSION config scripts
+ EXTRA_DIST = README README.windows VERSION config scripts
 Index: libressl/libressl-crypto.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-crypto.pc.in	2015-01-30 10:40:15.000000000 +0100
++++ libressl/libressl-crypto.pc.in	2015-03-05 15:13:22.000000000 +0100
 @@ -0,0 +1,15 @@
 +#libcrypto pkg-config source file
 +
@@ -38,7 +38,7 @@ Index: libressl/libressl-crypto.pc.in
 Index: libressl/libressl-openssl.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-openssl.pc.in	2015-01-30 10:39:07.000000000 +0100
++++ libressl/libressl-openssl.pc.in	2015-03-05 15:13:22.000000000 +0100
 @@ -0,0 +1,11 @@
 +#openssl pkg-config source file
 +
@@ -54,7 +54,7 @@ Index: libressl/libressl-openssl.pc.in
 Index: libressl/libressl-ssl.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-ssl.pc.in	2015-01-30 10:41:05.000000000 +0100
++++ libressl/libressl-ssl.pc.in	2015-03-05 15:13:22.000000000 +0100
 @@ -0,0 +1,16 @@
 +#libssl pkg-config source file
 +
@@ -74,7 +74,7 @@ Index: libressl/libressl-ssl.pc.in
 +Cflags: -I${includedir}
 Index: libressl/openssl.pc.in
 ===================================================================
---- libressl.orig/openssl.pc.in	2015-01-07 16:24:55.000000000 +0100
+--- libressl.orig/openssl.pc.in	2015-01-30 11:51:00.000000000 +0100
 +++ /dev/null	1970-01-01 00:00:00.000000000 +0000
 @@ -1,11 +0,0 @@
 -#openssl pkg-config source file
@@ -90,8 +90,8 @@ Index: libressl/openssl.pc.in
 -Requires: libssl libcrypto
 Index: libressl/crypto/Makefile.am
 ===================================================================
---- libressl.orig/crypto/Makefile.am	2015-01-30 10:37:21.000000000 +0100
-+++ libressl/crypto/Makefile.am	2015-01-30 10:45:12.000000000 +0100
+--- libressl.orig/crypto/Makefile.am	2015-03-05 15:11:45.000000000 +0100
++++ libressl/crypto/Makefile.am	2015-03-05 15:14:39.000000000 +0100
 @@ -4,19 +4,19 @@
  AM_CPPFLAGS += -I$(top_srcdir)/crypto/evp
  AM_CPPFLAGS += -I$(top_srcdir)/crypto/modes
@@ -119,7 +119,7 @@ Index: libressl/crypto/Makefile.am
  endif
  endif
  
-@@ -119,718 +119,718 @@
+@@ -122,717 +122,717 @@
  noinst_HEADERS += compat/arc4random_win.h
  noinst_HEADERS += compat/chacha_private.h
  
@@ -792,8 +792,6 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += evp/bio_enc.c
 -libcrypto_la_SOURCES += evp/bio_md.c
 -libcrypto_la_SOURCES += evp/c_all.c
--libcrypto_la_SOURCES += evp/c_allc.c
--libcrypto_la_SOURCES += evp/c_alld.c
 -libcrypto_la_SOURCES += evp/digest.c
 -libcrypto_la_SOURCES += evp/e_aes.c
 -libcrypto_la_SOURCES += evp/e_aes_cbc_hmac_sha1.c
@@ -852,8 +850,6 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += evp/bio_enc.c
 +libressl_crypto_la_SOURCES += evp/bio_md.c
 +libressl_crypto_la_SOURCES += evp/c_all.c
-+libressl_crypto_la_SOURCES += evp/c_allc.c
-+libressl_crypto_la_SOURCES += evp/c_alld.c
 +libressl_crypto_la_SOURCES += evp/digest.c
 +libressl_crypto_la_SOURCES += evp/e_aes.c
 +libressl_crypto_la_SOURCES += evp/e_aes_cbc_hmac_sha1.c
@@ -1274,6 +1270,7 @@ Index: libressl/crypto/Makefile.am
  # x509
 -libcrypto_la_SOURCES += x509/by_dir.c
 -libcrypto_la_SOURCES += x509/by_file.c
+-libcrypto_la_SOURCES += x509/by_mem.c
 -libcrypto_la_SOURCES += x509/x509_att.c
 -libcrypto_la_SOURCES += x509/x509_cmp.c
 -libcrypto_la_SOURCES += x509/x509_d2.c
@@ -1298,6 +1295,7 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += x509/x_all.c
 +libressl_crypto_la_SOURCES += x509/by_dir.c
 +libressl_crypto_la_SOURCES += x509/by_file.c
++libressl_crypto_la_SOURCES += x509/by_mem.c
 +libressl_crypto_la_SOURCES += x509/x509_att.c
 +libressl_crypto_la_SOURCES += x509/x509_cmp.c
 +libressl_crypto_la_SOURCES += x509/x509_d2.c
@@ -1395,9 +1393,9 @@ Index: libressl/crypto/Makefile.am
  noinst_HEADERS += x509v3/pcy_int.h
 Index: libressl/ssl/Makefile.am
 ===================================================================
---- libressl.orig/ssl/Makefile.am	2015-01-30 10:37:22.000000000 +0100
-+++ libressl/ssl/Makefile.am	2015-01-30 10:47:05.000000000 +0100
-@@ -1,53 +1,53 @@
+--- libressl.orig/ssl/Makefile.am	2015-03-05 15:11:46.000000000 +0100
++++ libressl/ssl/Makefile.am	2015-03-05 15:16:10.000000000 +0100
+@@ -1,56 +1,56 @@
  include $(top_srcdir)/Makefile.am.common
  
 -lib_LTLIBRARIES = libssl.la
@@ -1413,6 +1411,9 @@ Index: libressl/ssl/Makefile.am
 +libressl_ssl_la_LIBADD = ../crypto/libressl-crypto.la
  
 -libssl_la_SOURCES = bio_ssl.c
+-libssl_la_SOURCES += bs_ber.c
+-libssl_la_SOURCES += bs_cbb.c
+-libssl_la_SOURCES += bs_cbs.c
 -libssl_la_SOURCES += d1_both.c
 -libssl_la_SOURCES += d1_clnt.c
 -libssl_la_SOURCES += d1_enc.c
@@ -1453,6 +1454,9 @@ Index: libressl/ssl/Makefile.am
 -libssl_la_SOURCES += t1_reneg.c
 -libssl_la_SOURCES += t1_srvr.c
 +libressl_ssl_la_SOURCES = bio_ssl.c
++libressl_ssl_la_SOURCES += bs_ber.c
++libressl_ssl_la_SOURCES += bs_cbb.c
++libressl_ssl_la_SOURCES += bs_cbs.c
 +libressl_ssl_la_SOURCES += d1_both.c
 +libressl_ssl_la_SOURCES += d1_clnt.c
 +libressl_ssl_la_SOURCES += d1_enc.c
@@ -1497,9 +1501,9 @@ Index: libressl/ssl/Makefile.am
  noinst_HEADERS += ssl_locl.h
 Index: libressl/apps/Makefile.am
 ===================================================================
---- libressl.orig/apps/Makefile.am	2015-01-07 16:24:55.000000000 +0100
-+++ libressl/apps/Makefile.am	2015-01-30 10:39:07.000000000 +0100
-@@ -1,76 +1,76 @@
+--- libressl.orig/apps/Makefile.am	2015-03-05 15:11:45.000000000 +0100
++++ libressl/apps/Makefile.am	2015-03-05 15:17:07.000000000 +0100
+@@ -1,82 +1,82 @@
  include $(top_srcdir)/Makefile.am.common
  
 -bin_PROGRAMS = openssl
@@ -1614,6 +1618,14 @@ Index: libressl/apps/Makefile.am
 +libressl_openssl_SOURCES += version.c
 +libressl_openssl_SOURCES += x509.c
  
+ if BUILD_CERTHASH
+-openssl_SOURCES += certhash.c
++libressl_openssl_SOURCES += certhash.c
+ else
+-openssl_SOURCES += certhash_disabled.c
++libressl_openssl_SOURCES += certhash_disabled.c
+ endif
+ 
  if HOST_WIN
 -openssl_SOURCES += apps_win.c
 +libressl_openssl_SOURCES += apps_win.c
@@ -1637,9 +1649,9 @@ Index: libressl/apps/Makefile.am
  noinst_HEADERS = apps.h
 Index: libressl/configure.ac
 ===================================================================
---- libressl.orig/configure.ac	2015-01-30 10:37:21.000000000 +0100
-+++ libressl/configure.ac	2015-01-30 10:39:07.000000000 +0100
-@@ -274,7 +274,7 @@
+--- libressl.orig/configure.ac	2015-03-05 15:11:45.000000000 +0100
++++ libressl/configure.ac	2015-03-05 15:13:22.000000000 +0100
+@@ -308,7 +308,7 @@
  AC_ARG_ENABLE([libtls],
  	AS_HELP_STRING([--enable-libtls], [Enable building the libtls library]))
  AM_CONDITIONAL([ENABLE_LIBTLS], [test "x$enable_libtls" = xyes])
@@ -1648,7 +1660,7 @@ Index: libressl/configure.ac
  
  LT_INIT
  
-@@ -288,9 +288,9 @@
+@@ -322,9 +322,9 @@
  	tests/Makefile
  	apps/Makefile
  	man/Makefile
@@ -1663,10 +1675,10 @@ Index: libressl/configure.ac
  AC_OUTPUT
 Index: libressl/tests/Makefile.am
 ===================================================================
---- libressl.orig/tests/Makefile.am	2015-01-07 16:24:55.000000000 +0100
-+++ libressl/tests/Makefile.am	2015-01-30 10:39:07.000000000 +0100
-@@ -4,8 +4,8 @@
- AM_CPPFLAGS += -I $(top_srcdir)/crypto/asn1
+--- libressl.orig/tests/Makefile.am	2015-03-05 15:11:46.000000000 +0100
++++ libressl/tests/Makefile.am	2015-03-05 15:13:22.000000000 +0100
+@@ -5,8 +5,8 @@
+ AM_CPPFLAGS += -I $(top_srcdir)/ssl
  
  LDADD = $(PLATFORM_LDADD) $(PROG_LDADD)
 -LDADD += $(top_builddir)/ssl/libssl.la
@@ -1679,7 +1691,7 @@ Index: libressl/tests/Makefile.am
 Index: libressl/libressl-tls.pc.in
 ===================================================================
 --- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-tls.pc.in	2015-01-30 10:41:25.000000000 +0100
++++ libressl/libressl-tls.pc.in	2015-03-05 15:13:22.000000000 +0100
 @@ -0,0 +1,16 @@
 +#libtls pkg-config source file
 +
@@ -1699,8 +1711,8 @@ Index: libressl/libressl-tls.pc.in
 +Cflags: -I${includedir}
 Index: libressl/tests/testssl
 ===================================================================
---- libressl.orig/tests/testssl	2015-01-30 10:37:22.000000000 +0100
-+++ libressl/tests/testssl	2015-01-30 10:39:07.000000000 +0100
+--- libressl.orig/tests/testssl	2015-01-30 11:51:00.000000000 +0100
++++ libressl/tests/testssl	2015-03-05 15:13:22.000000000 +0100
 @@ -4,7 +4,7 @@
  cert="$2"
  CA="-CAfile $3"
@@ -1712,8 +1724,8 @@ Index: libressl/tests/testssl
  if $openssl x509 -in $cert -text -noout | fgrep 'DSA Public Key' >/dev/null; then
 Index: libressl/crypto/Makefile.am.elf-x86_64
 ===================================================================
---- libressl.orig/crypto/Makefile.am.elf-x86_64	2015-01-07 16:24:55.000000000 +0100
-+++ libressl/crypto/Makefile.am.elf-x86_64	2015-01-30 10:39:07.000000000 +0100
+--- libressl.orig/crypto/Makefile.am.elf-x86_64	2015-01-30 11:51:00.000000000 +0100
++++ libressl/crypto/Makefile.am.elf-x86_64	2015-03-05 15:13:22.000000000 +0100
 @@ -22,20 +22,20 @@
  EXTRA_DIST += $(ASM_X86_64_ELF)
  
@@ -1753,8 +1765,8 @@ Index: libressl/crypto/Makefile.am.elf-x86_64
  endif
 Index: libressl/crypto/Makefile.am.macosx-x86_64
 ===================================================================
---- libressl.orig/crypto/Makefile.am.macosx-x86_64	2015-01-07 16:24:55.000000000 +0100
-+++ libressl/crypto/Makefile.am.macosx-x86_64	2015-01-30 10:39:07.000000000 +0100
+--- libressl.orig/crypto/Makefile.am.macosx-x86_64	2015-01-30 11:51:00.000000000 +0100
++++ libressl/crypto/Makefile.am.macosx-x86_64	2015-03-05 15:13:22.000000000 +0100
 @@ -22,20 +22,20 @@
  EXTRA_DIST += $(ASM_X86_64_MACOSX)
  
@@ -1794,9 +1806,9 @@ Index: libressl/crypto/Makefile.am.macosx-x86_64
  endif
 Index: libressl/tls/Makefile.am
 ===================================================================
---- libressl.orig/tls/Makefile.am	2015-01-30 10:37:22.000000000 +0100
-+++ libressl/tls/Makefile.am	2015-01-30 10:46:51.000000000 +0100
-@@ -1,19 +1,19 @@
+--- libressl.orig/tls/Makefile.am	2015-03-05 15:11:47.000000000 +0100
++++ libressl/tls/Makefile.am	2015-03-05 15:13:22.000000000 +0100
+@@ -1,20 +1,20 @@
  include $(top_srcdir)/Makefile.am.common
  
  if ENABLE_LIBTLS
@@ -1825,10 +1837,11 @@ Index: libressl/tls/Makefile.am
 +libressl_tls_la_SOURCES += tls_util.c
 +libressl_tls_la_SOURCES += tls_verify.c
  noinst_HEADERS = tls_internal.h
- endif
+ 
+ if !HAVE_STRSEP
 Index: libressl/libcrypto.pc.in
 ===================================================================
---- libressl.orig/libcrypto.pc.in	2015-01-30 10:48:24.000000000 +0100
+--- libressl.orig/libcrypto.pc.in	2015-01-30 11:51:00.000000000 +0100
 +++ /dev/null	1970-01-01 00:00:00.000000000 +0000
 @@ -1,15 +0,0 @@
 -#libcrypto pkg-config source file
@@ -1848,7 +1861,7 @@ Index: libressl/libcrypto.pc.in
 -Cflags: -I${includedir}
 Index: libressl/libssl.pc.in
 ===================================================================
---- libressl.orig/libssl.pc.in	2015-01-30 10:48:24.000000000 +0100
+--- libressl.orig/libssl.pc.in	2015-01-30 11:51:00.000000000 +0100
 +++ /dev/null	1970-01-01 00:00:00.000000000 +0000
 @@ -1,16 +0,0 @@
 -#libssl pkg-config source file
@@ -1869,7 +1882,7 @@ Index: libressl/libssl.pc.in
 -Cflags: -I${includedir}
 Index: libressl/libtls.pc.in
 ===================================================================
---- libressl.orig/libtls.pc.in	2015-01-30 10:48:24.000000000 +0100
+--- libressl.orig/libtls.pc.in	2015-01-30 11:51:00.000000000 +0100
 +++ /dev/null	1970-01-01 00:00:00.000000000 +0000
 @@ -1,16 +0,0 @@
 -#libtls pkg-config source file
