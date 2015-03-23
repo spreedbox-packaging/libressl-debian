@@ -88,7 +88,6 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-@ENABLE_LIBTLS_TRUE@am__append_1 = libtls.pc
 subdir = .
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
@@ -102,7 +101,7 @@ DIST_COMMON = $(srcdir)/Makefile.am $(top_srcdir)/configure \
 am__CONFIG_DISTCLEAN_FILES = config.status config.cache config.log \
  configure.lineno config.status.lineno
 mkinstalldirs = $(install_sh) -d
-CONFIG_CLEAN_FILES = libtls.pc libcrypto.pc libssl.pc openssl.pc
+CONFIG_CLEAN_FILES = libcrypto.pc libssl.pc libtls.pc openssl.pc
 CONFIG_CLEAN_VPATH_FILES =
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
@@ -362,7 +361,7 @@ top_srcdir = @top_srcdir@
 SUBDIRS = crypto ssl tls include apps tests man
 ACLOCAL_AMFLAGS = -I m4
 pkgconfigdir = $(libdir)/pkgconfig
-pkgconfig_DATA = libcrypto.pc libssl.pc openssl.pc $(am__append_1)
+pkgconfig_DATA = libcrypto.pc libssl.pc libtls.pc openssl.pc
 EXTRA_DIST = README README.windows VERSION config scripts
 all: all-recursive
 
@@ -400,11 +399,11 @@ $(top_srcdir)/configure:  $(am__configure_deps)
 $(ACLOCAL_M4):  $(am__aclocal_m4_deps)
 	$(am__cd) $(srcdir) && $(ACLOCAL) $(ACLOCAL_AMFLAGS)
 $(am__aclocal_m4_deps):
-@ENABLE_LIBTLS_TRUE@libtls.pc: $(top_builddir)/config.status $(srcdir)/libtls.pc.in
-@ENABLE_LIBTLS_TRUE@	cd $(top_builddir) && $(SHELL) ./config.status $@
 libcrypto.pc: $(top_builddir)/config.status $(srcdir)/libcrypto.pc.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 libssl.pc: $(top_builddir)/config.status $(srcdir)/libssl.pc.in
+	cd $(top_builddir) && $(SHELL) ./config.status $@
+libtls.pc: $(top_builddir)/config.status $(srcdir)/libtls.pc.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@
 openssl.pc: $(top_builddir)/config.status $(srcdir)/openssl.pc.in
 	cd $(top_builddir) && $(SHELL) ./config.status $@

@@ -130,9 +130,7 @@ dist_man_MANS += BN_set_bit.3
 dist_man_MANS += BN_swap.3
 dist_man_MANS += BN_zero.3
 dist_man_MANS += openssl.1
-if ENABLE_LIBTLS
 dist_man_MANS += tls_init.3
-endif
 dist_man_MANS += BUF_MEM_new.3
 dist_man_MANS += CMS_add0_cert.3
 dist_man_MANS += CMS_add1_recipient_cert.3
@@ -2315,7 +2313,6 @@ install-data-hook:
     $(DESTDIR)$(mandir)/man3/SSL_want_x509_lookup.3
 	ln -f $(DESTDIR)$(mandir)/man3/d2i_SSL_SESSION.3 \
     $(DESTDIR)$(mandir)/man3/i2d_SSL_SESSION.3
-if ENABLE_LIBTLS
 	ln -f $(DESTDIR)$(mandir)/man3/tls_init.3 \
     $(DESTDIR)$(mandir)/man3/tls_config_new.3
 	ln -f $(DESTDIR)$(mandir)/man3/tls_init.3 \
@@ -2384,7 +2381,6 @@ if ENABLE_LIBTLS
     $(DESTDIR)$(mandir)/man3/tls_read.3
 	ln -f $(DESTDIR)$(mandir)/man3/tls_init.3 \
     $(DESTDIR)$(mandir)/man3/tls_write.3
-endif
 
 uninstall-local:
 	-rm -f $(DESTDIR)$(mandir)/man3/ASN1_OBJECT_free.3
@@ -3396,7 +3392,6 @@ uninstall-local:
 	-rm -f $(DESTDIR)$(mandir)/man3/SSL_want_write.3
 	-rm -f $(DESTDIR)$(mandir)/man3/SSL_want_x509_lookup.3
 	-rm -f $(DESTDIR)$(mandir)/man3/i2d_SSL_SESSION.3
-if ENABLE_LIBTLS
 	rm -f $(DESTDIR)$(mandir)/man3/tls_config_new.3
 	rm -f $(DESTDIR)$(mandir)/man3/tls_config_free.3
 	rm -f $(DESTDIR)$(mandir)/man3/tls_config_parse_protocols.3
@@ -3431,4 +3426,3 @@ if ENABLE_LIBTLS
 	rm -f $(DESTDIR)$(mandir)/man3/tls_accept_socket.3
 	rm -f $(DESTDIR)$(mandir)/man3/tls_read.3
 	rm -f $(DESTDIR)$(mandir)/man3/tls_write.3
-endif

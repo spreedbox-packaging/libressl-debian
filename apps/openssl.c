@@ -253,6 +253,11 @@ main(int argc, char **argv)
 	arg.data = NULL;
 	arg.count = 0;
 
+	if (BIO_sock_init() != 1) {
+		fprintf(stderr, "BIO_sock_init failed\n");
+		exit(1);
+	}
+
 	bio_err = BIO_new_fp(stderr, BIO_NOCLOSE);
 	if (bio_err == NULL) {
 		fprintf(stderr, "openssl: failed to initialise bio_err\n");
