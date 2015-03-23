@@ -9,8 +9,8 @@ AC_CONFIG_MACRO_DIR([m4])
 
 m4_ifdef([AM_SILENT_RULES], [AM_SILENT_RULES([yes])])
 
-AC_SUBST([USER_CFLAGS], "-O2 $CFLAGS")
-CFLAGS="$CFLAGS -Wall -std=gnu99 -g"
+AC_SUBST([USER_CFLAGS], "$CFLAGS")
+CFLAGS="-Wall -std=gnu99 -g -O2"
 
 case $host_os in
 	*darwin*)
@@ -41,7 +41,8 @@ case $host_os in
 		;;
 	*mingw*)
 		HOST_OS=win
-		CFLAGS="$CFLAGS -D_GNU_SOURCE -D_POSIX -D_POSIX_SOURCE -D_REENTRANT -D_POSIX_THREAD_SAFE_FUNCTIONS -DWIN32_LEAN_AND_MEAN -D_WIN32_WINNT=0x0600 -DOPENSSL_NO_SPEED -DNO_SYSLOG -D__USE_MINGW_ANSI_STDIO"
+		CFLAGS="$CFLAGS -D_GNU_SOURCE -D_POSIX -D_POSIX_SOURCE -D_REENTRANT -D_POSIX_THREAD_SAFE_FUNCTIONS -DWIN32_LEAN_AND_MEAN -D_WIN32_WINNT=0x0600 -DOPENSSL_NO_SPEED -DNO_SYSLOG -D__USE_MINGW_ANSI_STDIO -static-libgcc"
+		LDFLAGS="$LDFLAGS -static-libgcc"
 		AC_SUBST([PLATFORM_LDADD], ['-lws2_32'])
 		;;
 	*solaris*)
@@ -284,10 +285,14 @@ AC_ARG_ENABLE([asm],
 AM_CONDITIONAL([OPENSSL_NO_ASM], [test "x$enable_asm" = "xno"])
 
 old_cflags=$CFLAGS
-CFLAGS="$old_cflags -I$srcdir/include"
+CFLAGS="$USER_CFLAGS -I$srcdir/include"
+AC_MSG_CHECKING([if BSWAP4 builds without __STRICT_ALIGNMENT])
 AC_TRY_COMPILE([#include "$srcdir/crypto/modes/modes_lcl.h"],
 	       [int a = 0; BSWAP4(a);],
-	       BSWAP4=yes, BSWAP4=no)
+	       AC_MSG_RESULT([yes])
+	       BSWAP4=yes,
+	       AC_MSG_RESULT([no])
+	       BSWAP4=no)
 CFLAGS="$old_cflags"
 
 case $host_cpu in
@@ -296,7 +301,7 @@ case $host_cpu in
 		;;
 	*arm*)
 		AS_IF([test "x$BSWAP4" = "xyes"],,
-		    CFLAGS="$old_cflags -D__STRICT_ALIGNMENT")
+		    CFLAGS="$CFLAGS -D__STRICT_ALIGNMENT")
 		;;
 esac
 
@@ -304,11 +309,6 @@ AM_CONDITIONAL([HOST_ASM_ELF_X86_64],
     [test "x$HOST_ABI" = "xelf" -a "$host_cpu" = "x86_64" -a "x$enable_asm" != "xno"])
 AM_CONDITIONAL([HOST_ASM_MACOSX_X86_64],
     [test "x$HOST_ABI" = "xmacosx" -a "$host_cpu" = "x86_64" -a "x$enable_asm" != "xno"])
-
-AC_ARG_ENABLE([libtls],
-	AS_HELP_STRING([--enable-libtls], [Enable building the libtls library]))
-AM_CONDITIONAL([ENABLE_LIBTLS], [test "x$enable_libtls" = xyes])
-AM_COND_IF([ENABLE_LIBTLS], [AC_CONFIG_FILES([libtls.pc])])
 
 LT_INIT
 
@@ -324,6 +324,7 @@ AC_CONFIG_FILES([
 	man/Makefile
 	libcrypto.pc
 	libssl.pc
+	libtls.pc
 	openssl.pc
 ])
 

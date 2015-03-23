@@ -96,7 +96,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
-DIST_COMMON = $(srcdir)/Makefile.am $(am__include_HEADERS_DIST) \
+DIST_COMMON = $(srcdir)/Makefile.am $(include_HEADERS) \
 	$(noinst_HEADERS) $(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_CLEAN_FILES =
@@ -128,7 +128,6 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
-am__include_HEADERS_DIST = tls.h
 am__vpath_adj_setup = srcdirstrip=`echo "$(srcdir)" | sed 's|.|.|g'`;
 am__vpath_adj = case $$p in \
     $(srcdir)/*) f=`echo "$$p" | sed "s|^$$srcdirstrip/||"`;; \
@@ -344,7 +343,7 @@ noinst_HEADERS = err.h netdb.h poll.h pqueue.h stdio.h stdlib.h \
 	machine/endian.h netinet/in.h netinet/tcp.h sys/ioctl.h \
 	sys/mman.h sys/select.h sys/socket.h sys/times.h sys/types.h \
 	sys/uio.h
-@ENABLE_LIBTLS_TRUE@include_HEADERS = tls.h
+include_HEADERS = tls.h
 all: all-recursive
 
 .SUFFIXES:

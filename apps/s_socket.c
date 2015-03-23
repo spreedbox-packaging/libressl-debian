@@ -85,11 +85,6 @@ init_client(int *sock, char *host, char *port, int type, int af)
 	struct addrinfo hints, *ai_top, *ai;
 	int i, s;
 
-	if (BIO_sock_init() != 1) {
-		BIO_printf(bio_err, "BIO_sock_init failed\n");
-		return (0);
-	}
-
 	memset(&hints, '\0', sizeof(hints));
 	hints.ai_family = af;
 	hints.ai_socktype = type;
@@ -180,11 +175,6 @@ init_server_long(int *sock, int port, char *ip, int type)
 	int ret = 0;
 	struct sockaddr_in server;
 	int s = -1;
-
-	if (BIO_sock_init() != 1) {
-		BIO_printf(bio_err, "BIO_sock_init failed\n");
-		return (0);
-	}
 
 	memset((char *) &server, 0, sizeof(server));
 	server.sin_family = AF_INET;

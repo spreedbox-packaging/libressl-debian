@@ -89,7 +89,7 @@ PRE_UNINSTALL = :
 POST_UNINSTALL = :
 build_triplet = @build@
 host_triplet = @host@
-@ENABLE_LIBTLS_TRUE@@HAVE_STRSEP_FALSE@am__append_1 = strsep.c
+@HAVE_STRSEP_FALSE@am__append_1 = strsep.c
 subdir = tls
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
@@ -98,7 +98,7 @@ am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
 	$(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
-DIST_COMMON = $(srcdir)/Makefile.am $(am__noinst_HEADERS_DIST) \
+DIST_COMMON = $(srcdir)/Makefile.am $(noinst_HEADERS) \
 	$(am__DIST_COMMON)
 mkinstalldirs = $(install_sh) -d
 CONFIG_CLEAN_FILES =
@@ -133,18 +133,14 @@ am__uninstall_files_from_dir = { \
 am__installdirs = "$(DESTDIR)$(libdir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
 am__DEPENDENCIES_1 =
-@ENABLE_LIBTLS_TRUE@libtls_la_DEPENDENCIES = ../crypto/libcrypto.la \
-@ENABLE_LIBTLS_TRUE@	../ssl/libssl.la $(am__DEPENDENCIES_1)
+libtls_la_DEPENDENCIES = ../crypto/libcrypto.la ../ssl/libssl.la \
+	$(am__DEPENDENCIES_1)
 am__libtls_la_SOURCES_DIST = tls.c tls_client.c tls_config.c \
 	tls_server.c tls_util.c tls_verify.c strsep.c
-@ENABLE_LIBTLS_TRUE@@HAVE_STRSEP_FALSE@am__objects_1 =  \
-@ENABLE_LIBTLS_TRUE@@HAVE_STRSEP_FALSE@	libtls_la-strsep.lo
-@ENABLE_LIBTLS_TRUE@am_libtls_la_OBJECTS = libtls_la-tls.lo \
-@ENABLE_LIBTLS_TRUE@	libtls_la-tls_client.lo \
-@ENABLE_LIBTLS_TRUE@	libtls_la-tls_config.lo \
-@ENABLE_LIBTLS_TRUE@	libtls_la-tls_server.lo \
-@ENABLE_LIBTLS_TRUE@	libtls_la-tls_util.lo \
-@ENABLE_LIBTLS_TRUE@	libtls_la-tls_verify.lo $(am__objects_1)
+@HAVE_STRSEP_FALSE@am__objects_1 = libtls_la-strsep.lo
+am_libtls_la_OBJECTS = libtls_la-tls.lo libtls_la-tls_client.lo \
+	libtls_la-tls_config.lo libtls_la-tls_server.lo \
+	libtls_la-tls_util.lo libtls_la-tls_verify.lo $(am__objects_1)
 libtls_la_OBJECTS = $(am_libtls_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
@@ -153,7 +149,6 @@ am__v_lt_1 =
 libtls_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
 	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(libtls_la_CFLAGS) \
 	$(CFLAGS) $(libtls_la_LDFLAGS) $(LDFLAGS) -o $@
-@ENABLE_LIBTLS_TRUE@am_libtls_la_rpath = -rpath $(libdir)
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -195,7 +190,6 @@ am__can_run_installinfo = \
     n|no|NO) false;; \
     *) (install-info --version) >/dev/null 2>&1;; \
   esac
-am__noinst_HEADERS_DIST = tls_internal.h
 HEADERS = $(noinst_HEADERS)
 am__tagged_files = $(HEADERS) $(SOURCES) $(TAGS_FILES) $(LISP)
 # Read a list of newline-separated strings from the standard input,
@@ -343,15 +337,14 @@ top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
 AM_CPPFLAGS = -I$(top_srcdir)/include -DLIBRESSL_INTERNAL
-@ENABLE_LIBTLS_TRUE@lib_LTLIBRARIES = libtls.la
-@ENABLE_LIBTLS_TRUE@EXTRA_DIST = VERSION
-@ENABLE_LIBTLS_TRUE@libtls_la_LDFLAGS = -version-info @LIBTLS_VERSION@ -no-undefined
-@ENABLE_LIBTLS_TRUE@libtls_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
-@ENABLE_LIBTLS_TRUE@libtls_la_LIBADD = ../crypto/libcrypto.la ../ssl/libssl.la $(PLATFORM_LDADD)
-@ENABLE_LIBTLS_TRUE@libtls_la_SOURCES = tls.c tls_client.c \
-@ENABLE_LIBTLS_TRUE@	tls_config.c tls_server.c tls_util.c \
-@ENABLE_LIBTLS_TRUE@	tls_verify.c $(am__append_1)
-@ENABLE_LIBTLS_TRUE@noinst_HEADERS = tls_internal.h
+lib_LTLIBRARIES = libtls.la
+EXTRA_DIST = VERSION
+libtls_la_LDFLAGS = -version-info @LIBTLS_VERSION@ -no-undefined
+libtls_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
+libtls_la_LIBADD = ../crypto/libcrypto.la ../ssl/libssl.la $(PLATFORM_LDADD)
+libtls_la_SOURCES = tls.c tls_client.c tls_config.c tls_server.c \
+	tls_util.c tls_verify.c $(am__append_1)
+noinst_HEADERS = tls_internal.h
 all: all-am
 
 .SUFFIXES:
@@ -423,7 +416,7 @@ clean-libLTLIBRARIES:
 	}
 
 libtls.la: $(libtls_la_OBJECTS) $(libtls_la_DEPENDENCIES) $(EXTRA_libtls_la_DEPENDENCIES) 
-	$(AM_V_CCLD)$(libtls_la_LINK) $(am_libtls_la_rpath) $(libtls_la_OBJECTS) $(libtls_la_LIBADD) $(LIBS)
+	$(AM_V_CCLD)$(libtls_la_LINK) -rpath $(libdir) $(libtls_la_OBJECTS) $(libtls_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
