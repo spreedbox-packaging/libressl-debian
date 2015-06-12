@@ -1650,34 +1650,57 @@ X509_cmp_time(const ASN1_TIME *ctm, time_t *cmp_time)
 		memcpy(p, str, 10);
 		p += 10;
 		str += 10;
+		i -= 10;
 	} else {
 		if (i < 13)
 			return 0;
 		memcpy(p, str, 12);
 		p += 12;
 		str += 12;
+		i -= 12;
 	}
 
+	if (i < 1)
+		return 0;
 	if ((*str == 'Z') || (*str == '-') || (*str == '+')) {
 		*(p++) = '0';
 		*(p++) = '0';
 	} else {
+		if (i < 2)
+			return 0;
 		*(p++) = *(str++);
 		*(p++) = *(str++);
+		i -= 2;
+		if (i < 1)
+			return 0;
 		/* Skip any fractional seconds... */
 		if (*str == '.') {
 			str++;
-			while ((*str >= '0') && (*str <= '9'))
+			i--;
+			while (i > 1 && (*str >= '0') && (*str <= '9')) {
 				str++;
+				i--;
+			}
 		}
 	}
 	*(p++) = 'Z';
 	*(p++) = '\0';
 
-	if (*str == 'Z')
+	if (i < 1)
+		return 0;
+	if (*str == 'Z') {
+		if (i != 1)
+			return 0;
 		offset = 0;
-	else {
+	} else {
+		if (i != 5)
+			return 0;
 		if ((*str != '+') && (*str != '-'))
+			return 0;
+		if (str[1] < '0' || str[1] > '9' ||
+		    str[2] < '0' || str[2] > '9' ||
+		    str[3] < '0' || str[3] > '9' ||
+		    str[4] < '0' || str[4] > '9')
 			return 0;
 		offset = ((str[1] - '0') * 10 + (str[2] - '0')) * 60;
 		offset += (str[3] - '0') * 10 + (str[4] - '0');
