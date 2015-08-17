@@ -1,4 +1,4 @@
-Source: libressl
+Source: libressl-rng
 Section: libs
 Priority: optional
 Maintainer: Joachim Bauch <bauch@struktur.de>

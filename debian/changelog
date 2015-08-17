@@ -1,4 +1,4 @@
-libressl (2.1.7-1+struktur1~trusty0) trusty; urgency=low
+libressl-rng (2.1.7-1+struktur1~trusty0) trusty; urgency=low
 
   * Added RNG improvements.
   * Use separate package names to differ between original and RNG packages.
