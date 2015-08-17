@@ -14,7 +14,7 @@ Homepage: http://www.libressl.org/
 Vcs-Git: http://git.intranet.struktur.de/debian/libressl.git
 Vcs-Browser: http://git.intranet.struktur.de/debian/libressl
 
-Package: libressl-crypto-32
+Package: libressl-rng-crypto-32
 Architecture: any
 Multi-Arch: same
 Pre-Depends:
@@ -23,14 +23,15 @@ Depends:
  ${misc:Depends},
  ${shlibs:Depends}
 Conflicts:
- libressl-0
+ libressl-0,
+ libressl-crypto-32
 Description: SSL library, forked from OpenSSL - crypto library
  LibreSSL strives to maintain API compatibility with OpenSSL, but
  do away with all the cruft.
  .
  This package provides the "-crypto" library.
 
-Package: libressl-ssl-32
+Package: libressl-rng-ssl-32
 Architecture: any
 Multi-Arch: same
 Pre-Depends:
@@ -39,14 +40,15 @@ Depends:
  ${misc:Depends},
  ${shlibs:Depends}
 Conflicts:
- libressl-0
+ libressl-0,
+ libressl-ssl-32
 Description: SSL library, forked from OpenSSL - SSL library
  LibreSSL strives to maintain API compatibility with OpenSSL, but
  do away with all the cruft.
  .
  This package provides the "-ssl" library.
 
-Package: libressl-tls-3
+Package: libressl-rng-tls-3
 Architecture: any
 Multi-Arch: same
 Pre-Depends:
@@ -55,27 +57,30 @@ Depends:
  ${misc:Depends},
  ${shlibs:Depends}
 Conflicts:
- libressl-0
+ libressl-0,
+ libressl-tls-3
 Description: SSL library, forked from OpenSSL - TLS library
  LibreSSL strives to maintain API compatibility with OpenSSL, but
  do away with all the cruft.
  .
  This package provides the "-tls" library.
 
-Package: libressl-apps
+Package: libressl-rng-apps
 Section: utils
 Architecture: any
 Multi-Arch: same
 Depends:
  ${misc:Depends},
  ${shlibs:Depends}
+Conflicts:
+ libressl-apps
 Description: SSL library, forked from OpenSSL - applications
  LibreSSL strives to maintain API compatibility with OpenSSL, but
  do away with all the cruft.
  .
  The commandline tools that use libressl are provided by this package.
 
-Package: libressl-dev
+Package: libressl-rng-dev
 Section: libdevel
 Multi-Arch: same
 Architecture: any
@@ -84,6 +89,8 @@ Depends:
  ${package:libssl} (= ${binary:Version}),
  ${package:libtls} (= ${binary:Version}),
  ${misc:Depends}
+Conflicts:
+ libressl-dev
 Description: SSL library, forked from OpenSSL - development files
  LibreSSL strives to maintain API compatibility with OpenSSL, but
  do away with all the cruft.
@@ -91,35 +98,38 @@ Description: SSL library, forked from OpenSSL - development files
  The development headers for compiling programs that use libressl
  are provided by this package.
 
-Package: libressl-doc
+Package: libressl-rng-doc
 Section: doc
 Architecture: all
 Depends:
  ${misc:Depends}
 Conflicts:
- libssl-doc
+ libssl-doc,
+ libressl-doc
 Description: SSL library, forked from OpenSSL - documentation
  LibreSSL strives to maintain API compatibility with OpenSSL, but
  do away with all the cruft.
  .
  The documentation for libressl is provided by this package.
 
-Package: libressl-apps-dbg
+Package: libressl-rng-apps-dbg
 Section: debug
 Priority: extra
 Architecture: any
 Multi-Arch: same
 Depends:
- libressl-apps (= ${binary:Version}),
+ libressl-rng-apps (= ${binary:Version}),
  ${misc:Depends}
+Conflicts:
+ libressl-apps-dbg
 Description: SSL library, forked from OpenSSL - applications debug symbols
  LibreSSL strives to maintain API compatibility with OpenSSL, but
  do away with all the cruft.
  .
  The debugging symbols for tracking down bugs in applications that
- use libressl-apps are provided by this package.
+ use libressl-rng-apps are provided by this package.
 
-Package: libressl-crypto-dbg
+Package: libressl-rng-crypto-dbg
 Section: debug
 Priority: extra
 Architecture: any
@@ -127,14 +137,16 @@ Multi-Arch: same
 Depends:
  ${package:libcrypto} (= ${binary:Version}),
  ${misc:Depends}
+Conflicts:
+ libressl-crypto-dbg
 Description: SSL library, forked from OpenSSL - crypto debug symbols
  LibreSSL strives to maintain API compatibility with OpenSSL, but
  do away with all the cruft.
  .
  The debugging symbols for tracking down bugs in applications that
- use libressl-crypto are provided by this package.
+ use libressl-rng-crypto are provided by this package.
 
-Package: libressl-ssl-dbg
+Package: libressl-rng-ssl-dbg
 Section: debug
 Priority: extra
 Architecture: any
@@ -142,14 +154,16 @@ Multi-Arch: same
 Depends:
  ${package:libssl} (= ${binary:Version}),
  ${misc:Depends}
+Conflicts:
+ libressl-ssl-dbg
 Description: SSL library, forked from OpenSSL - SSL debug symbols
  LibreSSL strives to maintain API compatibility with OpenSSL, but
  do away with all the cruft.
  .
  The debugging symbols for tracking down bugs in applications that
- use libressl-ssl are provided by this package.
+ use libressl-rng-ssl are provided by this package.
 
-Package: libressl-tls-dbg
+Package: libressl-rng-tls-dbg
 Section: debug
 Priority: extra
 Architecture: any
@@ -157,9 +171,11 @@ Multi-Arch: same
 Depends:
  ${package:libtls} (= ${binary:Version}),
  ${misc:Depends}
+Conflicts:
+ libressl-tls-dbg
 Description: SSL library, forked from OpenSSL - TLS debug symbols
  LibreSSL strives to maintain API compatibility with OpenSSL, but
  do away with all the cruft.
  .
  The debugging symbols for tracking down bugs in applications that
- use libressl-tls are provided by this package.
+ use libressl-rng-tls are provided by this package.
