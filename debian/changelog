@@ -1,3 +1,10 @@
+libressl (2.1.7-1+struktur1~trusty0) trusty; urgency=low
+
+  * Added RNG improvements.
+  * Use separate package names to differ between original and RNG packages.
+
+ -- Joachim Bauch <bauch@struktur.de>  Mon, 17 Aug 2015 12:26:15 +0200
+
 libressl (2.1.7-1ppa1~trusty1) trusty; urgency=low
 
   * Imported Upstream version 2.1.7
