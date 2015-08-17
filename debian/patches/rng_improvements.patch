@@ -1,0 +1,174 @@
+diff --git a/crypto/compat/arc4random.c b/crypto/compat/arc4random.c
+index fd7e863..9077ca7 100644
+--- a/crypto/compat/arc4random.c
++++ b/crypto/compat/arc4random.c
+@@ -33,8 +33,17 @@
+ #include <sys/types.h>
+ #include <sys/time.h>
+ 
++// NOTE: we encrypt random data instead of returning just the keystream
++#define ENCRYPT_RANDOM_DATA
++
++// get 13 times the required amount of random data and compress using xor
++#define RANDOM_OVERGET_FACTOR 13
++
++#ifndef ENCRYPT_RANDOM_DATA
+ #define KEYSTREAM_ONLY
++#endif
+ #include "chacha_private.h"
++#include "openssl/aes.h"
+ 
+ #define min(a, b) ((a) < (b) ? (a) : (b))
+ #ifdef __GNUC__
+@@ -48,6 +57,13 @@
+ #define BLOCKSZ	64
+ #define RSBUFSZ	(16*BLOCKSZ)
+ 
++#define CHACHA_INIT_SIZE	(KEYSZ + IVSZ)
++#define AES256_INIT_SIZE	(KEYSZ)
++
++#if (RSBUFSZ % AES_BLOCK_SIZE != 0)
++#error "RSBUFSZ must be a multiple of AES_BLOCK_SIZE"
++#endif
++
+ /* Marked MAP_INHERIT_ZERO, so zero'd out in fork children. */
+ static struct _rs {
+ 	size_t		rs_have;	/* valid bytes at end of rs_buf */
+@@ -57,7 +73,9 @@ static struct _rs {
+ /* Maybe be preserved in fork children, if _rs_allocate() decides. */
+ static struct _rsx {
+ 	chacha_ctx	rs_chacha;	/* chacha context for random keystream */
++	AES_KEY		rs_aes256;	/* aes256 context for random keystream */
+ 	u_char		rs_buf[RSBUFSZ];	/* keystream blocks */
++	int		rs_use_chacha;
+ } *rsx;
+ 
+ static inline int _rs_allocate(struct _rs **, struct _rsx **);
+@@ -66,29 +84,67 @@ static inline void _rs_forkdetect(void);
+ 
+ static inline void _rs_rekey(u_char *dat, size_t datlen);
+ 
++// get random data from kernel and compress to required size
++static inline void
++_rs_getentropy(u_char *dst, size_t len)
++{
++	// get more data than actually required...
++	u_char temp_buf[RANDOM_OVERGET_FACTOR * len];
++	u_char *temp_ptr = temp_buf;
++	size_t remaining = sizeof(temp_buf);
++	size_t buf_pos;
++	while (remaining > 0) {
++		// need to get chunks of max. 256 bytes
++		size_t to_get = min(256, remaining);
++		if (getentropy(temp_ptr, to_get) == -1)
++			_getentropy_fail();
++
++		temp_ptr += to_get;
++		remaining -= to_get;
++	}
++
++	// ...and compress to buffer by xor-ing multiple bytes
++	temp_ptr = temp_buf;
++	for (buf_pos=0; buf_pos<len; buf_pos++) {
++		size_t temp_pos;
++		u_char temp_value = 0;
++		for (temp_pos=0; temp_pos<RANDOM_OVERGET_FACTOR; temp_pos++) {
++			temp_value = temp_value ^ temp_ptr[temp_pos];
++		}
++		dst[buf_pos] = temp_value;
++		temp_ptr += RANDOM_OVERGET_FACTOR;
++	}
++}
++
+ static inline void
+ _rs_init(u_char *buf, size_t n)
+ {
+-	if (n < KEYSZ + IVSZ)
+-		return;
++	if (((rs == NULL || rsx->rs_use_chacha) && n < CHACHA_INIT_SIZE) ||
++		 (!rsx->rs_use_chacha && n < AES256_INIT_SIZE)) {
++		abort();
++	}
+ 
+ 	if (rs == NULL) {
+ 		if (_rs_allocate(&rs, &rsx) == -1)
+ 			abort();
++
++		rsx->rs_use_chacha = 1;
+ 	}
+ 
+-	chacha_keysetup(&rsx->rs_chacha, buf, KEYSZ * 8, 0);
+-	chacha_ivsetup(&rsx->rs_chacha, buf + KEYSZ);
++	if (rsx->rs_use_chacha) {
++		chacha_keysetup(&rsx->rs_chacha, buf, KEYSZ * 8, 0);
++		chacha_ivsetup(&rsx->rs_chacha, buf + KEYSZ);
++	} else {
++		AES_set_encrypt_key(buf, KEYSZ * 8, &rsx->rs_aes256);
++	}
+ }
+ 
+ static void
+ _rs_stir(void)
+ {
+-	u_char rnd[KEYSZ + IVSZ];
+-
+-	if (getentropy(rnd, sizeof rnd) == -1)
+-		_getentropy_fail();
++	u_char rnd[KEYSZ + IVSZ + KEYSZ];
+ 
++	_rs_getentropy(rnd, sizeof rnd);
+ 	if (!rs)
+ 		_rs_init(rnd, sizeof(rnd));
+ 	else
+@@ -117,24 +173,43 @@ _rs_stir_if_needed(size_t len)
+ static inline void
+ _rs_rekey(u_char *dat, size_t datlen)
+ {
+-#ifndef KEYSTREAM_ONLY
++#ifdef ENCRYPT_RANDOM_DATA
++	_rs_getentropy(rsx->rs_buf, sizeof(rsx->rs_buf));
++#elif !defined(KEYSTREAM_ONLY)
+ 	memset(rsx->rs_buf, 0, sizeof(rsx->rs_buf));
+ #endif
+ 	/* fill rs_buf with the keystream */
+-	chacha_encrypt_bytes(&rsx->rs_chacha, rsx->rs_buf,
+-	    rsx->rs_buf, sizeof(rsx->rs_buf));
++	if (rsx->rs_use_chacha) {
++		chacha_encrypt_bytes(&rsx->rs_chacha, rsx->rs_buf,
++		    rsx->rs_buf, sizeof(rsx->rs_buf));
++	} else {
++		size_t i;
++		u_char *buf = rsx->rs_buf;
++		for (i=0; i<(RSBUFSZ / AES_BLOCK_SIZE); i++) {
++			AES_encrypt(buf, buf, &rsx->rs_aes256);
++			buf += AES_BLOCK_SIZE;
++		}
++	}
++	rsx->rs_use_chacha = 1 - rsx->rs_use_chacha;
+ 	/* mix in optional user provided data */
+ 	if (dat) {
+ 		size_t i, m;
+ 
+-		m = min(datlen, KEYSZ + IVSZ);
++		m = min(datlen,
++		    rsx->rs_use_chacha ? CHACHA_INIT_SIZE : AES256_INIT_SIZE);
+ 		for (i = 0; i < m; i++)
+ 			rsx->rs_buf[i] ^= dat[i];
+ 	}
+-	/* immediately reinit for backtracking resistance */
+-	_rs_init(rsx->rs_buf, KEYSZ + IVSZ);
+-	memset(rsx->rs_buf, 0, KEYSZ + IVSZ);
+-	rs->rs_have = sizeof(rsx->rs_buf) - KEYSZ - IVSZ;
++	/* immediately reinit for backtracking resistance but switch cipher */
++	if (rsx->rs_use_chacha) {
++		_rs_init(rsx->rs_buf, CHACHA_INIT_SIZE);
++		memset(rsx->rs_buf, 0, CHACHA_INIT_SIZE);
++		rs->rs_have = sizeof(rsx->rs_buf) - CHACHA_INIT_SIZE;
++	} else {
++		_rs_init(rsx->rs_buf, AES256_INIT_SIZE);
++		memset(rsx->rs_buf, 0, AES256_INIT_SIZE);
++		rs->rs_have = sizeof(rsx->rs_buf) - AES256_INIT_SIZE;
++	}
+ }
+ 
+ static inline void
