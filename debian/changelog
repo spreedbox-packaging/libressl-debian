@@ -1,3 +1,9 @@
+libressl (2.1.8-1ppa1~precise1) precise; urgency=low
+
+  * Imported Upstream version 2.1.8
+
+ -- Joachim Bauch <bauch@struktur.de>  Tue, 20 Oct 2015 11:18:29 +0200
+
 libressl (2.1.7-1ppa1~precise1) precise; urgency=low
 
   * Imported Upstream version 2.1.7
