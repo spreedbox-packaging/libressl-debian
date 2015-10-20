@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_gf2m.c,v 1.17 2015/02/09 15:49:22 jsing Exp $ */
+/* $OpenBSD: bn_gf2m.c,v 1.18 2015/02/10 09:50:12 miod Exp $ */
 /* ====================================================================
  * Copyright 2002 Sun Microsystems, Inc. ALL RIGHTS RESERVED.
  *
