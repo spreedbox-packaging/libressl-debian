@@ -75,6 +75,21 @@ Description: SSL library, forked from OpenSSL - applications
  .
  The commandline tools that use libressl are provided by this package.
 
+Package: libressl-openssl-compat
+Section: utils
+Architecture: all
+Depends:
+ libressl-apps,
+ ${misc:Depends}
+Provides: openssl
+Conflicts: openssl
+Replaces: openssl
+Description: SSL library, forked from OpenSSL - compatibility wrapper
+ LibreSSL strives to maintain API compatibility with OpenSSL, but
+ do away with all the cruft.
+ .
+ A "openssl" symlink for tools expecting OpenSSL is provided by this package.
+
 Package: libressl-dev
 Section: libdevel
 Multi-Arch: same
