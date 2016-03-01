@@ -1,0 +1,9 @@
+#!/bin/sh
+
+#DEBHELPER#
+
+set -e
+
+if [ -d "/etc/ssl/private" ]; then
+	chmod 700 "/etc/ssl/private"
+fi

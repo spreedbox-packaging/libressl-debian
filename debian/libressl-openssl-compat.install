@@ -1,0 +1,2 @@
+apps/openssl.cnf etc/ssl/
+debian/c_rehash usr/bin
