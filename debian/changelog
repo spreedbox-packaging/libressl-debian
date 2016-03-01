@@ -1,3 +1,9 @@
+libressl (2.1.10-1ppa1~trusty2) trusty; urgency=low
+
+  * Introduce compatibility package for packages expecting "openssl".
+
+ -- Joachim Bauch <bauch@struktur.de>  Tue, 01 Mar 2016 11:18:42 +0100
+
 libressl (2.1.10-1ppa1~trusty1) trusty; urgency=low
 
   * Imported Upstream version 2.1.10
