@@ -1,4 +1,4 @@
-/* $OpenBSD: c_all.c,v 1.15 2015/02/07 03:23:05 jsing Exp $ */
+/* $OpenBSD: c_all.c,v 1.19 2015/09/13 23:36:21 doug Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -238,8 +238,7 @@ OpenSSL_add_all_digests(void)
 	EVP_add_digest_alias(SN_md5, "ssl3-md5");
 #endif
 
-#if !defined(OPENSSL_NO_SHA) && !defined(OPENSSL_NO_SHA0)
-	EVP_add_digest(EVP_sha());
+#if !defined(OPENSSL_NO_SHA)
 #ifndef OPENSSL_NO_DSA
 	EVP_add_digest(EVP_dss());
 #endif
@@ -264,9 +263,6 @@ OpenSSL_add_all_digests(void)
 	EVP_add_digest(EVP_gost2814789imit());
 	EVP_add_digest(EVP_streebog256());
 	EVP_add_digest(EVP_streebog512());
-#endif
-#if !defined(OPENSSL_NO_MDC2) && !defined(OPENSSL_NO_DES)
-	EVP_add_digest(EVP_mdc2());
 #endif
 #ifndef OPENSSL_NO_RIPEMD
 	EVP_add_digest(EVP_ripemd160());

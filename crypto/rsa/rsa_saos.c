@@ -1,4 +1,4 @@
-/* $OpenBSD: rsa_saos.c,v 1.15 2014/07/11 08:44:49 jsing Exp $ */
+/* $OpenBSD: rsa_saos.c,v 1.18 2015/09/10 15:56:25 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -84,7 +84,7 @@ RSA_sign_ASN1_OCTET_STRING(int type, const unsigned char *m, unsigned int m_len,
 		    RSA_R_DIGEST_TOO_BIG_FOR_RSA_KEY);
 		return 0;
 	}
-	s = malloc((unsigned int)j + 1);
+	s = malloc(j + 1);
 	if (s == NULL) {
 		RSAerr(RSA_F_RSA_SIGN_ASN1_OCTET_STRING, ERR_R_MALLOC_FAILURE);
 		return 0;
@@ -97,7 +97,7 @@ RSA_sign_ASN1_OCTET_STRING(int type, const unsigned char *m, unsigned int m_len,
 	else
 		*siglen = i;
 
-	OPENSSL_cleanse(s, (unsigned int)j + 1);
+	explicit_bzero(s, (unsigned int)j + 1);
 	free(s);
 	return ret;
 }
@@ -117,7 +117,7 @@ RSA_verify_ASN1_OCTET_STRING(int dtype, const unsigned char *m,
 		return 0;
 	}
 
-	s = malloc((unsigned int)siglen);
+	s = malloc(siglen);
 	if (s == NULL) {
 		RSAerr(RSA_F_RSA_VERIFY_ASN1_OCTET_STRING,
 		    ERR_R_MALLOC_FAILURE);
@@ -140,9 +140,9 @@ RSA_verify_ASN1_OCTET_STRING(int dtype, const unsigned char *m,
 	} else
 		ret = 1;
 err:
-	M_ASN1_OCTET_STRING_free(sig);
+	ASN1_OCTET_STRING_free(sig);
 	if (s != NULL) {
-		OPENSSL_cleanse(s, (unsigned int)siglen);
+		explicit_bzero(s, (unsigned int)siglen);
 		free(s);
 	}
 	return ret;

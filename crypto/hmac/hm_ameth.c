@@ -1,4 +1,4 @@
-/* $OpenBSD: hm_ameth.c,v 1.7 2014/07/10 13:58:22 jsing Exp $ */
+/* $OpenBSD: hm_ameth.c,v 1.9 2015/07/20 15:45:29 miod Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2007.
  */
@@ -83,7 +83,7 @@ hmac_key_free(EVP_PKEY *pkey)
 
 	if (os) {
 		if (os->data)
-			OPENSSL_cleanse(os->data, os->length);
+			explicit_bzero(os->data, os->length);
 		ASN1_OCTET_STRING_free(os);
 	}
 }
@@ -112,10 +112,17 @@ old_hmac_decode(EVP_PKEY *pkey, const unsigned char **pder, int derlen)
 	ASN1_OCTET_STRING *os;
 
 	os = ASN1_OCTET_STRING_new();
-	if (!os || !ASN1_OCTET_STRING_set(os, *pder, derlen))
-		return 0;
-	EVP_PKEY_assign(pkey, EVP_PKEY_HMAC, os);
+	if (os == NULL)
+		goto err;
+	if (ASN1_OCTET_STRING_set(os, *pder, derlen) == 0)
+		goto err;
+	if (EVP_PKEY_assign(pkey, EVP_PKEY_HMAC, os) == 0)
+		goto err;
 	return 1;
+
+err:
+	ASN1_OCTET_STRING_free(os);
+	return 0;
 }
 
 static int
@@ -127,6 +134,8 @@ old_hmac_encode(const EVP_PKEY *pkey, unsigned char **pder)
 	if (pder) {
 		if (!*pder) {
 			*pder = malloc(os->length);
+			if (*pder == NULL)
+				return -1;
 			inc = 0;
 		} else
 			inc = 1;

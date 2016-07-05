@@ -75,7 +75,7 @@ L$oop_ssse3:
 	movups	0(%r12),%xmm12
 	xorps	%xmm13,%xmm12
 	xorps	%xmm12,%xmm11
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	32(%r15),%xmm15
 	xorl	%edx,%ecx
 	movdqa	%xmm3,%xmm8
@@ -101,7 +101,7 @@ L$oop_ssse3:
 	xorl	%ecx,%ebx
 	movdqa	%xmm9,48(%rsp)
 	xorl	%ecx,%edi
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	48(%r15),%xmm14
 	addl	%ebp,%edx
 	movdqa	%xmm4,%xmm10
@@ -128,7 +128,7 @@ L$oop_ssse3:
 	xorl	%eax,%ebp
 	movl	%ecx,%esi
 	roll	$5,%ecx
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	64(%r15),%xmm15
 	pslld	$2,%xmm9
 	pxor	%xmm10,%xmm4
@@ -158,7 +158,7 @@ L$oop_ssse3:
 	addl	%esi,%eax
 	pxor	%xmm3,%xmm9
 	addl	20(%rsp),%ebp
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	80(%r15),%xmm14
 	xorl	%edx,%ecx
 	movl	%eax,%esi
@@ -183,7 +183,7 @@ L$oop_ssse3:
 	xorl	%ecx,%ebx
 	psrld	$31,%xmm9
 	xorl	%ecx,%esi
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	96(%r15),%xmm15
 	addl	%ebp,%edx
 	movdqa	%xmm8,%xmm10
@@ -212,7 +212,7 @@ L$oop_ssse3:
 .byte	102,15,58,15,242,8
 	movl	%ecx,%edi
 	roll	$5,%ecx
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	112(%r15),%xmm14
 	paddd	%xmm5,%xmm8
 	andl	%ebp,%esi
@@ -239,7 +239,7 @@ L$oop_ssse3:
 	rorl	$7,%ecx
 	addl	%edi,%eax
 	addl	40(%rsp),%ebp
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	128(%r15),%xmm15
 	xorl	%edx,%ecx
 	pslldq	$12,%xmm9
@@ -266,7 +266,7 @@ L$oop_ssse3:
 	xorl	%ecx,%ebx
 	movdqa	16(%r11),%xmm9
 	xorl	%ecx,%edi
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	144(%r15),%xmm14
 	addl	%ebp,%edx
 	pxor	%xmm8,%xmm6
@@ -293,7 +293,7 @@ L$oop_ssse3:
 	xorl	%eax,%ebp
 	movl	%ecx,%esi
 	roll	$5,%ecx
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	160(%r15),%xmm15
 	pxor	%xmm8,%xmm7
 	andl	%ebp,%edi
@@ -325,16 +325,16 @@ L$oop_ssse3:
 	cmpl	$11,%r8d
 	jb	L$aesenclast1
 	movups	176(%r15),%xmm14
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	192(%r15),%xmm15
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	je	L$aesenclast1
 	movups	208(%r15),%xmm14
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	224(%r15),%xmm15
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 L$aesenclast1:
-.byte	102,69,15,56,221,223
+	aesenclast	%xmm15,%xmm11
 	movups	16(%r15),%xmm14
 	xorl	%edx,%ecx
 	movl	%eax,%esi
@@ -366,7 +366,7 @@ L$aesenclast1:
 	xorps	%xmm13,%xmm12
 	movups	%xmm11,0(%r13,%r12,1)
 	xorps	%xmm12,%xmm11
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	32(%r15),%xmm15
 	addl	%ebp,%edx
 	pxor	%xmm9,%xmm0
@@ -390,7 +390,7 @@ L$aesenclast1:
 	xorl	%eax,%ebp
 	movl	%ecx,%edi
 	roll	$5,%ecx
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	48(%r15),%xmm14
 	por	%xmm9,%xmm0
 	andl	%ebp,%esi
@@ -411,7 +411,7 @@ L$aesenclast1:
 	rorl	$7,%ecx
 	addl	%edi,%eax
 	addl	16(%rsp),%ebp
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	64(%r15),%xmm15
 	pxor	%xmm5,%xmm1
 .byte	102,68,15,58,15,215,8
@@ -443,7 +443,7 @@ L$aesenclast1:
 	movl	%edx,%edi
 	roll	$5,%edx
 	xorl	%eax,%esi
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	80(%r15),%xmm14
 	addl	%edx,%ecx
 	rorl	$7,%ebp
@@ -473,7 +473,7 @@ L$aesenclast1:
 	addl	%esi,%eax
 	pxor	%xmm8,%xmm2
 	addl	36(%rsp),%ebp
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	96(%r15),%xmm15
 	xorl	%edx,%edi
 	movl	%eax,%esi
@@ -501,7 +501,7 @@ L$aesenclast1:
 	movl	%edx,%esi
 	roll	$5,%edx
 	xorl	%eax,%edi
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	112(%r15),%xmm14
 	addl	%edx,%ecx
 	rorl	$7,%ebp
@@ -532,7 +532,7 @@ L$aesenclast1:
 	addl	%edi,%eax
 	pslld	$2,%xmm3
 	addl	56(%rsp),%ebp
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	128(%r15),%xmm15
 	xorl	%edx,%esi
 	psrld	$30,%xmm9
@@ -560,7 +560,7 @@ L$aesenclast1:
 	roll	$5,%edx
 	pxor	%xmm5,%xmm4
 	xorl	%eax,%esi
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	144(%r15),%xmm14
 	addl	%edx,%ecx
 	movdqa	%xmm8,%xmm9
@@ -590,7 +590,7 @@ L$aesenclast1:
 	addl	%esi,%eax
 	por	%xmm10,%xmm4
 	addl	12(%rsp),%ebp
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	160(%r15),%xmm15
 	xorl	%edx,%edi
 	movdqa	%xmm4,%xmm8
@@ -624,16 +624,16 @@ L$aesenclast1:
 	cmpl	$11,%r8d
 	jb	L$aesenclast2
 	movups	176(%r15),%xmm14
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	192(%r15),%xmm15
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	je	L$aesenclast2
 	movups	208(%r15),%xmm14
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	224(%r15),%xmm15
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 L$aesenclast2:
-.byte	102,69,15,56,221,223
+	aesenclast	%xmm15,%xmm11
 	movups	16(%r15),%xmm14
 	addl	%edx,%ecx
 	rorl	$7,%ebp
@@ -663,7 +663,7 @@ L$aesenclast2:
 	xorps	%xmm13,%xmm12
 	movups	%xmm11,16(%r13,%r12,1)
 	xorps	%xmm12,%xmm11
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	32(%r15),%xmm15
 	pxor	%xmm2,%xmm6
 .byte	102,68,15,58,15,204,8
@@ -695,7 +695,7 @@ L$aesenclast2:
 	addl	%esi,%edx
 	movl	%ebp,%esi
 	roll	$5,%ebp
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	48(%r15),%xmm14
 	addl	%edi,%edx
 	xorl	%ecx,%ebx
@@ -719,7 +719,7 @@ L$aesenclast2:
 	addl	44(%rsp),%ebx
 	andl	%eax,%esi
 	andl	%ebp,%edi
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	64(%r15),%xmm15
 	rorl	$7,%edx
 	addl	%esi,%ebx
@@ -749,7 +749,7 @@ L$aesenclast2:
 	movdqa	%xmm7,%xmm10
 	movdqa	%xmm8,32(%rsp)
 	movl	%ecx,%esi
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	80(%r15),%xmm14
 	xorl	%edx,%ecx
 	addl	52(%rsp),%ebp
@@ -775,7 +775,7 @@ L$aesenclast2:
 	addl	%edi,%edx
 	movl	%ebp,%edi
 	roll	$5,%ebp
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	96(%r15),%xmm15
 	addl	%esi,%edx
 	xorl	%ecx,%ebx
@@ -800,7 +800,7 @@ L$aesenclast2:
 	andl	%eax,%edi
 	pxor	%xmm1,%xmm0
 	andl	%ebp,%esi
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	112(%r15),%xmm14
 	rorl	$7,%edx
 	movdqa	%xmm9,%xmm10
@@ -830,7 +830,7 @@ L$aesenclast2:
 	addl	%ebx,%eax
 	por	%xmm8,%xmm0
 	movl	%ecx,%edi
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	128(%r15),%xmm15
 	xorl	%edx,%ecx
 	movdqa	%xmm0,%xmm9
@@ -853,7 +853,7 @@ L$aesenclast2:
 	addl	%esi,%edx
 	movl	%ebp,%esi
 	roll	$5,%ebp
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	144(%r15),%xmm14
 	addl	%edi,%edx
 	xorl	%ecx,%ebx
@@ -884,7 +884,7 @@ L$aesenclast2:
 	andl	%eax,%esi
 	pslld	$2,%xmm1
 	andl	%ebp,%edi
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	160(%r15),%xmm15
 	rorl	$7,%edx
 	psrld	$30,%xmm9
@@ -912,16 +912,16 @@ L$aesenclast2:
 	cmpl	$11,%r8d
 	jb	L$aesenclast3
 	movups	176(%r15),%xmm14
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	192(%r15),%xmm15
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	je	L$aesenclast3
 	movups	208(%r15),%xmm14
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	224(%r15),%xmm15
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 L$aesenclast3:
-.byte	102,69,15,56,221,223
+	aesenclast	%xmm15,%xmm11
 	movups	16(%r15),%xmm14
 	xorl	%edx,%ecx
 	addl	28(%rsp),%ebp
@@ -953,7 +953,7 @@ L$aesenclast3:
 	xorps	%xmm13,%xmm12
 	movups	%xmm11,32(%r13,%r12,1)
 	xorps	%xmm12,%xmm11
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	32(%r15),%xmm15
 	addl	%esi,%edx
 	xorl	%ecx,%ebx
@@ -981,7 +981,7 @@ L$aesenclast3:
 	addl	40(%rsp),%ebx
 	andl	%eax,%edi
 	andl	%ebp,%esi
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	48(%r15),%xmm14
 	rorl	$7,%edx
 	addl	%edi,%ebx
@@ -1003,7 +1003,7 @@ L$aesenclast3:
 	xorl	%ebp,%edx
 	addl	%ebx,%eax
 	addl	48(%rsp),%ebp
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	64(%r15),%xmm15
 	pxor	%xmm7,%xmm3
 .byte	102,68,15,58,15,193,8
@@ -1035,7 +1035,7 @@ L$aesenclast3:
 	movl	%edx,%edi
 	roll	$5,%edx
 	xorl	%eax,%esi
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	80(%r15),%xmm14
 	addl	%edx,%ecx
 	rorl	$7,%ebp
@@ -1060,7 +1060,7 @@ L$aesenclast3:
 	rorl	$7,%ecx
 	addl	%esi,%eax
 	addl	4(%rsp),%ebp
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	96(%r15),%xmm15
 	xorl	%edx,%edi
 	movl	%eax,%esi
@@ -1082,7 +1082,7 @@ L$aesenclast3:
 	movl	%edx,%esi
 	roll	$5,%edx
 	xorl	%eax,%edi
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	112(%r15),%xmm14
 	addl	%edx,%ecx
 	rorl	$7,%ebp
@@ -1118,7 +1118,7 @@ L$aesenclast3:
 	rorl	$7,%ecx
 	addl	%edi,%eax
 	addl	24(%rsp),%ebp
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	128(%r15),%xmm15
 	xorl	%edx,%esi
 	movl	%eax,%edi
@@ -1142,7 +1142,7 @@ L$aesenclast3:
 	roll	$5,%edx
 	paddd	%xmm9,%xmm1
 	xorl	%eax,%esi
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	144(%r15),%xmm14
 	addl	%edx,%ecx
 	rorl	$7,%ebp
@@ -1166,7 +1166,7 @@ L$aesenclast3:
 	rorl	$7,%ecx
 	addl	%esi,%eax
 	addl	44(%rsp),%ebp
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	160(%r15),%xmm15
 	xorl	%edx,%edi
 	movl	%eax,%esi
@@ -1195,16 +1195,16 @@ L$aesenclast3:
 	cmpl	$11,%r8d
 	jb	L$aesenclast4
 	movups	176(%r15),%xmm14
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	192(%r15),%xmm15
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	je	L$aesenclast4
 	movups	208(%r15),%xmm14
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	224(%r15),%xmm15
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 L$aesenclast4:
-.byte	102,69,15,56,221,223
+	aesenclast	%xmm15,%xmm11
 	movups	16(%r15),%xmm14
 	addl	%edx,%ecx
 	rorl	$7,%ebp
@@ -1260,7 +1260,7 @@ L$done_ssse3:
 	rorl	$7,%ecx
 	addl	%edi,%eax
 	addl	24(%rsp),%ebp
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	128(%r15),%xmm15
 	xorl	%edx,%esi
 	movl	%eax,%edi
@@ -1282,7 +1282,7 @@ L$done_ssse3:
 	movl	%edx,%edi
 	roll	$5,%edx
 	xorl	%eax,%esi
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	144(%r15),%xmm14
 	addl	%edx,%ecx
 	rorl	$7,%ebp
@@ -1304,7 +1304,7 @@ L$done_ssse3:
 	rorl	$7,%ecx
 	addl	%esi,%eax
 	addl	44(%rsp),%ebp
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	movups	160(%r15),%xmm15
 	xorl	%edx,%edi
 	movl	%eax,%esi
@@ -1329,16 +1329,16 @@ L$done_ssse3:
 	cmpl	$11,%r8d
 	jb	L$aesenclast5
 	movups	176(%r15),%xmm14
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	192(%r15),%xmm15
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 	je	L$aesenclast5
 	movups	208(%r15),%xmm14
-.byte	102,69,15,56,220,223
+	aesenc	%xmm15,%xmm11
 	movups	224(%r15),%xmm15
-.byte	102,69,15,56,220,222
+	aesenc	%xmm14,%xmm11
 L$aesenclast5:
-.byte	102,69,15,56,221,223
+	aesenclast	%xmm15,%xmm11
 	movups	16(%r15),%xmm14
 	addl	%edx,%ecx
 	rorl	$7,%ebp

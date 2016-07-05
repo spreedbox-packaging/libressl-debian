@@ -3,10 +3,10 @@ include $(top_srcdir)/Makefile.am.common
 lib_LTLIBRARIES = libssl.la
 
 EXTRA_DIST = VERSION
+EXTRA_DIST += CMakeLists.txt
 
 libssl_la_LDFLAGS = -version-info @LIBSSL_VERSION@ -no-undefined
-libssl_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
-libssl_la_LIBADD = ../crypto/libcrypto.la
+libssl_la_LIBADD = $(abs_top_builddir)/crypto/libcrypto.la
 
 libssl_la_SOURCES = bio_ssl.c
 libssl_la_SOURCES += bs_ber.c
@@ -23,15 +23,12 @@ libssl_la_SOURCES += d1_srvr.c
 libssl_la_SOURCES += pqueue.c
 libssl_la_SOURCES += s23_clnt.c
 libssl_la_SOURCES += s23_lib.c
-libssl_la_SOURCES += s23_meth.c
 libssl_la_SOURCES += s23_pkt.c
 libssl_la_SOURCES += s23_srvr.c
 libssl_la_SOURCES += s3_both.c
 libssl_la_SOURCES += s3_cbc.c
 libssl_la_SOURCES += s3_clnt.c
-libssl_la_SOURCES += s3_enc.c
 libssl_la_SOURCES += s3_lib.c
-libssl_la_SOURCES += s3_meth.c
 libssl_la_SOURCES += s3_pkt.c
 libssl_la_SOURCES += s3_srvr.c
 libssl_la_SOURCES += ssl_algs.c

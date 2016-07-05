@@ -1,4 +1,4 @@
-/* $OpenBSD: ec_lib.c,v 1.15 2014/07/12 16:03:37 miod Exp $ */
+/* $OpenBSD: ec_lib.c,v 1.19 2015/09/10 15:56:25 jsing Exp $ */
 /*
  * Originally written by Bodo Moeller for the OpenSSL project.
  */
@@ -152,10 +152,10 @@ EC_GROUP_clear_free(EC_GROUP * group)
 	BN_clear_free(&group->cofactor);
 
 	if (group->seed) {
-		OPENSSL_cleanse(group->seed, group->seed_len);
+		explicit_bzero(group->seed, group->seed_len);
 		free(group->seed);
 	}
-	OPENSSL_cleanse(group, sizeof *group);
+	explicit_bzero(group, sizeof *group);
 	free(group);
 }
 
@@ -216,8 +216,7 @@ EC_GROUP_copy(EC_GROUP * dest, const EC_GROUP * src)
 		dest->seed = malloc(src->seed_len);
 		if (dest->seed == NULL)
 			return 0;
-		if (!memcpy(dest->seed, src->seed, src->seed_len))
-			return 0;
+		memcpy(dest->seed, src->seed, src->seed_len);
 		dest->seed_len = src->seed_len;
 	} else {
 		free(dest->seed);
@@ -531,12 +530,8 @@ EC_GROUP_cmp(const EC_GROUP * a, const EC_GROUP * b, BN_CTX * ctx)
 		if (!EC_GROUP_get_order(a, a1, ctx) ||
 		    !EC_GROUP_get_order(b, b1, ctx) ||
 		    !EC_GROUP_get_cofactor(a, a2, ctx) ||
-		    !EC_GROUP_get_cofactor(b, b2, ctx)) {
-			BN_CTX_end(ctx);
-			if (ctx_new)
-				BN_CTX_free(ctx);
-			return -1;
-		}
+		    !EC_GROUP_get_cofactor(b, b2, ctx))
+			goto err;
 		if (BN_cmp(a1, b1) || BN_cmp(a2, b2))
 			r = 1;
 	}
@@ -759,7 +754,7 @@ EC_POINT_clear_free(EC_POINT * point)
 		point->meth->point_clear_finish(point);
 	else if (point->meth->point_finish != 0)
 		point->meth->point_finish(point);
-	OPENSSL_cleanse(point, sizeof *point);
+	explicit_bzero(point, sizeof *point);
 	free(point);
 }
 
@@ -1106,4 +1101,20 @@ EC_GROUP_have_precompute_mult(const EC_GROUP * group)
 	else
 		return 0;	/* cannot tell whether precomputation has
 				 * been performed */
+}
+
+EC_KEY *
+ECParameters_dup(EC_KEY *key)
+{
+	unsigned char *p = NULL;
+	EC_KEY *k = NULL;
+	int len;
+
+	if (key == NULL)
+		return (NULL);
+
+	if ((len = i2d_ECParameters(key, &p)) > 0)
+		k = d2i_ECParameters(NULL, (const unsigned char **)&p, len);
+
+	return (k);	
 }

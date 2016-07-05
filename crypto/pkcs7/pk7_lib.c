@@ -1,4 +1,4 @@
-/* $OpenBSD: pk7_lib.c,v 1.14 2014/07/12 16:03:37 miod Exp $ */
+/* $OpenBSD: pk7_lib.c,v 1.17 2015/09/30 17:30:15 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -181,7 +181,7 @@ PKCS7_set_type(PKCS7 *p7, int type)
 		break;
 	case NID_pkcs7_data:
 		p7->type = obj;
-		if ((p7->d.data = M_ASN1_OCTET_STRING_new()) == NULL)
+		if ((p7->d.data = ASN1_OCTET_STRING_new()) == NULL)
 			goto err;
 		break;
 	case NID_pkcs7_signedAndEnveloped:
@@ -378,9 +378,9 @@ PKCS7_SIGNER_INFO_set(PKCS7_SIGNER_INFO *p7i, X509 *x509, EVP_PKEY *pkey,
 
 	/* because ASN1_INTEGER_set is used to set a 'long' we will do
 	 * things the ugly way. */
-	M_ASN1_INTEGER_free(p7i->issuer_and_serial->serial);
+	ASN1_INTEGER_free(p7i->issuer_and_serial->serial);
 	if (!(p7i->issuer_and_serial->serial =
-	    M_ASN1_INTEGER_dup(X509_get_serialNumber(x509))))
+	    ASN1_STRING_dup(X509_get_serialNumber(x509))))
 		goto err;
 
 	/* lets keep the pkey around for a while */
@@ -543,9 +543,9 @@ PKCS7_RECIP_INFO_set(PKCS7_RECIP_INFO *p7i, X509 *x509)
 	    X509_get_issuer_name(x509)))
 		return 0;
 
-	M_ASN1_INTEGER_free(p7i->issuer_and_serial->serial);
+	ASN1_INTEGER_free(p7i->issuer_and_serial->serial);
 	if (!(p7i->issuer_and_serial->serial =
-	    M_ASN1_INTEGER_dup(X509_get_serialNumber(x509))))
+	    ASN1_STRING_dup(X509_get_serialNumber(x509))))
 		return 0;
 
 	pkey = X509_get_pubkey(x509);
@@ -636,7 +636,7 @@ PKCS7_stream(unsigned char ***boundary, PKCS7 *p7)
 	case NID_pkcs7_signedAndEnveloped:
 		os = p7->d.signed_and_enveloped->enc_data->enc_data;
 		if (os == NULL) {
-			os = M_ASN1_OCTET_STRING_new();
+			os = ASN1_OCTET_STRING_new();
 			p7->d.signed_and_enveloped->enc_data->enc_data = os;
 		}
 		break;
@@ -644,7 +644,7 @@ PKCS7_stream(unsigned char ***boundary, PKCS7 *p7)
 	case NID_pkcs7_enveloped:
 		os = p7->d.enveloped->enc_data->enc_data;
 		if (os == NULL) {
-			os = M_ASN1_OCTET_STRING_new();
+			os = ASN1_OCTET_STRING_new();
 			p7->d.enveloped->enc_data->enc_data = os;
 		}
 		break;

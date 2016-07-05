@@ -1,4 +1,4 @@
-/* $OpenBSD: v3_cpols.c,v 1.18 2015/02/10 11:22:22 jsing Exp $ */
+/* $OpenBSD: v3_cpols.c,v 1.22 2015/07/29 16:13:48 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -83,19 +83,39 @@ static POLICYQUALINFO *notice_section(X509V3_CTX *ctx,
 static int nref_nos(STACK_OF(ASN1_INTEGER) *nnums, STACK_OF(CONF_VALUE) *nos);
 
 const X509V3_EXT_METHOD v3_cpols = {
-	NID_certificate_policies, 0, ASN1_ITEM_ref(CERTIFICATEPOLICIES),
-	0, 0, 0, 0,
-	0, 0,
-	0, 0,
-	(X509V3_EXT_I2R)i2r_certpol,
-	(X509V3_EXT_R2I)r2i_certpol,
-	NULL
+	.ext_nid = NID_certificate_policies,
+	.ext_flags = 0,
+	.it = ASN1_ITEM_ref(CERTIFICATEPOLICIES),
+	.ext_new = NULL,
+	.ext_free = NULL,
+	.d2i = NULL,
+	.i2d = NULL,
+	.i2s = NULL,
+	.s2i = NULL,
+	.i2v = NULL,
+	.v2i = NULL,
+	.i2r = (X509V3_EXT_I2R)i2r_certpol,
+	.r2i = (X509V3_EXT_R2I)r2i_certpol,
+	.usr_data = NULL,
 };
 
-ASN1_ITEM_TEMPLATE(CERTIFICATEPOLICIES) =
-    ASN1_EX_TEMPLATE_TYPE(ASN1_TFLG_SEQUENCE_OF, 0, CERTIFICATEPOLICIES,
-	POLICYINFO)
-ASN1_ITEM_TEMPLATE_END(CERTIFICATEPOLICIES)
+static const ASN1_TEMPLATE CERTIFICATEPOLICIES_item_tt = {
+	.flags = ASN1_TFLG_SEQUENCE_OF,
+	.tag = 0,
+	.offset = 0,
+	.field_name = "CERTIFICATEPOLICIES",
+	.item = &POLICYINFO_it,
+};
+
+const ASN1_ITEM CERTIFICATEPOLICIES_it = {
+	.itype = ASN1_ITYPE_PRIMITIVE,
+	.utype = -1,
+	.templates = &CERTIFICATEPOLICIES_item_tt,
+	.tcount = 0,
+	.funcs = NULL,
+	.size = 0,
+	.sname = "CERTIFICATEPOLICIES",
+};
 
 
 CERTIFICATEPOLICIES *
@@ -123,10 +143,32 @@ CERTIFICATEPOLICIES_free(CERTIFICATEPOLICIES *a)
 	ASN1_item_free((ASN1_VALUE *)a, &CERTIFICATEPOLICIES_it);
 }
 
-ASN1_SEQUENCE(POLICYINFO) = {
-	ASN1_SIMPLE(POLICYINFO, policyid, ASN1_OBJECT),
-	ASN1_SEQUENCE_OF_OPT(POLICYINFO, qualifiers, POLICYQUALINFO)
-} ASN1_SEQUENCE_END(POLICYINFO)
+static const ASN1_TEMPLATE POLICYINFO_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(POLICYINFO, policyid),
+		.field_name = "policyid",
+		.item = &ASN1_OBJECT_it,
+	},
+	{
+		.flags = ASN1_TFLG_SEQUENCE_OF | ASN1_TFLG_OPTIONAL,
+		.tag = 0,
+		.offset = offsetof(POLICYINFO, qualifiers),
+		.field_name = "qualifiers",
+		.item = &POLICYQUALINFO_it,
+	},
+};
+
+const ASN1_ITEM POLICYINFO_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = POLICYINFO_seq_tt,
+	.tcount = sizeof(POLICYINFO_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(POLICYINFO),
+	.sname = "POLICYINFO",
+};
 
 
 POLICYINFO *
@@ -154,18 +196,75 @@ POLICYINFO_free(POLICYINFO *a)
 	ASN1_item_free((ASN1_VALUE *)a, &POLICYINFO_it);
 }
 
-ASN1_ADB_TEMPLATE(policydefault) =
-    ASN1_SIMPLE(POLICYQUALINFO, d.other, ASN1_ANY);
+static const ASN1_TEMPLATE policydefault_tt = {
+	.flags = 0,
+	.tag = 0,
+	.offset = offsetof(POLICYQUALINFO, d.other),
+	.field_name = "d.other",
+	.item = &ASN1_ANY_it,
+};
 
-ASN1_ADB(POLICYQUALINFO) = {
-	ADB_ENTRY(NID_id_qt_cps, ASN1_SIMPLE(POLICYQUALINFO, d.cpsuri, ASN1_IA5STRING)),
-	ADB_ENTRY(NID_id_qt_unotice, ASN1_SIMPLE(POLICYQUALINFO, d.usernotice, USERNOTICE))
-} ASN1_ADB_END(POLICYQUALINFO, 0, pqualid, 0, &policydefault_tt, NULL);
+static const ASN1_ADB_TABLE POLICYQUALINFO_adbtbl[] = {
+	{
+		.value = NID_id_qt_cps,
+		.tt = {
+			.flags = 0,
+			.tag = 0,
+			.offset = offsetof(POLICYQUALINFO, d.cpsuri),
+			.field_name = "d.cpsuri",
+			.item = &ASN1_IA5STRING_it,
+		},
+	
+	},
+	{
+		.value = NID_id_qt_unotice,
+		.tt = {
+			.flags = 0,
+			.tag = 0,
+			.offset = offsetof(POLICYQUALINFO, d.usernotice),
+			.field_name = "d.usernotice",
+			.item = &USERNOTICE_it,
+		},
+	
+	},
+};
 
-ASN1_SEQUENCE(POLICYQUALINFO) = {
-	ASN1_SIMPLE(POLICYQUALINFO, pqualid, ASN1_OBJECT),
-	ASN1_ADB_OBJECT(POLICYQUALINFO)
-} ASN1_SEQUENCE_END(POLICYQUALINFO)
+static const ASN1_ADB POLICYQUALINFO_adb = {
+	.flags = 0,
+	.offset = offsetof(POLICYQUALINFO, pqualid),
+	.app_items = 0,
+	.tbl = POLICYQUALINFO_adbtbl,
+	.tblcount = sizeof(POLICYQUALINFO_adbtbl) / sizeof(ASN1_ADB_TABLE),
+	.default_tt = &policydefault_tt,
+	.null_tt = NULL,
+};
+
+static const ASN1_TEMPLATE POLICYQUALINFO_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(POLICYQUALINFO, pqualid),
+		.field_name = "pqualid",
+		.item = &ASN1_OBJECT_it,
+	},
+	{
+		.flags = ASN1_TFLG_ADB_OID,
+		.tag = -1,
+		.offset = 0,
+		.field_name = "POLICYQUALINFO",
+		.item = (const ASN1_ITEM *)&POLICYQUALINFO_adb,
+	},
+};
+
+const ASN1_ITEM POLICYQUALINFO_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = POLICYQUALINFO_seq_tt,
+	.tcount = sizeof(POLICYQUALINFO_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(POLICYQUALINFO),
+	.sname = "POLICYQUALINFO",
+};
 
 
 POLICYQUALINFO *
@@ -193,10 +292,32 @@ POLICYQUALINFO_free(POLICYQUALINFO *a)
 	ASN1_item_free((ASN1_VALUE *)a, &POLICYQUALINFO_it);
 }
 
-ASN1_SEQUENCE(USERNOTICE) = {
-	ASN1_OPT(USERNOTICE, noticeref, NOTICEREF),
-	ASN1_OPT(USERNOTICE, exptext, DISPLAYTEXT)
-} ASN1_SEQUENCE_END(USERNOTICE)
+static const ASN1_TEMPLATE USERNOTICE_seq_tt[] = {
+	{
+		.flags = ASN1_TFLG_OPTIONAL,
+		.tag = 0,
+		.offset = offsetof(USERNOTICE, noticeref),
+		.field_name = "noticeref",
+		.item = &NOTICEREF_it,
+	},
+	{
+		.flags = ASN1_TFLG_OPTIONAL,
+		.tag = 0,
+		.offset = offsetof(USERNOTICE, exptext),
+		.field_name = "exptext",
+		.item = &DISPLAYTEXT_it,
+	},
+};
+
+const ASN1_ITEM USERNOTICE_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = USERNOTICE_seq_tt,
+	.tcount = sizeof(USERNOTICE_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(USERNOTICE),
+	.sname = "USERNOTICE",
+};
 
 
 USERNOTICE *
@@ -224,10 +345,32 @@ USERNOTICE_free(USERNOTICE *a)
 	ASN1_item_free((ASN1_VALUE *)a, &USERNOTICE_it);
 }
 
-ASN1_SEQUENCE(NOTICEREF) = {
-	ASN1_SIMPLE(NOTICEREF, organization, DISPLAYTEXT),
-	ASN1_SEQUENCE_OF(NOTICEREF, noticenos, ASN1_INTEGER)
-} ASN1_SEQUENCE_END(NOTICEREF)
+static const ASN1_TEMPLATE NOTICEREF_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(NOTICEREF, organization),
+		.field_name = "organization",
+		.item = &DISPLAYTEXT_it,
+	},
+	{
+		.flags = ASN1_TFLG_SEQUENCE_OF,
+		.tag = 0,
+		.offset = offsetof(NOTICEREF, noticenos),
+		.field_name = "noticenos",
+		.item = &ASN1_INTEGER_it,
+	},
+};
+
+const ASN1_ITEM NOTICEREF_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = NOTICEREF_seq_tt,
+	.tcount = sizeof(NOTICEREF_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(NOTICEREF),
+	.sname = "NOTICEREF",
+};
 
 
 NOTICEREF *
@@ -334,35 +477,45 @@ policy_section(X509V3_CTX *ctx, STACK_OF(CONF_VALUE) *polstrs, int ia5org)
 	int i;
 	CONF_VALUE *cnf;
 	POLICYINFO *pol;
-	POLICYQUALINFO *qual;
+	POLICYQUALINFO *nqual = NULL;
 
-	if (!(pol = POLICYINFO_new()))
+	if ((pol = POLICYINFO_new()) == NULL)
 		goto merr;
 	for (i = 0; i < sk_CONF_VALUE_num(polstrs); i++) {
 		cnf = sk_CONF_VALUE_value(polstrs, i);
-		if (!strcmp(cnf->name, "policyIdentifier")) {
+		if (strcmp(cnf->name, "policyIdentifier") == 0) {
 			ASN1_OBJECT *pobj;
-			if (!(pobj = OBJ_txt2obj(cnf->value, 0))) {
+
+			if ((pobj = OBJ_txt2obj(cnf->value, 0)) == NULL) {
 				X509V3err(X509V3_F_POLICY_SECTION,
 				    X509V3_R_INVALID_OBJECT_IDENTIFIER);
 				X509V3_conf_err(cnf);
 				goto err;
 			}
 			pol->policyid = pobj;
-		} else if (!name_cmp(cnf->name, "CPS")) {
-			if (!pol->qualifiers)
+		} else if (name_cmp(cnf->name, "CPS") == 0) {
+			if ((nqual = POLICYQUALINFO_new()) == NULL)
+				goto merr;
+			nqual->pqualid = OBJ_nid2obj(NID_id_qt_cps);
+			nqual->d.cpsuri = ASN1_IA5STRING_new();
+			if (nqual->d.cpsuri == NULL)
+				goto merr;
+			if (ASN1_STRING_set(nqual->d.cpsuri, cnf->value,
+			    strlen(cnf->value)) == 0)
+				goto merr;
+
+			if (pol->qualifiers == NULL) {
 				pol->qualifiers = sk_POLICYQUALINFO_new_null();
-			if (!(qual = POLICYQUALINFO_new()))
+				if (pol->qualifiers == NULL)
+					goto merr;
+			}
+			if (sk_POLICYQUALINFO_push(pol->qualifiers, nqual) == 0)
 				goto merr;
-			if (!sk_POLICYQUALINFO_push(pol->qualifiers, qual))
-				goto merr;
-			qual->pqualid = OBJ_nid2obj(NID_id_qt_cps);
-			qual->d.cpsuri = M_ASN1_IA5STRING_new();
-			if (!ASN1_STRING_set(qual->d.cpsuri, cnf->value,
-			    strlen(cnf->value)))
-				goto merr;
-		} else if (!name_cmp(cnf->name, "userNotice")) {
+			nqual = NULL;
+		} else if (name_cmp(cnf->name, "userNotice") == 0) {
 			STACK_OF(CONF_VALUE) *unot;
+			POLICYQUALINFO *qual;
+
 			if (*cnf->value != '@') {
 				X509V3err(X509V3_F_POLICY_SECTION,
 				    X509V3_R_EXPECTED_A_SECTION_NAME);
@@ -370,7 +523,7 @@ policy_section(X509V3_CTX *ctx, STACK_OF(CONF_VALUE) *polstrs, int ia5org)
 				goto err;
 			}
 			unot = X509V3_get_section(ctx, cnf->value + 1);
-			if (!unot) {
+			if (unot == NULL) {
 				X509V3err(X509V3_F_POLICY_SECTION,
 				    X509V3_R_INVALID_SECTION);
 				X509V3_conf_err(cnf);
@@ -378,11 +531,15 @@ policy_section(X509V3_CTX *ctx, STACK_OF(CONF_VALUE) *polstrs, int ia5org)
 			}
 			qual = notice_section(ctx, unot, ia5org);
 			X509V3_section_free(ctx, unot);
-			if (!qual)
+			if (qual == NULL)
 				goto err;
-			if (!pol->qualifiers) pol->qualifiers =
-			    sk_POLICYQUALINFO_new_null();
-			if (!sk_POLICYQUALINFO_push(pol->qualifiers, qual))
+
+			if (pol->qualifiers == NULL) {
+				pol->qualifiers = sk_POLICYQUALINFO_new_null();
+				if (pol->qualifiers == NULL)
+					goto merr;
+			}
+			if (sk_POLICYQUALINFO_push(pol->qualifiers, qual) == 0)
 				goto merr;
 		} else {
 			X509V3err(X509V3_F_POLICY_SECTION,
@@ -391,7 +548,7 @@ policy_section(X509V3_CTX *ctx, STACK_OF(CONF_VALUE) *polstrs, int ia5org)
 			goto err;
 		}
 	}
-	if (!pol->policyid) {
+	if (pol->policyid == NULL) {
 		X509V3err(X509V3_F_POLICY_SECTION,
 		    X509V3_R_NO_POLICY_IDENTIFIER);
 		goto err;
@@ -403,6 +560,7 @@ merr:
 	X509V3err(X509V3_F_POLICY_SECTION, ERR_R_MALLOC_FAILURE);
 
 err:
+	POLICYQUALINFO_free(nqual);
 	POLICYINFO_free(pol);
 	return NULL;
 }
@@ -425,7 +583,7 @@ notice_section(X509V3_CTX *ctx, STACK_OF(CONF_VALUE) *unot, int ia5org)
 		cnf = sk_CONF_VALUE_value(unot, i);
 		if (!strcmp(cnf->name, "explicitText")) {
 			if (not->exptext == NULL) {
-				not->exptext = M_ASN1_VISIBLESTRING_new();
+				not->exptext = ASN1_VISIBLESTRING_new();
 				if (not->exptext == NULL)
 					goto merr;
 			}

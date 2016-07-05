@@ -1,4 +1,4 @@
-/* $OpenBSD: x509.h,v 1.21 2015/01/28 04:14:31 beck Exp $ */
+/* $OpenBSD: x509.h,v 1.22 2015/02/11 02:17:59 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -110,6 +110,19 @@
 
 #ifdef  __cplusplus
 extern "C" {
+#endif
+
+#if defined(_WIN32)
+#ifndef LIBRESSL_INTERNAL
+#ifdef _MSC_VER
+#pragma message("Warning, overriding WinCrypt defines")
+#else
+#warning overriding WinCrypt defines
+#endif
+#endif
+#undef X509_NAME
+#undef X509_CERT_PAIR
+#undef X509_EXTENSIONS
 #endif
 
 #define X509_FILETYPE_PEM	1
@@ -857,8 +870,6 @@ int X509_CRL_get0_by_cert(X509_CRL *crl, X509_REVOKED **ret, X509 *x);
 
 X509_PKEY *	X509_PKEY_new(void );
 void		X509_PKEY_free(X509_PKEY *a);
-int		i2d_X509_PKEY(X509_PKEY *a,unsigned char **pp);
-X509_PKEY *	d2i_X509_PKEY(X509_PKEY **a,const unsigned char **pp,long length);
 
 DECLARE_ASN1_FUNCTIONS(NETSCAPE_SPKI)
 DECLARE_ASN1_FUNCTIONS(NETSCAPE_SPKAC)

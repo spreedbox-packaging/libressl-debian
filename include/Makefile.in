@@ -90,10 +90,13 @@ build_triplet = @build@
 host_triplet = @host@
 subdir = include
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
-	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
-	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/check-hardening-options.m4 \
+	$(top_srcdir)/m4/check-libc.m4 \
+	$(top_srcdir)/m4/check-os-options.m4 \
+	$(top_srcdir)/m4/disable-compiler-warnings.m4 \
+	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
+	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
+	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(include_HEADERS) \
@@ -265,6 +268,7 @@ NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OPENSSLDIR = @OPENSSLDIR@
 OTOOL = @OTOOL@
 OTOOL64 = @OTOOL64@
 PACKAGE = @PACKAGE@
@@ -282,7 +286,6 @@ SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
-USER_CFLAGS = @USER_CFLAGS@
 VERSION = @VERSION@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
@@ -336,13 +339,21 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CPPFLAGS = -I$(top_srcdir)/include -DLIBRESSL_INTERNAL
+AM_CFLAGS = 
+AM_CPPFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/include/compat -DLIBRESSL_INTERNAL
+EXTRA_DIST = CMakeLists.txt
 SUBDIRS = openssl
-noinst_HEADERS = err.h netdb.h poll.h pqueue.h stdio.h stdlib.h \
-	string.h syslog.h unistd.h win32netcompat.h arpa/inet.h \
-	machine/endian.h netinet/in.h netinet/tcp.h sys/ioctl.h \
-	sys/mman.h sys/select.h sys/socket.h sys/times.h sys/types.h \
-	sys/uio.h
+noinst_HEADERS = pqueue.h compat/dirent.h compat/dirent_msvc.h \
+	compat/err.h compat/limits.h compat/netdb.h compat/poll.h \
+	compat/readpassphrase.h compat/resolv.h compat/stdio.h \
+	compat/stdlib.h compat/string.h compat/time.h compat/unistd.h \
+	compat/win32netcompat.h compat/arpa/inet.h \
+	compat/arpa/nameser.h compat/machine/endian.h \
+	compat/netinet/in.h compat/netinet/ip.h compat/netinet/tcp.h \
+	compat/sys/cdefs.h compat/sys/ioctl.h compat/sys/mman.h \
+	compat/sys/param.h compat/sys/select.h compat/sys/socket.h \
+	compat/sys/stat.h compat/sys/time.h compat/sys/types.h \
+	compat/sys/uio.h
 include_HEADERS = tls.h
 all: all-recursive
 
@@ -356,9 +367,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am $(top_srcdir)/Makefile.am.common $
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu include/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign include/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu include/Makefile
+	  $(AUTOMAKE) --foreign include/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \

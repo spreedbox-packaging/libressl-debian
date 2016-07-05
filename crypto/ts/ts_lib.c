@@ -1,4 +1,4 @@
-/* $OpenBSD: ts_lib.c,v 1.7 2014/07/10 13:58:23 jsing Exp $ */
+/* $OpenBSD: ts_lib.c,v 1.9 2015/07/29 14:58:34 jsing Exp $ */
 /* Written by Zoltan Glozik (zglozik@stones.com) for the OpenSSL
  * project 2002.
  */
@@ -117,7 +117,7 @@ TS_ext_print_bio(BIO *bio, const STACK_OF(X509_EXTENSION) *extensions)
 		BIO_printf(bio, ": %s\n", critical ? "critical" : "");
 		if (!X509V3_EXT_print(bio, ex, 0, 4)) {
 			BIO_printf(bio, "%4s", "");
-			M_ASN1_OCTET_STRING_print(bio, ex->value);
+			ASN1_STRING_print(bio, ex->value);
 		}
 		BIO_write(bio, "\n", 1);
 	}
@@ -137,14 +137,14 @@ TS_X509_ALGOR_print_bio(BIO *bio, const X509_ALGOR *alg)
 int
 TS_MSG_IMPRINT_print_bio(BIO *bio, TS_MSG_IMPRINT *a)
 {
-	const ASN1_OCTET_STRING *msg;
+	ASN1_OCTET_STRING *msg;
 
 	TS_X509_ALGOR_print_bio(bio, TS_MSG_IMPRINT_get_algo(a));
 
 	BIO_printf(bio, "Message data:\n");
 	msg = TS_MSG_IMPRINT_get_msg(a);
-	BIO_dump_indent(bio, (const char *)M_ASN1_STRING_data(msg),
-	    M_ASN1_STRING_length(msg), 4);
+	BIO_dump_indent(bio, (const char *)ASN1_STRING_data(msg),
+	    ASN1_STRING_length(msg), 4);
 
 	return 1;
 }

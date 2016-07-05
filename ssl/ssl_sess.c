@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_sess.c,v 1.43 2014/11/08 15:21:02 jsing Exp $ */
+/* $OpenBSD: ssl_sess.c,v 1.48 2015/09/10 17:57:50 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -300,11 +300,9 @@ ssl_get_new_session(SSL *s, int session)
 
 	if (session) {
 		switch (s->version) {
-		case SSL3_VERSION:
 		case TLS1_VERSION:
 		case TLS1_1_VERSION:
 		case TLS1_2_VERSION:
-		case DTLS1_BAD_VER:
 		case DTLS1_VERSION:
 			ss->ssl_version = s->version;
 			ss->session_id_length = SSL3_SSL_SESSION_ID_LENGTH;
@@ -452,8 +450,6 @@ ssl_get_prev_session(SSL *s, unsigned char *session_id, int len,
 		SSL_SESSION data;
 		data.ssl_version = s->version;
 		data.session_id_length = len;
-		if (len == 0)
-			return 0;
 		memcpy(data.session_id, session_id, len);
 
 		CRYPTO_r_lock(CRYPTO_LOCK_SSL_CTX);
@@ -697,12 +693,11 @@ SSL_SESSION_free(SSL_SESSION *ss)
 
 	CRYPTO_free_ex_data(CRYPTO_EX_INDEX_SSL_SESSION, ss, &ss->ex_data);
 
-	OPENSSL_cleanse(ss->master_key, sizeof ss->master_key);
-	OPENSSL_cleanse(ss->session_id, sizeof ss->session_id);
+	explicit_bzero(ss->master_key, sizeof ss->master_key);
+	explicit_bzero(ss->session_id, sizeof ss->session_id);
 	if (ss->sess_cert != NULL)
 		ssl_sess_cert_free(ss->sess_cert);
-	if (ss->peer != NULL)
-		X509_free(ss->peer);
+	X509_free(ss->peer);
 	if (ss->ciphers != NULL)
 		sk_SSL_CIPHER_free(ss->ciphers);
 	free(ss->tlsext_hostname);
@@ -711,7 +706,7 @@ SSL_SESSION_free(SSL_SESSION *ss)
 	free(ss->tlsext_ecpointformatlist);
 	ss->tlsext_ellipticcurvelist_length = 0;
 	free(ss->tlsext_ellipticcurvelist);
-	OPENSSL_cleanse(ss, sizeof(*ss));
+	explicit_bzero(ss, sizeof(*ss));
 	free(ss);
 }
 

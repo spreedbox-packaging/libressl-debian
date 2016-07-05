@@ -1,4 +1,4 @@
-/* $OpenBSD: asn1_lib.c,v 1.33 2015/02/07 13:19:15 doug Exp $ */
+/* $OpenBSD: asn1_lib.c,v 1.36 2015/07/29 14:53:20 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -61,7 +61,6 @@
 #include <string.h>
 
 #include <openssl/asn1.h>
-#include <openssl/asn1_mac.h>
 #include <openssl/err.h>
 
 static int asn1_get_length(const unsigned char **pp, int *inf, long *rl, int max);
@@ -402,6 +401,8 @@ ASN1_STRING_set(ASN1_STRING *str, const void *_data, int len)
 void
 ASN1_STRING_set0(ASN1_STRING *str, void *data, int len)
 {
+	if (str->data != NULL)
+		explicit_bzero(str->data, str->length);
 	free(str->data);
 	str->data = data;
 	str->length = len;
@@ -435,8 +436,10 @@ ASN1_STRING_free(ASN1_STRING *a)
 {
 	if (a == NULL)
 		return;
-	if (a->data && !(a->flags & ASN1_STRING_FLAG_NDEF))
+	if (a->data != NULL && !(a->flags & ASN1_STRING_FLAG_NDEF)) {
+		explicit_bzero(a->data, a->length);
 		free(a->data);
+	}
 	free(a);
 }
 
@@ -465,24 +468,23 @@ asn1_add_error(const unsigned char *address, int offset)
 int
 ASN1_STRING_length(const ASN1_STRING *x)
 {
-	return M_ASN1_STRING_length(x);
+	return (x->length);
 }
 
 void
 ASN1_STRING_length_set(ASN1_STRING *x, int len)
 {
-	M_ASN1_STRING_length_set(x, len);
-	return;
+	x->length = len;
 }
 
 int
 ASN1_STRING_type(ASN1_STRING *x)
 {
-	return M_ASN1_STRING_type(x);
+	return (x->type);
 }
 
 unsigned char *
 ASN1_STRING_data(ASN1_STRING *x)
 {
-	return M_ASN1_STRING_data(x);
+	return (x->data);
 }

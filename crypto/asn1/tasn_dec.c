@@ -1,4 +1,4 @@
-/* $OpenBSD: tasn_dec.c,v 1.28 2015/12/04 04:19:25 beck Exp $ */
+/* $OpenBSD: tasn_dec.c,v 1.31 2016/05/04 14:53:29 tedu Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2000.
  */
@@ -435,8 +435,10 @@ ASN1_item_ex_d2i(ASN1_VALUE **pval, const unsigned char **in, long len,
 			}
 		}
 		/* Save encoding */
-		if (!asn1_enc_save(pval, *in, p - *in, it))
+		if (!asn1_enc_save(pval, *in, p - *in, it)) {
+			ASN1err(ASN1_F_ASN1_ITEM_EX_D2I, ERR_R_MALLOC_FAILURE);
 			goto auxerr;
+		}
 		*in = p;
 		if (asn1_cb && !asn1_cb(ASN1_OP_D2I_POST, pval, it, NULL))
 			goto auxerr;
@@ -674,6 +676,10 @@ asn1_d2i_ex_primitive(ASN1_VALUE **pval, const unsigned char **in, long inlen,
 	const unsigned char *cont = NULL;
 	long len;
 
+	buf.length = 0;
+	buf.max = 0;
+	buf.data = NULL;
+
 	if (!pval) {
 		ASN1err(ASN1_F_ASN1_D2I_EX_PRIMITIVE, ASN1_R_ILLEGAL_NULL);
 		return 0; /* Should never happen */
@@ -751,9 +757,6 @@ asn1_d2i_ex_primitive(ASN1_VALUE **pval, const unsigned char **in, long inlen,
 			buf.data = NULL;
 		}
 	} else if (cst) {
-		buf.length = 0;
-		buf.max = 0;
-		buf.data = NULL;
 		/* Should really check the internal tags are correct but
 		 * some things may get this wrong. The relevant specs
 		 * say that constructed string types should be OCTET STRINGs
@@ -858,9 +861,7 @@ asn1_ex_c2i(ASN1_VALUE **pval, const unsigned char *cont, int len, int utype,
 		break;
 
 	case V_ASN1_INTEGER:
-	case V_ASN1_NEG_INTEGER:
 	case V_ASN1_ENUMERATED:
-	case V_ASN1_NEG_ENUMERATED:
 		tint = (ASN1_INTEGER **)pval;
 		if (!c2i_ASN1_INTEGER(tint, &cont, len))
 			goto err;

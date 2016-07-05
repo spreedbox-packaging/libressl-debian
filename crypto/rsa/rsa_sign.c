@@ -1,4 +1,4 @@
-/* $OpenBSD: rsa_sign.c,v 1.21 2014/07/10 13:58:23 jsing Exp $ */
+/* $OpenBSD: rsa_sign.c,v 1.24 2015/07/19 18:29:31 miod Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -121,7 +121,7 @@ RSA_sign(int type, const unsigned char *m, unsigned int m_len,
 		return 0;
 	}
 	if (type != NID_md5_sha1) {
-		tmps = malloc((unsigned int)j + 1);
+		tmps = malloc(j + 1);
 		if (tmps == NULL) {
 			RSAerr(RSA_F_RSA_SIGN, ERR_R_MALLOC_FAILURE);
 			return 0;
@@ -137,7 +137,7 @@ RSA_sign(int type, const unsigned char *m, unsigned int m_len,
 		*siglen = i;
 
 	if (type != NID_md5_sha1) {
-		OPENSSL_cleanse(tmps, (unsigned int)j + 1);
+		explicit_bzero(tmps, (unsigned int)j + 1);
 		free(tmps);
 	}
 	return (ret);
@@ -166,7 +166,7 @@ int_rsa_verify(int dtype, const unsigned char *m, unsigned int m_len,
 		return 1;
 	}
 
-	s = malloc((unsigned int)siglen);
+	s = malloc(siglen);
 	if (s == NULL) {
 		RSAerr(RSA_F_INT_RSA_VERIFY, ERR_R_MALLOC_FAILURE);
 		goto err;
@@ -179,21 +179,6 @@ int_rsa_verify(int dtype, const unsigned char *m, unsigned int m_len,
 
 	if (i <= 0)
 		goto err;
-
-	/*
-	 * Oddball MDC2 case: signature can be OCTET STRING.
-	 * check for correct tag and length octets.
-	 */
-	if (dtype == NID_mdc2 && i == 18 && s[0] == 0x04 && s[1] == 0x10) {
-		if (rm) {
-			memcpy(rm, s + 2, 16);
-			*prm_len = 16;
-			ret = 1;
-		} else if (memcmp(m, s + 2, 16))
-			RSAerr(RSA_F_INT_RSA_VERIFY, RSA_R_BAD_SIGNATURE);
-		else
-			ret = 1;
-	}
 
 	/* Special case: SSL signature */
 	if (dtype == NID_md5_sha1) {
@@ -252,7 +237,7 @@ err:
 	if (sig != NULL)
 		X509_SIG_free(sig);
 	if (s != NULL) {
-		OPENSSL_cleanse(s, (unsigned int)siglen);
+		explicit_bzero(s, (unsigned int)siglen);
 		free(s);
 	}
 	return ret;
