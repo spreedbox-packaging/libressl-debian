@@ -1,7 +1,5 @@
-Index: libressl/include/openssl/Makefile.am
-===================================================================
---- libressl.orig/include/openssl/Makefile.am	2015-03-23 12:36:30.000000000 +0100
-+++ libressl/include/openssl/Makefile.am	2015-03-23 12:51:15.000000000 +0100
+--- a/include/openssl/Makefile.am
++++ b/include/openssl/Makefile.am
 @@ -1,6 +1,6 @@
  include $(top_srcdir)/Makefile.am.common
  
@@ -10,43 +8,35 @@ Index: libressl/include/openssl/Makefile.am
  
  opensslinclude_HEADERS =
  opensslinclude_HEADERS += aes.h
-Index: libressl/libressl-crypto.pc.in
-===================================================================
---- libressl.orig/libressl-crypto.pc.in	2015-03-23 12:51:11.000000000 +0100
-+++ libressl/libressl-crypto.pc.in	2015-03-23 12:51:15.000000000 +0100
+--- a/libressl-crypto.pc.in
++++ b/libressl-crypto.pc.in
 @@ -12,4 +12,4 @@
  Conflicts:
  Libs: -L${libdir} -lressl-crypto
  Libs.private: @LIBS@
 -Cflags: -I${includedir}
 +Cflags: -I${includedir}/libressl
-Index: libressl/libressl-ssl.pc.in
-===================================================================
---- libressl.orig/libressl-ssl.pc.in	2015-03-23 12:51:11.000000000 +0100
-+++ libressl/libressl-ssl.pc.in	2015-03-23 12:51:15.000000000 +0100
+--- a/libressl-ssl.pc.in
++++ b/libressl-ssl.pc.in
 @@ -13,4 +13,4 @@
  Conflicts:
  Libs: -L${libdir} -lressl-ssl
  Libs.private: @LIBS@ -lressl-crypto
 -Cflags: -I${includedir}
 +Cflags: -I${includedir}/libressl
-Index: libressl/libressl-tls.pc.in
-===================================================================
---- libressl.orig/libressl-tls.pc.in	2015-03-23 12:51:11.000000000 +0100
-+++ libressl/libressl-tls.pc.in	2015-03-23 12:51:15.000000000 +0100
+--- a/libressl-tls.pc.in
++++ b/libressl-tls.pc.in
 @@ -13,4 +13,4 @@
  Conflicts:
  Libs: -L${libdir} -lressl-tls
  Libs.private: @LIBS@ -lressl-crypto -lressl-ssl
 -Cflags: -I${includedir}
 +Cflags: -I${includedir}/libressl
-Index: libressl/include/Makefile.am
-===================================================================
---- libressl.orig/include/Makefile.am	2015-03-23 12:36:30.000000000 +0100
-+++ libressl/include/Makefile.am	2015-03-23 12:51:23.000000000 +0100
-@@ -28,4 +28,5 @@
- noinst_HEADERS += sys/types.h
- noinst_HEADERS += sys/uio.h
+--- a/include/Makefile.am
++++ b/include/Makefile.am
+@@ -40,4 +40,5 @@
+ noinst_HEADERS += compat/sys/types.h
+ noinst_HEADERS += compat/sys/uio.h
  
 -include_HEADERS = tls.h
 +tlsincludedir=$(includedir)/libressl
