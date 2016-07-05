@@ -1,3 +1,11 @@
+libressl (2.4.1-1ppa1~trusty1) trusty; urgency=low
+
+  * Imported Upstream version 2.4.1
+  * Updated patches for new upstream version.
+  * Updated package names / files to install for new upstream version.
+
+ -- Joachim Bauch <bauch@struktur.de>  Tue, 05 Jul 2016 17:21:20 +0200
+
 libressl (2.1.10-1ppa1~trusty2) trusty; urgency=low
 
   * Introduce compatibility package for packages expecting "openssl".
