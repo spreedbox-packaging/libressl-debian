@@ -1,4 +1,4 @@
-/* $OpenBSD: pk7_doit.c,v 1.31 2015/02/07 13:19:15 doug Exp $ */
+/* $OpenBSD: pk7_doit.c,v 1.37 2015/09/10 15:56:25 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -233,7 +233,7 @@ pkcs7_decrypt_rinfo(unsigned char **pek, int *peklen, PKCS7_RECIP_INFO *ri,
 	ret = 1;
 
 	if (*pek) {
-		OPENSSL_cleanse(*pek, *peklen);
+		explicit_bzero(*pek, *peklen);
 		free(*pek);
 	}
 
@@ -371,7 +371,7 @@ PKCS7_dataInit(PKCS7 *p7, BIO *bio)
 			if (pkcs7_encode_rinfo(ri, key, keylen) <= 0)
 				goto err;
 		}
-		OPENSSL_cleanse(key, keylen);
+		explicit_bzero(key, keylen);
 
 		if (out == NULL)
 			out = btmp;
@@ -417,7 +417,7 @@ pkcs7_cmp_ri(PKCS7_RECIP_INFO *ri, X509 *pcert)
 	    pcert->cert_info->issuer);
 	if (ret)
 		return ret;
-	return M_ASN1_INTEGER_cmp(pcert->cert_info->serialNumber,
+	return ASN1_STRING_cmp(pcert->cert_info->serialNumber,
 	    ri->issuer_and_serial->serial);
 }
 
@@ -588,7 +588,7 @@ PKCS7_dataDecode(PKCS7 *p7, EVP_PKEY *pkey, BIO *in_bio, X509 *pcert)
 			 */
 			if (!EVP_CIPHER_CTX_set_key_length(evp_ctx, eklen)) {
 				/* Use random key as MMA defence */
-				OPENSSL_cleanse(ek, eklen);
+				explicit_bzero(ek, eklen);
 				free(ek);
 				ek = tkey;
 				eklen = tkeylen;
@@ -601,12 +601,12 @@ PKCS7_dataDecode(PKCS7 *p7, EVP_PKEY *pkey, BIO *in_bio, X509 *pcert)
 			goto err;
 
 		if (ek) {
-			OPENSSL_cleanse(ek, eklen);
+			explicit_bzero(ek, eklen);
 			free(ek);
 			ek = NULL;
 		}
 		if (tkey) {
-			OPENSSL_cleanse(tkey, tkeylen);
+			explicit_bzero(tkey, tkeylen);
 			free(tkey);
 			tkey = NULL;
 		}
@@ -631,16 +631,15 @@ PKCS7_dataDecode(PKCS7 *p7, EVP_PKEY *pkey, BIO *in_bio, X509 *pcert)
 			goto err;
 	}
 	BIO_push(out, bio);
-	bio = NULL;
 
 	if (0) {
 err:
 		if (ek) {
-			OPENSSL_cleanse(ek, eklen);
+			explicit_bzero(ek, eklen);
 			free(ek);
 		}
 		if (tkey) {
-			OPENSSL_cleanse(tkey, tkeylen);
+			explicit_bzero(tkey, tkeylen);
 			free(tkey);
 		}
 		if (out != NULL)
@@ -649,8 +648,6 @@ err:
 			BIO_free_all(btmp);
 		if (etmp != NULL)
 			BIO_free_all(etmp);
-		if (bio != NULL)
-			BIO_free_all(bio);
 		out = NULL;
 	}
 	return (out);
@@ -748,7 +745,7 @@ PKCS7_dataFinal(PKCS7 *p7, BIO *bio)
 		si_sk = p7->d.signed_and_enveloped->signer_info;
 		os = p7->d.signed_and_enveloped->enc_data->enc_data;
 		if (!os) {
-			os = M_ASN1_OCTET_STRING_new();
+			os = ASN1_OCTET_STRING_new();
 			if (!os) {
 				PKCS7err(PKCS7_F_PKCS7_DATAFINAL,
 				    ERR_R_MALLOC_FAILURE);
@@ -761,7 +758,7 @@ PKCS7_dataFinal(PKCS7 *p7, BIO *bio)
 		/* XXX */
 		os = p7->d.enveloped->enc_data->enc_data;
 		if (!os) {
-			os = M_ASN1_OCTET_STRING_new();
+			os = ASN1_OCTET_STRING_new();
 			if (!os) {
 				PKCS7err(PKCS7_F_PKCS7_DATAFINAL,
 				    ERR_R_MALLOC_FAILURE);
@@ -779,7 +776,7 @@ PKCS7_dataFinal(PKCS7 *p7, BIO *bio)
 		}
 		/* If detached data then the content is excluded */
 		if (PKCS7_type_is_data(p7->d.sign->contents) && p7->detached) {
-			M_ASN1_OCTET_STRING_free(os);
+			ASN1_OCTET_STRING_free(os);
 			os = NULL;
 			p7->d.sign->contents->d.data = NULL;
 		}
@@ -794,7 +791,7 @@ PKCS7_dataFinal(PKCS7 *p7, BIO *bio)
 		/* If detached data then the content is excluded */
 		if (PKCS7_type_is_data(p7->d.digest->contents) &&
 		    p7->detached) {
-			M_ASN1_OCTET_STRING_free(os);
+			ASN1_OCTET_STRING_free(os);
 			os = NULL;
 			p7->d.digest->contents->d.data = NULL;
 		}
@@ -853,12 +850,15 @@ PKCS7_dataFinal(PKCS7 *p7, BIO *bio)
 	} else if (i == NID_pkcs7_digest) {
 		unsigned char md_data[EVP_MAX_MD_SIZE];
 		unsigned int md_len;
+
 		if (!PKCS7_find_digest(&mdc, bio,
 		    OBJ_obj2nid(p7->d.digest->md->algorithm)))
 			goto err;
 		if (!EVP_DigestFinal_ex(mdc, md_data, &md_len))
 			goto err;
-		M_ASN1_OCTET_STRING_set(p7->d.digest->digest, md_data, md_len);
+		if (ASN1_STRING_set(p7->d.digest->digest, md_data,
+		    md_len) == 0)
+			goto err;
 	}
 
 	if (!PKCS7_is_detached(p7)) {
@@ -1186,6 +1186,8 @@ PKCS7_digest_from_attributes(STACK_OF(X509_ATTRIBUTE) *sk)
 	ASN1_TYPE *astype;
 
 	if (!(astype = get_attribute(sk, NID_pkcs9_messageDigest)))
+		return NULL;
+	if (astype->type != V_ASN1_OCTET_STRING)
 		return NULL;
 	return astype->value.octet_string;
 }

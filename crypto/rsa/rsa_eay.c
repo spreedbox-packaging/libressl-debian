@@ -1,4 +1,4 @@
-/* $OpenBSD: rsa_eay.c,v 1.37 2015/02/09 15:49:22 jsing Exp $ */
+/* $OpenBSD: rsa_eay.c,v 1.39 2015/06/13 08:38:10 doug Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -110,6 +110,7 @@
  */
 
 #include <stdio.h>
+#include <string.h>
 
 #include <openssl/opensslconf.h>
 
@@ -242,7 +243,7 @@ err:
 		BN_CTX_free(ctx);
 	}
 	if (buf != NULL) {
-		OPENSSL_cleanse(buf, num);
+		explicit_bzero(buf, num);
 		free(buf);
 	}
 	return r;
@@ -393,7 +394,7 @@ RSA_eay_private_encrypt(int flen, const unsigned char *from, unsigned char *to,
 	if (BN_bin2bn(buf, num, f) == NULL)
 		goto err;
 
-		if (BN_ucmp(f, rsa->n) >= 0) {
+	if (BN_ucmp(f, rsa->n) >= 0) {
 		/* usually the padding functions would catch this */
 		RSAerr(RSA_F_RSA_EAY_PRIVATE_ENCRYPT,
 		    RSA_R_DATA_TOO_LARGE_FOR_MODULUS);
@@ -472,7 +473,7 @@ err:
 		BN_CTX_free(ctx);
 	}
 	if (buf != NULL) {
-		OPENSSL_cleanse(buf, num);
+		explicit_bzero(buf, num);
 		free(buf);
 	}
 	return r;
@@ -607,7 +608,7 @@ err:
 		BN_CTX_free(ctx);
 	}
 	if (buf != NULL) {
-		OPENSSL_cleanse(buf, num);
+		explicit_bzero(buf, num);
 		free(buf);
 	}
 	return r;
@@ -712,7 +713,7 @@ err:
 		BN_CTX_free(ctx);
 	}
 	if (buf != NULL) {
-		OPENSSL_cleanse(buf, num);
+		explicit_bzero(buf, num);
 		free(buf);
 	}
 	return r;

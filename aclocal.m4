@@ -1170,6 +1170,10 @@ AC_SUBST([am__tar])
 AC_SUBST([am__untar])
 ]) # _AM_PROG_TAR
 
+m4_include([m4/check-hardening-options.m4])
+m4_include([m4/check-libc.m4])
+m4_include([m4/check-os-options.m4])
+m4_include([m4/disable-compiler-warnings.m4])
 m4_include([m4/libtool.m4])
 m4_include([m4/ltoptions.m4])
 m4_include([m4/ltsugar.m4])

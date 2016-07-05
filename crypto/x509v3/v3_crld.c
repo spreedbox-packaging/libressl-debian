@@ -1,4 +1,4 @@
-/* $OpenBSD: v3_crld.c,v 1.15 2015/02/10 08:33:10 jsing Exp $ */
+/* $OpenBSD: v3_crld.c,v 1.18 2015/07/25 16:14:29 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -71,23 +71,37 @@ static int i2r_crldp(const X509V3_EXT_METHOD *method, void *pcrldp, BIO *out,
     int indent);
 
 const X509V3_EXT_METHOD v3_crld = {
-	NID_crl_distribution_points, 0, ASN1_ITEM_ref(CRL_DIST_POINTS),
-	0, 0, 0, 0,
-	0, 0,
-	0,
-	v2i_crld,
-	i2r_crldp, 0,
-	NULL
+	.ext_nid = NID_crl_distribution_points,
+	.ext_flags = 0,
+	.it = ASN1_ITEM_ref(CRL_DIST_POINTS),
+	.ext_new = NULL,
+	.ext_free = NULL,
+	.d2i = NULL,
+	.i2d = NULL,
+	.i2s = NULL,
+	.s2i = NULL,
+	.i2v = NULL,
+	.v2i = v2i_crld,
+	.i2r = i2r_crldp,
+	.r2i = NULL,
+	.usr_data = NULL,
 };
 
 const X509V3_EXT_METHOD v3_freshest_crl = {
-	NID_freshest_crl, 0, ASN1_ITEM_ref(CRL_DIST_POINTS),
-	0, 0, 0, 0,
-	0, 0,
-	0,
-	v2i_crld,
-	i2r_crldp, 0,
-	NULL
+	.ext_nid = NID_freshest_crl,
+	.ext_flags = 0,
+	.it = ASN1_ITEM_ref(CRL_DIST_POINTS),
+	.ext_new = NULL,
+	.ext_free = NULL,
+	.d2i = NULL,
+	.i2d = NULL,
+	.i2s = NULL,
+	.s2i = NULL,
+	.i2v = NULL,
+	.v2i = v2i_crld,
+	.i2r = i2r_crldp,
+	.r2i = NULL,
+	.usr_data = NULL,
 };
 
 static
@@ -374,10 +388,40 @@ dpn_cb(int operation, ASN1_VALUE **pval, const ASN1_ITEM *it, void *exarg)
 }
 
 
-ASN1_CHOICE_cb(DIST_POINT_NAME, dpn_cb) = {
-	ASN1_IMP_SEQUENCE_OF(DIST_POINT_NAME, name.fullname, GENERAL_NAME, 0),
-	ASN1_IMP_SET_OF(DIST_POINT_NAME, name.relativename, X509_NAME_ENTRY, 1)
-} ASN1_CHOICE_END_cb(DIST_POINT_NAME, DIST_POINT_NAME, type)
+static const ASN1_AUX DIST_POINT_NAME_aux = {
+	.app_data = NULL,
+	.flags = 0,
+	.ref_offset = 0,
+	.ref_lock = 0,
+	.asn1_cb = dpn_cb,
+	.enc_offset = 0,
+};
+static const ASN1_TEMPLATE DIST_POINT_NAME_ch_tt[] = {
+	{
+		.flags = ASN1_TFLG_IMPLICIT | ASN1_TFLG_SEQUENCE_OF,
+		.tag = 0,
+		.offset = offsetof(DIST_POINT_NAME, name.fullname),
+		.field_name = "name.fullname",
+		.item = &GENERAL_NAME_it,
+	},
+	{
+		.flags = ASN1_TFLG_IMPLICIT | ASN1_TFLG_SET_OF,
+		.tag = 1,
+		.offset = offsetof(DIST_POINT_NAME, name.relativename),
+		.field_name = "name.relativename",
+		.item = &X509_NAME_ENTRY_it,
+	},
+};
+
+const ASN1_ITEM DIST_POINT_NAME_it = {
+	.itype = ASN1_ITYPE_CHOICE,
+	.utype = offsetof(DIST_POINT_NAME, type),
+	.templates = DIST_POINT_NAME_ch_tt,
+	.tcount = sizeof(DIST_POINT_NAME_ch_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = &DIST_POINT_NAME_aux,
+	.size = sizeof(DIST_POINT_NAME),
+	.sname = "DIST_POINT_NAME",
+};
 
 
 
@@ -406,11 +450,39 @@ DIST_POINT_NAME_free(DIST_POINT_NAME *a)
 	ASN1_item_free((ASN1_VALUE *)a, &DIST_POINT_NAME_it);
 }
 
-ASN1_SEQUENCE(DIST_POINT) = {
-	ASN1_EXP_OPT(DIST_POINT, distpoint, DIST_POINT_NAME, 0),
-	ASN1_IMP_OPT(DIST_POINT, reasons, ASN1_BIT_STRING, 1),
-	ASN1_IMP_SEQUENCE_OF_OPT(DIST_POINT, CRLissuer, GENERAL_NAME, 2)
-} ASN1_SEQUENCE_END(DIST_POINT)
+static const ASN1_TEMPLATE DIST_POINT_seq_tt[] = {
+	{
+		.flags = ASN1_TFLG_EXPLICIT | ASN1_TFLG_OPTIONAL,
+		.tag = 0,
+		.offset = offsetof(DIST_POINT, distpoint),
+		.field_name = "distpoint",
+		.item = &DIST_POINT_NAME_it,
+	},
+	{
+		.flags = ASN1_TFLG_IMPLICIT | ASN1_TFLG_OPTIONAL,
+		.tag = 1,
+		.offset = offsetof(DIST_POINT, reasons),
+		.field_name = "reasons",
+		.item = &ASN1_BIT_STRING_it,
+	},
+	{
+		.flags = ASN1_TFLG_IMPLICIT | ASN1_TFLG_SEQUENCE_OF | ASN1_TFLG_OPTIONAL,
+		.tag = 2,
+		.offset = offsetof(DIST_POINT, CRLissuer),
+		.field_name = "CRLissuer",
+		.item = &GENERAL_NAME_it,
+	},
+};
+
+const ASN1_ITEM DIST_POINT_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = DIST_POINT_seq_tt,
+	.tcount = sizeof(DIST_POINT_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(DIST_POINT),
+	.sname = "DIST_POINT",
+};
 
 
 DIST_POINT *
@@ -438,10 +510,23 @@ DIST_POINT_free(DIST_POINT *a)
 	ASN1_item_free((ASN1_VALUE *)a, &DIST_POINT_it);
 }
 
-ASN1_ITEM_TEMPLATE(CRL_DIST_POINTS) =
-    ASN1_EX_TEMPLATE_TYPE(ASN1_TFLG_SEQUENCE_OF, 0, CRLDistributionPoints,
-	DIST_POINT)
-ASN1_ITEM_TEMPLATE_END(CRL_DIST_POINTS)
+static const ASN1_TEMPLATE CRL_DIST_POINTS_item_tt = {
+	.flags = ASN1_TFLG_SEQUENCE_OF,
+	.tag = 0,
+	.offset = 0,
+	.field_name = "CRLDistributionPoints",
+	.item = &DIST_POINT_it,
+};
+
+const ASN1_ITEM CRL_DIST_POINTS_it = {
+	.itype = ASN1_ITYPE_PRIMITIVE,
+	.utype = -1,
+	.templates = &CRL_DIST_POINTS_item_tt,
+	.tcount = 0,
+	.funcs = NULL,
+	.size = 0,
+	.sname = "CRL_DIST_POINTS",
+};
 
 
 CRL_DIST_POINTS *
@@ -469,14 +554,60 @@ CRL_DIST_POINTS_free(CRL_DIST_POINTS *a)
 	ASN1_item_free((ASN1_VALUE *)a, &CRL_DIST_POINTS_it);
 }
 
-ASN1_SEQUENCE(ISSUING_DIST_POINT) = {
-	ASN1_EXP_OPT(ISSUING_DIST_POINT, distpoint, DIST_POINT_NAME, 0),
-	ASN1_IMP_OPT(ISSUING_DIST_POINT, onlyuser, ASN1_FBOOLEAN, 1),
-	ASN1_IMP_OPT(ISSUING_DIST_POINT, onlyCA, ASN1_FBOOLEAN, 2),
-	ASN1_IMP_OPT(ISSUING_DIST_POINT, onlysomereasons, ASN1_BIT_STRING, 3),
-	ASN1_IMP_OPT(ISSUING_DIST_POINT, indirectCRL, ASN1_FBOOLEAN, 4),
-	ASN1_IMP_OPT(ISSUING_DIST_POINT, onlyattr, ASN1_FBOOLEAN, 5)
-} ASN1_SEQUENCE_END(ISSUING_DIST_POINT)
+static const ASN1_TEMPLATE ISSUING_DIST_POINT_seq_tt[] = {
+	{
+		.flags = ASN1_TFLG_EXPLICIT | ASN1_TFLG_OPTIONAL,
+		.tag = 0,
+		.offset = offsetof(ISSUING_DIST_POINT, distpoint),
+		.field_name = "distpoint",
+		.item = &DIST_POINT_NAME_it,
+	},
+	{
+		.flags = ASN1_TFLG_IMPLICIT | ASN1_TFLG_OPTIONAL,
+		.tag = 1,
+		.offset = offsetof(ISSUING_DIST_POINT, onlyuser),
+		.field_name = "onlyuser",
+		.item = &ASN1_FBOOLEAN_it,
+	},
+	{
+		.flags = ASN1_TFLG_IMPLICIT | ASN1_TFLG_OPTIONAL,
+		.tag = 2,
+		.offset = offsetof(ISSUING_DIST_POINT, onlyCA),
+		.field_name = "onlyCA",
+		.item = &ASN1_FBOOLEAN_it,
+	},
+	{
+		.flags = ASN1_TFLG_IMPLICIT | ASN1_TFLG_OPTIONAL,
+		.tag = 3,
+		.offset = offsetof(ISSUING_DIST_POINT, onlysomereasons),
+		.field_name = "onlysomereasons",
+		.item = &ASN1_BIT_STRING_it,
+	},
+	{
+		.flags = ASN1_TFLG_IMPLICIT | ASN1_TFLG_OPTIONAL,
+		.tag = 4,
+		.offset = offsetof(ISSUING_DIST_POINT, indirectCRL),
+		.field_name = "indirectCRL",
+		.item = &ASN1_FBOOLEAN_it,
+	},
+	{
+		.flags = ASN1_TFLG_IMPLICIT | ASN1_TFLG_OPTIONAL,
+		.tag = 5,
+		.offset = offsetof(ISSUING_DIST_POINT, onlyattr),
+		.field_name = "onlyattr",
+		.item = &ASN1_FBOOLEAN_it,
+	},
+};
+
+const ASN1_ITEM ISSUING_DIST_POINT_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = ISSUING_DIST_POINT_seq_tt,
+	.tcount = sizeof(ISSUING_DIST_POINT_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(ISSUING_DIST_POINT),
+	.sname = "ISSUING_DIST_POINT",
+};
 
 
 ISSUING_DIST_POINT *

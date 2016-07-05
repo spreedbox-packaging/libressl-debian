@@ -183,12 +183,12 @@ _mul_1x1:
 	movq	(%rsp,%rdi,8),%rcx
 	movq	%rcx,%rbx
 	shlq	$60,%rcx
-.byte	102,72,15,126,198
+	movd	%xmm0,%rsi
 	shrq	$4,%rbx
 	xorq	%rcx,%rax
 	psrldq	$8,%xmm0
 	xorq	%rbx,%rdx
-.byte	102,72,15,126,199
+	movd	%xmm0,%rdi
 	xorq	%rsi,%rax
 	xorq	%rdi,%rdx
 
@@ -205,10 +205,10 @@ _bn_GF2m_mul_2x2:
 	btq	$33,%rax
 	jnc	L$vanilla_mul_2x2
 
-.byte	102,72,15,110,198
-.byte	102,72,15,110,201
-.byte	102,72,15,110,210
-.byte	102,73,15,110,216
+	movd	%rsi,%xmm0
+	movd	%rcx,%xmm1
+	movd	%rdx,%xmm2
+	movd	%r8,%xmm3
 	movdqa	%xmm0,%xmm4
 	movdqa	%xmm1,%xmm5
 .byte	102,15,58,68,193,0

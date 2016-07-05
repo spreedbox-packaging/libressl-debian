@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_print.c,v 1.22 2014/07/11 08:44:48 jsing Exp $ */
+/* $OpenBSD: bn_print.c,v 1.28 2015/09/28 18:58:33 deraadt Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -57,6 +57,7 @@
  */
 
 #include <ctype.h>
+#include <limits.h>
 #include <stdio.h>
 
 #include <openssl/opensslconf.h>
@@ -77,23 +78,23 @@ BN_bn2hex(const BIGNUM *a)
 	char *buf;
 	char *p;
 
-	buf = malloc(a->top * BN_BYTES * 2 + 2);
+	buf = malloc(BN_is_negative(a) + a->top * BN_BYTES * 2 + 2);
 	if (buf == NULL) {
 		BNerr(BN_F_BN_BN2HEX, ERR_R_MALLOC_FAILURE);
 		goto err;
 	}
 	p = buf;
-	if (a->neg)
-		*(p++) = '-';
+	if (BN_is_negative(a))
+		*p++ = '-';
 	if (BN_is_zero(a))
-		*(p++) = '0';
+		*p++ = '0';
 	for (i = a->top - 1; i >=0; i--) {
 		for (j = BN_BITS2 - 8; j >= 0; j -= 8) {
 			/* strip leading zeros */
 			v = ((int)(a->d[i] >> (long)j)) & 0xff;
 			if (z || (v != 0)) {
-				*(p++) = Hex[v >> 4];
-				*(p++) = Hex[v & 0x0f];
+				*p++ = Hex[v >> 4];
+				*p++ = Hex[v & 0x0f];
 				z = 1;
 			}
 		}
@@ -114,6 +115,20 @@ BN_bn2dec(const BIGNUM *a)
 	BIGNUM *t = NULL;
 	BN_ULONG *bn_data = NULL, *lp;
 
+	if (BN_is_zero(a)) {
+		buf = malloc(BN_is_negative(a) + 2);
+		if (buf == NULL) {
+			BNerr(BN_F_BN_BN2DEC, ERR_R_MALLOC_FAILURE);
+			goto err;
+		}
+		p = buf;
+		if (BN_is_negative(a))
+			*p++ = '-';
+		*p++ = '0';
+		*p++ = '\0';
+		return (buf);
+	}
+
 	/* get an upper bound for the length of the decimal integer
 	 * num <= (BN_num_bits(a) + 1) * log(2)
 	 *     <= 3 * BN_num_bits(a) * 0.1001 + log(2) + 1     (rounding error)
@@ -133,31 +148,26 @@ BN_bn2dec(const BIGNUM *a)
 #define BUF_REMAIN (num+3 - (size_t)(p - buf))
 	p = buf;
 	lp = bn_data;
-	if (BN_is_zero(t)) {
-		*(p++) = '0';
-		*(p++) = '\0';
-	} else {
-		if (BN_is_negative(t))
-			*p++ = '-';
+	if (BN_is_negative(t))
+		*p++ = '-';
 
-		i = 0;
-		while (!BN_is_zero(t)) {
-			*lp = BN_div_word(t, BN_DEC_CONV);
-			lp++;
-		}
+	i = 0;
+	while (!BN_is_zero(t)) {
+		*lp = BN_div_word(t, BN_DEC_CONV);
+		lp++;
+	}
+	lp--;
+	/* We now have a series of blocks, BN_DEC_NUM chars
+	 * in length, where the last one needs truncation.
+	 * The blocks need to be reversed in order. */
+	snprintf(p, BUF_REMAIN, BN_DEC_FMT1, *lp);
+	while (*p)
+		p++;
+	while (lp != bn_data) {
 		lp--;
-		/* We now have a series of blocks, BN_DEC_NUM chars
-		 * in length, where the last one needs truncation.
-		 * The blocks need to be reversed in order. */
-		snprintf(p, BUF_REMAIN, BN_DEC_FMT1, *lp);
+		snprintf(p, BUF_REMAIN, BN_DEC_FMT2, *lp);
 		while (*p)
 			p++;
-		while (lp != bn_data) {
-			lp--;
-			snprintf(p, BUF_REMAIN, BN_DEC_FMT2, *lp);
-			while (*p)
-				p++;
-		}
 	}
 	ok = 1;
 
@@ -188,8 +198,10 @@ BN_hex2bn(BIGNUM **bn, const char *a)
 		a++;
 	}
 
-	for (i = 0; isxdigit((unsigned char)a[i]); i++)
+	for (i = 0; i <= (INT_MAX / 4) && isxdigit((unsigned char)a[i]); i++)
 		;
+	if (i > INT_MAX / 4)
+		goto err;
 
 	num = i + neg;
 	if (bn == NULL)
@@ -204,7 +216,7 @@ BN_hex2bn(BIGNUM **bn, const char *a)
 		BN_zero(ret);
 	}
 
-	/* i is the number of hex digests; */
+	/* i is the number of hex digits */
 	if (bn_expand(ret, i * 4) == NULL)
 		goto err;
 
@@ -262,8 +274,10 @@ BN_dec2bn(BIGNUM **bn, const char *a)
 		a++;
 	}
 
-	for (i = 0; isdigit((unsigned char)a[i]); i++)
+	for (i = 0; i <= (INT_MAX / 4) && isdigit((unsigned char)a[i]); i++)
 		;
+	if (i > INT_MAX / 4)
+		goto err;
 
 	num = i + neg;
 	if (bn == NULL)
@@ -279,7 +293,7 @@ BN_dec2bn(BIGNUM **bn, const char *a)
 		BN_zero(ret);
 	}
 
-	/* i is the number of digests, a bit of an over expand; */
+	/* i is the number of digits, a bit of an over expand */
 	if (bn_expand(ret, i * 4) == NULL)
 		goto err;
 

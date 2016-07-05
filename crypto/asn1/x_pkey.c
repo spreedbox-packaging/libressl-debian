@@ -1,4 +1,4 @@
-/* $OpenBSD: x_pkey.c,v 1.14 2014/07/11 08:44:47 jsing Exp $ */
+/* $OpenBSD: x_pkey.c,v 1.18 2015/07/27 12:53:56 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -59,51 +59,10 @@
 #include <stdio.h>
 #include <string.h>
 
-#include <openssl/asn1_mac.h>
 #include <openssl/err.h>
 #include <openssl/evp.h>
 #include <openssl/objects.h>
 #include <openssl/x509.h>
-
-/* need to implement */
-int
-i2d_X509_PKEY(X509_PKEY *a, unsigned char **pp)
-{
-	return (0);
-}
-
-X509_PKEY *
-d2i_X509_PKEY(X509_PKEY **a, const unsigned char **pp, long length)
-{
-	int i;
-	M_ASN1_D2I_vars(a, X509_PKEY *, X509_PKEY_new);
-
-	M_ASN1_D2I_Init();
-	M_ASN1_D2I_start_sequence();
-	M_ASN1_D2I_get_x(X509_ALGOR, ret->enc_algor, d2i_X509_ALGOR);
-	M_ASN1_D2I_get_x(ASN1_OCTET_STRING, ret->enc_pkey,
-	    d2i_ASN1_OCTET_STRING);
-
-	ret->cipher.cipher = EVP_get_cipherbyname(
-	    OBJ_nid2ln(OBJ_obj2nid(ret->enc_algor->algorithm)));
-	if (ret->cipher.cipher == NULL) {
-		c.error = ASN1_R_UNSUPPORTED_CIPHER;
-		c.line = __LINE__;
-		goto err;
-	}
-	if (ret->enc_algor->parameter->type == V_ASN1_OCTET_STRING) {
-		i = ret->enc_algor->parameter->value.octet_string->length;
-		if (i > EVP_MAX_IV_LENGTH) {
-			c.error = ASN1_R_IV_TOO_LARGE;
-			c.line = __LINE__;
-			goto err;
-		}
-		memcpy(ret->cipher.iv,
-		    ret->enc_algor->parameter->value.octet_string->data, i);
-	} else
-		memset(ret->cipher.iv, 0, EVP_MAX_IV_LENGTH);
-	M_ASN1_D2I_Finish(a, X509_PKEY_free, ASN1_F_D2I_X509_PKEY);
-}
 
 X509_PKEY *
 X509_PKEY_new(void)
@@ -111,19 +70,17 @@ X509_PKEY_new(void)
 	X509_PKEY *ret = NULL;
 
 	if ((ret = malloc(sizeof(X509_PKEY))) == NULL) {
-		ASN1_MAC_H_err(ASN1_F_X509_PKEY_NEW, ERR_R_MALLOC_FAILURE,
-		    __LINE__);
-		return NULL;
+		ASN1err(ASN1_F_X509_PKEY_NEW, ERR_R_MALLOC_FAILURE);
+		goto err;
 	}
 	ret->version = 0;
 	if ((ret->enc_algor = X509_ALGOR_new()) == NULL) {
-		free(ret);
-		return NULL;
+		ASN1err(ASN1_F_X509_PKEY_NEW, ERR_R_MALLOC_FAILURE);
+		goto err;
 	}
-	if ((ret->enc_pkey = M_ASN1_OCTET_STRING_new()) == NULL) {
-		X509_ALGOR_free(ret->enc_algor);
-		free(ret);
-		return NULL;
+	if ((ret->enc_pkey = ASN1_OCTET_STRING_new()) == NULL) {
+		ASN1err(ASN1_F_X509_PKEY_NEW, ERR_R_MALLOC_FAILURE);
+		goto err;
 	}
 	ret->dec_pkey = NULL;
 	ret->key_length = 0;
@@ -133,6 +90,13 @@ X509_PKEY_new(void)
 	memset(ret->cipher.iv, 0, EVP_MAX_IV_LENGTH);
 	ret->references = 1;
 	return (ret);
+
+err:
+	if (ret) {
+		X509_ALGOR_free(ret->enc_algor);
+		free(ret);
+	}
+	return NULL;
 }
 
 void
@@ -149,7 +113,7 @@ X509_PKEY_free(X509_PKEY *x)
 
 	if (x->enc_algor != NULL)
 		X509_ALGOR_free(x->enc_algor);
-	M_ASN1_OCTET_STRING_free(x->enc_pkey);
+	ASN1_OCTET_STRING_free(x->enc_pkey);
 	EVP_PKEY_free(x->dec_pkey);
 	if ((x->key_data != NULL) && (x->key_free))
 		free(x->key_data);

@@ -69,6 +69,18 @@
 extern "C" {
 #endif
 
+#if defined(_WIN32) && defined(__WINCRYPT_H__)
+#ifndef LIBRESSL_INTERNAL
+#ifdef _MSC_VER
+#pragma message("Warning, overriding WinCrypt defines")
+#else
+#warning overriding WinCrypt defines
+#endif
+#endif
+#undef PKCS7_ISSUER_AND_SERIAL
+#undef PKCS7_SIGNER_INFO
+#endif
+
 /*
 Encryption_ID		DES-CBC
 Digest_ID		MD5

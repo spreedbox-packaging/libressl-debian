@@ -1,4 +1,4 @@
-/* $OpenBSD: v3_info.c,v 1.20 2015/02/07 13:19:15 doug Exp $ */
+/* $OpenBSD: v3_info.c,v 1.22 2015/07/25 16:00:14 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -72,31 +72,65 @@ static AUTHORITY_INFO_ACCESS *v2i_AUTHORITY_INFO_ACCESS(
     X509V3_EXT_METHOD *method, X509V3_CTX *ctx, STACK_OF(CONF_VALUE) *nval);
 
 const X509V3_EXT_METHOD v3_info = {
-	NID_info_access, X509V3_EXT_MULTILINE,
-	ASN1_ITEM_ref(AUTHORITY_INFO_ACCESS),
-	0, 0, 0, 0,
-	0, 0,
-	(X509V3_EXT_I2V)i2v_AUTHORITY_INFO_ACCESS,
-	(X509V3_EXT_V2I)v2i_AUTHORITY_INFO_ACCESS,
-	0, 0,
-	NULL
+	.ext_nid = NID_info_access,
+	.ext_flags = X509V3_EXT_MULTILINE,
+	.it = ASN1_ITEM_ref(AUTHORITY_INFO_ACCESS),
+	.ext_new = NULL,
+	.ext_free = NULL,
+	.d2i = NULL,
+	.i2d = NULL,
+	.i2s = NULL,
+	.s2i = NULL,
+	.i2v = (X509V3_EXT_I2V)i2v_AUTHORITY_INFO_ACCESS,
+	.v2i = (X509V3_EXT_V2I)v2i_AUTHORITY_INFO_ACCESS,
+	.i2r = NULL,
+	.r2i = NULL,
+	.usr_data = NULL,
 };
 
 const X509V3_EXT_METHOD v3_sinfo = {
-	NID_sinfo_access, X509V3_EXT_MULTILINE,
-	ASN1_ITEM_ref(AUTHORITY_INFO_ACCESS),
-	0, 0, 0, 0,
-	0, 0,
-	(X509V3_EXT_I2V)i2v_AUTHORITY_INFO_ACCESS,
-	(X509V3_EXT_V2I)v2i_AUTHORITY_INFO_ACCESS,
-	0, 0,
-	NULL
+	.ext_nid = NID_sinfo_access,
+	.ext_flags = X509V3_EXT_MULTILINE,
+	.it = ASN1_ITEM_ref(AUTHORITY_INFO_ACCESS),
+	.ext_new = NULL,
+	.ext_free = NULL,
+	.d2i = NULL,
+	.i2d = NULL,
+	.i2s = NULL,
+	.s2i = NULL,
+	.i2v = (X509V3_EXT_I2V)i2v_AUTHORITY_INFO_ACCESS,
+	.v2i = (X509V3_EXT_V2I)v2i_AUTHORITY_INFO_ACCESS,
+	.i2r = NULL,
+	.r2i = NULL,
+	.usr_data = NULL,
 };
 
-ASN1_SEQUENCE(ACCESS_DESCRIPTION) = {
-	ASN1_SIMPLE(ACCESS_DESCRIPTION, method, ASN1_OBJECT),
-	ASN1_SIMPLE(ACCESS_DESCRIPTION, location, GENERAL_NAME)
-} ASN1_SEQUENCE_END(ACCESS_DESCRIPTION)
+static const ASN1_TEMPLATE ACCESS_DESCRIPTION_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(ACCESS_DESCRIPTION, method),
+		.field_name = "method",
+		.item = &ASN1_OBJECT_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(ACCESS_DESCRIPTION, location),
+		.field_name = "location",
+		.item = &GENERAL_NAME_it,
+	},
+};
+
+const ASN1_ITEM ACCESS_DESCRIPTION_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = ACCESS_DESCRIPTION_seq_tt,
+	.tcount = sizeof(ACCESS_DESCRIPTION_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(ACCESS_DESCRIPTION),
+	.sname = "ACCESS_DESCRIPTION",
+};
 
 
 ACCESS_DESCRIPTION *
@@ -124,10 +158,23 @@ ACCESS_DESCRIPTION_free(ACCESS_DESCRIPTION *a)
 	ASN1_item_free((ASN1_VALUE *)a, &ACCESS_DESCRIPTION_it);
 }
 
-ASN1_ITEM_TEMPLATE(AUTHORITY_INFO_ACCESS) =
-    ASN1_EX_TEMPLATE_TYPE(ASN1_TFLG_SEQUENCE_OF, 0, GeneralNames,
-	ACCESS_DESCRIPTION)
-ASN1_ITEM_TEMPLATE_END(AUTHORITY_INFO_ACCESS)
+static const ASN1_TEMPLATE AUTHORITY_INFO_ACCESS_item_tt = {
+	.flags = ASN1_TFLG_SEQUENCE_OF,
+	.tag = 0,
+	.offset = 0,
+	.field_name = "GeneralNames",
+	.item = &ACCESS_DESCRIPTION_it,
+};
+
+const ASN1_ITEM AUTHORITY_INFO_ACCESS_it = {
+	.itype = ASN1_ITYPE_PRIMITIVE,
+	.utype = -1,
+	.templates = &AUTHORITY_INFO_ACCESS_item_tt,
+	.tcount = 0,
+	.funcs = NULL,
+	.size = 0,
+	.sname = "AUTHORITY_INFO_ACCESS",
+};
 
 
 AUTHORITY_INFO_ACCESS *

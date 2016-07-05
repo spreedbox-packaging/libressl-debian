@@ -1,4 +1,4 @@
-/* $OpenBSD: v3_alt.c,v 1.21 2014/07/11 08:44:49 jsing Exp $ */
+/* $OpenBSD: v3_alt.c,v 1.24 2015/07/29 16:13:48 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
  */
@@ -74,27 +74,52 @@ static int do_dirname(GENERAL_NAME *gen, char *value, X509V3_CTX *ctx);
 
 const X509V3_EXT_METHOD v3_alt[] = {
 	{
-		NID_subject_alt_name, 0, ASN1_ITEM_ref(GENERAL_NAMES),
-		0, 0, 0, 0,
-		0, 0,
-		(X509V3_EXT_I2V)i2v_GENERAL_NAMES,
-		(X509V3_EXT_V2I)v2i_subject_alt,
-		NULL, NULL, NULL
+		.ext_nid = NID_subject_alt_name,
+		.ext_flags = 0,
+		.it = ASN1_ITEM_ref(GENERAL_NAMES),
+		.ext_new = NULL,
+		.ext_free = NULL,
+		.d2i = NULL,
+		.i2d = NULL,
+		.i2s = NULL,
+		.s2i = NULL,
+		.i2v = (X509V3_EXT_I2V)i2v_GENERAL_NAMES,
+		.v2i = (X509V3_EXT_V2I)v2i_subject_alt,
+		.i2r = NULL,
+		.r2i = NULL,
+		.usr_data = NULL,
 	},
 	{
-		NID_issuer_alt_name, 0, ASN1_ITEM_ref(GENERAL_NAMES),
-		0, 0, 0, 0,
-		0, 0,
-		(X509V3_EXT_I2V)i2v_GENERAL_NAMES,
-		(X509V3_EXT_V2I)v2i_issuer_alt,
-		NULL, NULL, NULL
+		.ext_nid = NID_issuer_alt_name,
+		.ext_flags = 0,
+		.it = ASN1_ITEM_ref(GENERAL_NAMES),
+		.ext_new = NULL,
+		.ext_free = NULL,
+		.d2i = NULL,
+		.i2d = NULL,
+		.i2s = NULL,
+		.s2i = NULL,
+		.i2v = (X509V3_EXT_I2V)i2v_GENERAL_NAMES,
+		.v2i = (X509V3_EXT_V2I)v2i_issuer_alt,
+		.i2r = NULL,
+		.r2i = NULL,
+		.usr_data = NULL,
 	},
 	{
-		NID_certificate_issuer, 0, ASN1_ITEM_ref(GENERAL_NAMES),
-		0, 0, 0, 0,
-		0, 0,
-		(X509V3_EXT_I2V)i2v_GENERAL_NAMES,
-		NULL, NULL, NULL, NULL
+		.ext_nid = NID_certificate_issuer,
+		.ext_flags = 0,
+		.it = ASN1_ITEM_ref(GENERAL_NAMES),
+		.ext_new = NULL,
+		.ext_free = NULL,
+		.d2i = NULL,
+		.i2d = NULL,
+		.i2s = NULL,
+		.s2i = NULL,
+		.i2v = (X509V3_EXT_I2V)i2v_GENERAL_NAMES,
+		.v2i = NULL,
+		.i2r = NULL,
+		.r2i = NULL,
+		.usr_data = NULL,
 	},
 };
 
@@ -390,7 +415,7 @@ copy_email(X509V3_CTX *ctx, GENERAL_NAMES *gens, int move_p)
 	while ((i = X509_NAME_get_index_by_NID(nm,
 	    NID_pkcs9_emailAddress, i)) >= 0) {
 		ne = X509_NAME_get_entry(nm, i);
-		email = M_ASN1_IA5STRING_dup(X509_NAME_ENTRY_get_data(ne));
+		email = ASN1_STRING_dup(X509_NAME_ENTRY_get_data(ne));
 		if (move_p) {
 			X509_NAME_delete_entry(nm, i);
 			X509_NAME_ENTRY_free(ne);
@@ -414,7 +439,7 @@ copy_email(X509V3_CTX *ctx, GENERAL_NAMES *gens, int move_p)
 
 err:
 	GENERAL_NAME_free(gen);
-	M_ASN1_IA5STRING_free(email);
+	ASN1_IA5STRING_free(email);
 	return 0;
 }
 
@@ -532,7 +557,7 @@ a2i_GENERAL_NAME(GENERAL_NAME *out, const X509V3_EXT_METHOD *method,
 	}
 
 	if (is_string) {
-		if (!(gen->d.ia5 = M_ASN1_IA5STRING_new()) ||
+		if (!(gen->d.ia5 = ASN1_IA5STRING_new()) ||
 		    !ASN1_STRING_set(gen->d.ia5, (unsigned char*)value,
 			strlen(value))) {
 			X509V3err(X509V3_F_A2I_GENERAL_NAME,

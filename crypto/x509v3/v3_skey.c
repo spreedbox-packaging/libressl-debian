@@ -1,4 +1,4 @@
-/* $OpenBSD: v3_skey.c,v 1.9 2014/07/10 13:58:23 jsing Exp $ */
+/* $OpenBSD: v3_skey.c,v 1.12 2015/07/29 16:13:49 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -64,13 +64,22 @@
 
 static ASN1_OCTET_STRING *s2i_skey_id(X509V3_EXT_METHOD *method,
     X509V3_CTX *ctx, char *str);
+
 const X509V3_EXT_METHOD v3_skey_id = {
-	NID_subject_key_identifier, 0, ASN1_ITEM_ref(ASN1_OCTET_STRING),
-	0, 0, 0, 0,
-	(X509V3_EXT_I2S)i2s_ASN1_OCTET_STRING,
-	(X509V3_EXT_S2I)s2i_skey_id,
-	0, 0, 0, 0,
-	NULL
+	.ext_nid = NID_subject_key_identifier,
+	.ext_flags = 0,
+	.it = ASN1_ITEM_ref(ASN1_OCTET_STRING),
+	.ext_new = NULL,
+	.ext_free = NULL,
+	.d2i = NULL,
+	.i2d = NULL,
+	.i2s = (X509V3_EXT_I2S)i2s_ASN1_OCTET_STRING,
+	.s2i = (X509V3_EXT_S2I)s2i_skey_id,
+	.i2v = NULL,
+	.v2i = NULL,
+	.i2r = NULL,
+	.r2i = NULL,
+	.usr_data = NULL,
 };
 
 char *
@@ -85,13 +94,13 @@ s2i_ASN1_OCTET_STRING(X509V3_EXT_METHOD *method, X509V3_CTX *ctx, char *str)
 	ASN1_OCTET_STRING *oct;
 	long length;
 
-	if (!(oct = M_ASN1_OCTET_STRING_new())) {
+	if (!(oct = ASN1_OCTET_STRING_new())) {
 		X509V3err(X509V3_F_S2I_ASN1_OCTET_STRING, ERR_R_MALLOC_FAILURE);
 		return NULL;
 	}
 
 	if (!(oct->data = string_to_hex(str, &length))) {
-		M_ASN1_OCTET_STRING_free(oct);
+		ASN1_OCTET_STRING_free(oct);
 		return NULL;
 	}
 
@@ -111,7 +120,7 @@ s2i_skey_id(X509V3_EXT_METHOD *method, X509V3_CTX *ctx, char *str)
 	if (strcmp(str, "hash"))
 		return s2i_ASN1_OCTET_STRING(method, ctx, str);
 
-	if (!(oct = M_ASN1_OCTET_STRING_new())) {
+	if (!(oct = ASN1_OCTET_STRING_new())) {
 		X509V3err(X509V3_F_S2I_SKEY_ID, ERR_R_MALLOC_FAILURE);
 		return NULL;
 	}
@@ -138,7 +147,7 @@ s2i_skey_id(X509V3_EXT_METHOD *method, X509V3_CTX *ctx, char *str)
 	    EVP_sha1(), NULL))
 		goto err;
 
-	if (!M_ASN1_OCTET_STRING_set(oct, pkey_dig, diglen)) {
+	if (!ASN1_STRING_set(oct, pkey_dig, diglen)) {
 		X509V3err(X509V3_F_S2I_SKEY_ID, ERR_R_MALLOC_FAILURE);
 		goto err;
 	}
@@ -146,6 +155,6 @@ s2i_skey_id(X509V3_EXT_METHOD *method, X509V3_CTX *ctx, char *str)
 	return oct;
 
 err:
-	M_ASN1_OCTET_STRING_free(oct);
+	ASN1_OCTET_STRING_free(oct);
 	return NULL;
 }

@@ -133,6 +133,7 @@
 /* Define globals.  They are protected by a lock */
 static void (*savsig[NX509_SIG])(int );
 
+DWORD console_mode;
 static FILE *tty_in, *tty_out;
 static int is_a_tty;
 
@@ -285,7 +286,7 @@ error:
 	if (ps >= 1)
 		popsig();
 
-	OPENSSL_cleanse(result, BUFSIZ);
+	explicit_bzero(result, BUFSIZ);
 	return ok;
 }
 
@@ -300,16 +301,25 @@ open_console(UI *ui)
 	tty_in = stdin;
 	tty_out = stderr;
 
-	return 1;
+	HANDLE handle = GetStdHandle(STD_INPUT_HANDLE);
+	if (handle != NULL && handle != INVALID_HANDLE_VALUE) {
+		if (GetFileType(handle) == FILE_TYPE_CHAR)
+			return GetConsoleMode(handle, &console_mode);
+		else
+			return 1;
+	}
+	return 0;
 }
 
 static int
 noecho_console(UI *ui)
 {
-	DWORD mode = 0;
 	HANDLE handle = GetStdHandle(STD_INPUT_HANDLE);
-	if (handle != INVALID_HANDLE_VALUE && handle != handle) {
-		return GetConsoleMode(handle, &mode) && SetConsoleMode(handle, mode & (~ENABLE_ECHO_INPUT));
+	if (handle != NULL && handle != INVALID_HANDLE_VALUE) {
+		if (GetFileType(handle) == FILE_TYPE_CHAR)
+			return SetConsoleMode(handle, console_mode & ~ENABLE_ECHO_INPUT);
+		else
+			return 1;
 	}
 	return 0;
 }
@@ -317,10 +327,12 @@ noecho_console(UI *ui)
 static int
 echo_console(UI *ui)
 {
-	DWORD mode = 0;
 	HANDLE handle = GetStdHandle(STD_INPUT_HANDLE);
-	if (handle != INVALID_HANDLE_VALUE && handle != handle) {
-		return GetConsoleMode(handle, &mode) && SetConsoleMode(handle, mode | ENABLE_ECHO_INPUT);
+	if (handle != NULL && handle != INVALID_HANDLE_VALUE) {
+		if (GetFileType(handle) == FILE_TYPE_CHAR)
+			return SetConsoleMode(handle, console_mode);
+		else
+			return 1;
 	}
 	return 0;
 }

@@ -1,4 +1,4 @@
-/* $OpenBSD: ec_asn1.c,v 1.12 2015/02/10 05:43:09 jsing Exp $ */
+/* $OpenBSD: ec_asn1.c,v 1.21 2015/10/16 15:15:39 jsing Exp $ */
 /*
  * Written by Nils Larsch for the OpenSSL project.
  */
@@ -198,13 +198,42 @@ typedef struct ec_privatekey_st {
 } EC_PRIVATEKEY;
 
 /* the OpenSSL ASN.1 definitions */
-ASN1_SEQUENCE(X9_62_PENTANOMIAL) = {
-	ASN1_SIMPLE(X9_62_PENTANOMIAL, k1, LONG),
-	ASN1_SIMPLE(X9_62_PENTANOMIAL, k2, LONG),
-	ASN1_SIMPLE(X9_62_PENTANOMIAL, k3, LONG)
-} ASN1_SEQUENCE_END(X9_62_PENTANOMIAL)
+static const ASN1_TEMPLATE X9_62_PENTANOMIAL_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(X9_62_PENTANOMIAL, k1),
+		.field_name = "k1",
+		.item = &LONG_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(X9_62_PENTANOMIAL, k2),
+		.field_name = "k2",
+		.item = &LONG_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(X9_62_PENTANOMIAL, k3),
+		.field_name = "k3",
+		.item = &LONG_it,
+	},
+};
 
-DECLARE_ASN1_ALLOC_FUNCTIONS(X9_62_PENTANOMIAL)
+const ASN1_ITEM X9_62_PENTANOMIAL_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = X9_62_PENTANOMIAL_seq_tt,
+	.tcount = sizeof(X9_62_PENTANOMIAL_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(X9_62_PENTANOMIAL),
+	.sname = "X9_62_PENTANOMIAL",
+};
+
+X9_62_PENTANOMIAL *X9_62_PENTANOMIAL_new(void);
+void X9_62_PENTANOMIAL_free(X9_62_PENTANOMIAL *a);
 
 X9_62_PENTANOMIAL *
 X9_62_PENTANOMIAL_new(void)
@@ -218,20 +247,95 @@ X9_62_PENTANOMIAL_free(X9_62_PENTANOMIAL *a)
 	ASN1_item_free((ASN1_VALUE *)a, &X9_62_PENTANOMIAL_it);
 }
 
-ASN1_ADB_TEMPLATE(char_two_def) = ASN1_SIMPLE(X9_62_CHARACTERISTIC_TWO, p.other, ASN1_ANY);
+static const ASN1_TEMPLATE char_two_def_tt = {
+	.flags = 0,
+	.tag = 0,
+	.offset = offsetof(X9_62_CHARACTERISTIC_TWO, p.other),
+	.field_name = "p.other",
+	.item = &ASN1_ANY_it,
+};
 
-ASN1_ADB(X9_62_CHARACTERISTIC_TWO) = {
-	ADB_ENTRY(NID_X9_62_onBasis, ASN1_SIMPLE(X9_62_CHARACTERISTIC_TWO, p.onBasis, ASN1_NULL)),
-	ADB_ENTRY(NID_X9_62_tpBasis, ASN1_SIMPLE(X9_62_CHARACTERISTIC_TWO, p.tpBasis, ASN1_INTEGER)),
-	ADB_ENTRY(NID_X9_62_ppBasis, ASN1_SIMPLE(X9_62_CHARACTERISTIC_TWO, p.ppBasis, X9_62_PENTANOMIAL))
-} ASN1_ADB_END(X9_62_CHARACTERISTIC_TWO, 0, type, 0, &char_two_def_tt, NULL);
+static const ASN1_ADB_TABLE X9_62_CHARACTERISTIC_TWO_adbtbl[] = {
+	{
+		.value = NID_X9_62_onBasis,
+		.tt = {
+			.flags = 0,
+			.tag = 0,
+			.offset = offsetof(X9_62_CHARACTERISTIC_TWO, p.onBasis),
+			.field_name = "p.onBasis",
+			.item = &ASN1_NULL_it,
+		},
+	
+	},
+	{
+		.value = NID_X9_62_tpBasis,
+		.tt = {
+			.flags = 0,
+			.tag = 0,
+			.offset = offsetof(X9_62_CHARACTERISTIC_TWO, p.tpBasis),
+			.field_name = "p.tpBasis",
+			.item = &ASN1_INTEGER_it,
+		},
+	
+	},
+	{
+		.value = NID_X9_62_ppBasis,
+		.tt = {
+			.flags = 0,
+			.tag = 0,
+			.offset = offsetof(X9_62_CHARACTERISTIC_TWO, p.ppBasis),
+			.field_name = "p.ppBasis",
+			.item = &X9_62_PENTANOMIAL_it,
+		},
+	
+	},
+};
 
-ASN1_SEQUENCE(X9_62_CHARACTERISTIC_TWO) = {
-	ASN1_SIMPLE(X9_62_CHARACTERISTIC_TWO, m, LONG),
-	ASN1_SIMPLE(X9_62_CHARACTERISTIC_TWO, type, ASN1_OBJECT),
-	ASN1_ADB_OBJECT(X9_62_CHARACTERISTIC_TWO)
-} ASN1_SEQUENCE_END(X9_62_CHARACTERISTIC_TWO)
-DECLARE_ASN1_ALLOC_FUNCTIONS(X9_62_CHARACTERISTIC_TWO)
+static const ASN1_ADB X9_62_CHARACTERISTIC_TWO_adb = {
+	.flags = 0,
+	.offset = offsetof(X9_62_CHARACTERISTIC_TWO, type),
+	.app_items = 0,
+	.tbl = X9_62_CHARACTERISTIC_TWO_adbtbl,
+	.tblcount = sizeof(X9_62_CHARACTERISTIC_TWO_adbtbl) / sizeof(ASN1_ADB_TABLE),
+	.default_tt = &char_two_def_tt,
+	.null_tt = NULL,
+};
+
+static const ASN1_TEMPLATE X9_62_CHARACTERISTIC_TWO_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(X9_62_CHARACTERISTIC_TWO, m),
+		.field_name = "m",
+		.item = &LONG_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(X9_62_CHARACTERISTIC_TWO, type),
+		.field_name = "type",
+		.item = &ASN1_OBJECT_it,
+	},
+	{
+		.flags = ASN1_TFLG_ADB_OID,
+		.tag = -1,
+		.offset = 0,
+		.field_name = "X9_62_CHARACTERISTIC_TWO",
+		.item = (const ASN1_ITEM *)&X9_62_CHARACTERISTIC_TWO_adb,
+	},
+};
+
+const ASN1_ITEM X9_62_CHARACTERISTIC_TWO_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = X9_62_CHARACTERISTIC_TWO_seq_tt,
+	.tcount = sizeof(X9_62_CHARACTERISTIC_TWO_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(X9_62_CHARACTERISTIC_TWO),
+	.sname = "X9_62_CHARACTERISTIC_TWO",
+};
+X9_62_CHARACTERISTIC_TWO *X9_62_CHARACTERISTIC_TWO_new(void);
+void X9_62_CHARACTERISTIC_TWO_free(X9_62_CHARACTERISTIC_TWO *a);
 
 X9_62_CHARACTERISTIC_TWO *
 X9_62_CHARACTERISTIC_TWO_new(void)
@@ -244,33 +348,166 @@ X9_62_CHARACTERISTIC_TWO_free(X9_62_CHARACTERISTIC_TWO *a)
 {
 	ASN1_item_free((ASN1_VALUE *)a, &X9_62_CHARACTERISTIC_TWO_it);
 }
-ASN1_ADB_TEMPLATE(fieldID_def) = ASN1_SIMPLE(X9_62_FIELDID, p.other, ASN1_ANY);
+static const ASN1_TEMPLATE fieldID_def_tt = {
+	.flags = 0,
+	.tag = 0,
+	.offset = offsetof(X9_62_FIELDID, p.other),
+	.field_name = "p.other",
+	.item = &ASN1_ANY_it,
+};
 
-ASN1_ADB(X9_62_FIELDID) = {
-	ADB_ENTRY(NID_X9_62_prime_field, ASN1_SIMPLE(X9_62_FIELDID, p.prime, ASN1_INTEGER)),
-	ADB_ENTRY(NID_X9_62_characteristic_two_field, ASN1_SIMPLE(X9_62_FIELDID, p.char_two, X9_62_CHARACTERISTIC_TWO))
-} ASN1_ADB_END(X9_62_FIELDID, 0, fieldType, 0, &fieldID_def_tt, NULL);
+static const ASN1_ADB_TABLE X9_62_FIELDID_adbtbl[] = {
+	{
+		.value = NID_X9_62_prime_field,
+		.tt = {
+			.flags = 0,
+			.tag = 0,
+			.offset = offsetof(X9_62_FIELDID, p.prime),
+			.field_name = "p.prime",
+			.item = &ASN1_INTEGER_it,
+		},
+	
+	},
+	{
+		.value = NID_X9_62_characteristic_two_field,
+		.tt = {
+			.flags = 0,
+			.tag = 0,
+			.offset = offsetof(X9_62_FIELDID, p.char_two),
+			.field_name = "p.char_two",
+			.item = &X9_62_CHARACTERISTIC_TWO_it,
+		},
+	
+	},
+};
 
-ASN1_SEQUENCE(X9_62_FIELDID) = {
-	ASN1_SIMPLE(X9_62_FIELDID, fieldType, ASN1_OBJECT),
-	ASN1_ADB_OBJECT(X9_62_FIELDID)
-} ASN1_SEQUENCE_END(X9_62_FIELDID)
+static const ASN1_ADB X9_62_FIELDID_adb = {
+	.flags = 0,
+	.offset = offsetof(X9_62_FIELDID, fieldType),
+	.app_items = 0,
+	.tbl = X9_62_FIELDID_adbtbl,
+	.tblcount = sizeof(X9_62_FIELDID_adbtbl) / sizeof(ASN1_ADB_TABLE),
+	.default_tt = &fieldID_def_tt,
+	.null_tt = NULL,
+};
 
-ASN1_SEQUENCE(X9_62_CURVE) = {
-	ASN1_SIMPLE(X9_62_CURVE, a, ASN1_OCTET_STRING),
-	ASN1_SIMPLE(X9_62_CURVE, b, ASN1_OCTET_STRING),
-	ASN1_OPT(X9_62_CURVE, seed, ASN1_BIT_STRING)
-} ASN1_SEQUENCE_END(X9_62_CURVE)
+static const ASN1_TEMPLATE X9_62_FIELDID_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(X9_62_FIELDID, fieldType),
+		.field_name = "fieldType",
+		.item = &ASN1_OBJECT_it,
+	},
+	{
+		.flags = ASN1_TFLG_ADB_OID,
+		.tag = -1,
+		.offset = 0,
+		.field_name = "X9_62_FIELDID",
+		.item = (const ASN1_ITEM *)&X9_62_FIELDID_adb,
+	},
+};
 
-ASN1_SEQUENCE(ECPARAMETERS) = {
-	ASN1_SIMPLE(ECPARAMETERS, version, LONG),
-	ASN1_SIMPLE(ECPARAMETERS, fieldID, X9_62_FIELDID),
-	ASN1_SIMPLE(ECPARAMETERS, curve, X9_62_CURVE),
-	ASN1_SIMPLE(ECPARAMETERS, base, ASN1_OCTET_STRING),
-	ASN1_SIMPLE(ECPARAMETERS, order, ASN1_INTEGER),
-	ASN1_OPT(ECPARAMETERS, cofactor, ASN1_INTEGER)
-} ASN1_SEQUENCE_END(ECPARAMETERS)
-DECLARE_ASN1_ALLOC_FUNCTIONS(ECPARAMETERS)
+const ASN1_ITEM X9_62_FIELDID_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = X9_62_FIELDID_seq_tt,
+	.tcount = sizeof(X9_62_FIELDID_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(X9_62_FIELDID),
+	.sname = "X9_62_FIELDID",
+};
+
+static const ASN1_TEMPLATE X9_62_CURVE_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(X9_62_CURVE, a),
+		.field_name = "a",
+		.item = &ASN1_OCTET_STRING_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(X9_62_CURVE, b),
+		.field_name = "b",
+		.item = &ASN1_OCTET_STRING_it,
+	},
+	{
+		.flags = ASN1_TFLG_OPTIONAL,
+		.tag = 0,
+		.offset = offsetof(X9_62_CURVE, seed),
+		.field_name = "seed",
+		.item = &ASN1_BIT_STRING_it,
+	},
+};
+
+const ASN1_ITEM X9_62_CURVE_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = X9_62_CURVE_seq_tt,
+	.tcount = sizeof(X9_62_CURVE_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(X9_62_CURVE),
+	.sname = "X9_62_CURVE",
+};
+
+static const ASN1_TEMPLATE ECPARAMETERS_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(ECPARAMETERS, version),
+		.field_name = "version",
+		.item = &LONG_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(ECPARAMETERS, fieldID),
+		.field_name = "fieldID",
+		.item = &X9_62_FIELDID_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(ECPARAMETERS, curve),
+		.field_name = "curve",
+		.item = &X9_62_CURVE_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(ECPARAMETERS, base),
+		.field_name = "base",
+		.item = &ASN1_OCTET_STRING_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(ECPARAMETERS, order),
+		.field_name = "order",
+		.item = &ASN1_INTEGER_it,
+	},
+	{
+		.flags = ASN1_TFLG_OPTIONAL,
+		.tag = 0,
+		.offset = offsetof(ECPARAMETERS, cofactor),
+		.field_name = "cofactor",
+		.item = &ASN1_INTEGER_it,
+	},
+};
+
+const ASN1_ITEM ECPARAMETERS_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = ECPARAMETERS_seq_tt,
+	.tcount = sizeof(ECPARAMETERS_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(ECPARAMETERS),
+	.sname = "ECPARAMETERS",
+};
+ECPARAMETERS *ECPARAMETERS_new(void);
+void ECPARAMETERS_free(ECPARAMETERS *a);
 
 ECPARAMETERS *
 ECPARAMETERS_new(void)
@@ -284,13 +521,44 @@ ECPARAMETERS_free(ECPARAMETERS *a)
 	ASN1_item_free((ASN1_VALUE *)a, &ECPARAMETERS_it);
 }
 
-ASN1_CHOICE(ECPKPARAMETERS) = {
-	ASN1_SIMPLE(ECPKPARAMETERS, value.named_curve, ASN1_OBJECT),
-	ASN1_SIMPLE(ECPKPARAMETERS, value.parameters, ECPARAMETERS),
-	ASN1_SIMPLE(ECPKPARAMETERS, value.implicitlyCA, ASN1_NULL)
-} ASN1_CHOICE_END(ECPKPARAMETERS)
-DECLARE_ASN1_FUNCTIONS_const(ECPKPARAMETERS)
-DECLARE_ASN1_ENCODE_FUNCTIONS_const(ECPKPARAMETERS, ECPKPARAMETERS)
+static const ASN1_TEMPLATE ECPKPARAMETERS_ch_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(ECPKPARAMETERS, value.named_curve),
+		.field_name = "value.named_curve",
+		.item = &ASN1_OBJECT_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(ECPKPARAMETERS, value.parameters),
+		.field_name = "value.parameters",
+		.item = &ECPARAMETERS_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(ECPKPARAMETERS, value.implicitlyCA),
+		.field_name = "value.implicitlyCA",
+		.item = &ASN1_NULL_it,
+	},
+};
+
+const ASN1_ITEM ECPKPARAMETERS_it = {
+	.itype = ASN1_ITYPE_CHOICE,
+	.utype = offsetof(ECPKPARAMETERS, type),
+	.templates = ECPKPARAMETERS_ch_tt,
+	.tcount = sizeof(ECPKPARAMETERS_ch_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(ECPKPARAMETERS),
+	.sname = "ECPKPARAMETERS",
+};
+
+ECPKPARAMETERS *ECPKPARAMETERS_new(void);
+void ECPKPARAMETERS_free(ECPKPARAMETERS *a);
+ECPKPARAMETERS *d2i_ECPKPARAMETERS(ECPKPARAMETERS **a, const unsigned char **in, long len);
+int i2d_ECPKPARAMETERS(const ECPKPARAMETERS *a, unsigned char **out);
 
 ECPKPARAMETERS *
 d2i_ECPKPARAMETERS(ECPKPARAMETERS **a, const unsigned char **in, long len)
@@ -317,14 +585,51 @@ ECPKPARAMETERS_free(ECPKPARAMETERS *a)
 	ASN1_item_free((ASN1_VALUE *)a, &ECPKPARAMETERS_it);
 }
 
-ASN1_SEQUENCE(EC_PRIVATEKEY) = {
-	ASN1_SIMPLE(EC_PRIVATEKEY, version, LONG),
-	ASN1_SIMPLE(EC_PRIVATEKEY, privateKey, ASN1_OCTET_STRING),
-	ASN1_EXP_OPT(EC_PRIVATEKEY, parameters, ECPKPARAMETERS, 0),
-	ASN1_EXP_OPT(EC_PRIVATEKEY, publicKey, ASN1_BIT_STRING, 1)
-} ASN1_SEQUENCE_END(EC_PRIVATEKEY)
-DECLARE_ASN1_FUNCTIONS_const(EC_PRIVATEKEY)
-DECLARE_ASN1_ENCODE_FUNCTIONS_const(EC_PRIVATEKEY, EC_PRIVATEKEY)
+static const ASN1_TEMPLATE EC_PRIVATEKEY_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(EC_PRIVATEKEY, version),
+		.field_name = "version",
+		.item = &LONG_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(EC_PRIVATEKEY, privateKey),
+		.field_name = "privateKey",
+		.item = &ASN1_OCTET_STRING_it,
+	},
+	{
+		.flags = ASN1_TFLG_EXPLICIT | ASN1_TFLG_OPTIONAL,
+		.tag = 0,
+		.offset = offsetof(EC_PRIVATEKEY, parameters),
+		.field_name = "parameters",
+		.item = &ECPKPARAMETERS_it,
+	},
+	{
+		.flags = ASN1_TFLG_EXPLICIT | ASN1_TFLG_OPTIONAL,
+		.tag = 1,
+		.offset = offsetof(EC_PRIVATEKEY, publicKey),
+		.field_name = "publicKey",
+		.item = &ASN1_BIT_STRING_it,
+	},
+};
+
+const ASN1_ITEM EC_PRIVATEKEY_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = EC_PRIVATEKEY_seq_tt,
+	.tcount = sizeof(EC_PRIVATEKEY_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(EC_PRIVATEKEY),
+	.sname = "EC_PRIVATEKEY",
+};
+
+EC_PRIVATEKEY *EC_PRIVATEKEY_new(void);
+void EC_PRIVATEKEY_free(EC_PRIVATEKEY *a);
+EC_PRIVATEKEY *d2i_EC_PRIVATEKEY(EC_PRIVATEKEY **a, const unsigned char **in, long len);
+int i2d_EC_PRIVATEKEY(const EC_PRIVATEKEY *a, unsigned char **out);
 
 EC_PRIVATEKEY *
 d2i_EC_PRIVATEKEY(EC_PRIVATEKEY **a, const unsigned char **in, long len)
@@ -562,8 +867,8 @@ ec_asn1_group2curve(const EC_GROUP * group, X9_62_CURVE * curve)
 	}
 
 	/* set a and b */
-	if (!M_ASN1_OCTET_STRING_set(curve->a, a_buf, len_1) ||
-	    !M_ASN1_OCTET_STRING_set(curve->b, b_buf, len_2)) {
+	if (!ASN1_STRING_set(curve->a, a_buf, len_1) ||
+	    !ASN1_STRING_set(curve->b, b_buf, len_2)) {
 		ECerr(EC_F_EC_ASN1_GROUP2CURVE, ERR_R_ASN1_LIB);
 		goto err;
 	}
@@ -714,7 +1019,7 @@ ec_asn1_group2pkparameters(const EC_GROUP * group, ECPKPARAMETERS * params)
 
 	if (EC_GROUP_get_asn1_flag(group)) {
 		/*
-		 * use the asn1 OID to describe the the elliptic curve
+		 * use the asn1 OID to describe the elliptic curve
 		 * parameters
 		 */
 		tmp = EC_GROUP_get_curve_name(group);
@@ -1071,8 +1376,8 @@ d2i_ECPrivateKey(EC_KEY ** a, const unsigned char **in, long len)
 
 	if (priv_key->privateKey) {
 		ret->priv_key = BN_bin2bn(
-		    M_ASN1_STRING_data(priv_key->privateKey),
-		    M_ASN1_STRING_length(priv_key->privateKey),
+		    ASN1_STRING_data(priv_key->privateKey),
+		    ASN1_STRING_length(priv_key->privateKey),
 		    ret->priv_key);
 		if (ret->priv_key == NULL) {
 			ECerr(EC_F_D2I_ECPRIVATEKEY,
@@ -1095,8 +1400,8 @@ d2i_ECPrivateKey(EC_KEY ** a, const unsigned char **in, long len)
 			ECerr(EC_F_D2I_ECPRIVATEKEY, ERR_R_EC_LIB);
 			goto err;
 		}
-		pub_oct = M_ASN1_STRING_data(priv_key->publicKey);
-		pub_oct_len = M_ASN1_STRING_length(priv_key->publicKey);
+		pub_oct = ASN1_STRING_data(priv_key->publicKey);
+		pub_oct_len = ASN1_STRING_length(priv_key->publicKey);
 		/* save the point conversion form */
 		ret->conv_form = (point_conversion_form_t) (pub_oct[0] & ~0x01);
 		if (!EC_POINT_oct2point(ret->group, ret->pub_key,
@@ -1151,7 +1456,7 @@ i2d_ECPrivateKey(EC_KEY * a, unsigned char **out)
 		ECerr(EC_F_I2D_ECPRIVATEKEY, ERR_R_BN_LIB);
 		goto err;
 	}
-	if (!M_ASN1_OCTET_STRING_set(priv_key->privateKey, buffer, buf_len)) {
+	if (!ASN1_STRING_set(priv_key->privateKey, buffer, buf_len)) {
 		ECerr(EC_F_I2D_ECPRIVATEKEY, ERR_R_ASN1_LIB);
 		goto err;
 	}
@@ -1163,7 +1468,7 @@ i2d_ECPrivateKey(EC_KEY * a, unsigned char **out)
 		}
 	}
 	if (!(a->enc_flag & EC_PKEY_NO_PUBKEY) && a->pub_key != NULL) {
-		priv_key->publicKey = M_ASN1_BIT_STRING_new();
+		priv_key->publicKey = ASN1_BIT_STRING_new();
 		if (priv_key->publicKey == NULL) {
 			ECerr(EC_F_I2D_ECPRIVATEKEY,
 			    ERR_R_MALLOC_FAILURE);
@@ -1188,7 +1493,7 @@ i2d_ECPrivateKey(EC_KEY * a, unsigned char **out)
 		}
 		priv_key->publicKey->flags &= ~(ASN1_STRING_FLAG_BITS_LEFT | 0x07);
 		priv_key->publicKey->flags |= ASN1_STRING_FLAG_BITS_LEFT;
-		if (!M_ASN1_BIT_STRING_set(priv_key->publicKey, buffer,
+		if (!ASN1_STRING_set(priv_key->publicKey, buffer,
 			buf_len)) {
 			ECerr(EC_F_I2D_ECPRIVATEKEY, ERR_R_ASN1_LIB);
 			goto err;
@@ -1235,6 +1540,8 @@ d2i_ECParameters(EC_KEY ** a, const unsigned char **in, long len)
 
 	if (!d2i_ECPKParameters(&ret->group, in, len)) {
 		ECerr(EC_F_D2I_ECPARAMETERS, ERR_R_EC_LIB);
+		if (a == NULL || *a != ret)
+			EC_KEY_free(ret);
 		return NULL;
 	}
 

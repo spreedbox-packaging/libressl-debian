@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl3.h,v 1.35 2015/02/12 03:45:25 jsing Exp $ */
+/* $OpenBSD: ssl3.h,v 1.40 2015/07/18 19:41:54 doug Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -351,21 +351,10 @@ typedef struct ssl3_buffer_st {
 #define SSL3_FLAGS_NO_RENEGOTIATE_CIPHERS	0x0001
 #define SSL3_FLAGS_DELAY_CLIENT_FINISHED	0x0002
 #define SSL3_FLAGS_POP_BUFFER			0x0004
-#define TLS1_FLAGS_TLS_PADDING_BUG		0x0008
+#define TLS1_FLAGS_TLS_PADDING_BUG		0x0
 #define TLS1_FLAGS_SKIP_CERT_VERIFY		0x0010
 #define TLS1_FLAGS_KEEP_HANDSHAKE		0x0020
 #define SSL3_FLAGS_CCS_OK			0x0080
-
-/* SSL3_FLAGS_SGC_RESTART_DONE is set when we
- * restart a handshake because of MS SGC and so prevents us
- * from restarting the handshake in a loop. It's reset on a
- * renegotiation, so effectively limits the client to one restart
- * per negotiation. This limits the possibility of a DDoS
- * attack where the client handshakes in a loop using SGC to
- * restart. Servers which permit renegotiation can still be
- * effected, but we can't prevent that.
- */
-#define SSL3_FLAGS_SGC_RESTART_DONE		0x0040
 
 #ifndef OPENSSL_NO_SSL_INTERN
 
@@ -386,9 +375,6 @@ typedef struct ssl3_state_st {
 	/* flags for countermeasure against known-IV weakness */
 	int need_empty_fragments;
 	int empty_fragment_done;
-
-	/* The value of 'extra' when the buffers were initialized */
-	int init_extra;
 
 	SSL3_BUFFER rbuf;	/* read IO goes into here */
 	SSL3_BUFFER wbuf;	/* write IO goes into here */
@@ -500,11 +486,6 @@ typedef struct ssl3_state_st {
 	 */
 	unsigned char *alpn_selected;
 	unsigned int alpn_selected_len;
-
-	/* This is set to true if we believe that this is a version of Safari
-	 * running on OS X 10.6 or newer. We wish to know this because Safari
-	 * on 10.8 .. 10.8.3 has broken ECDHE-ECDSA support. */
-	char is_probably_safari;
 } SSL3_STATE;
 
 #endif

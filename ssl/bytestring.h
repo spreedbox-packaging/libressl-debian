@@ -1,4 +1,4 @@
-/*	$OpenBSD: bytestring.h,v 1.3 2015/02/07 02:02:28 doug Exp $	*/
+/*	$OpenBSD: bytestring.h,v 1.13 2015/06/18 23:25:07 doug Exp $	*/
 /*
  * Copyright (c) 2014, Google Inc.
  *
@@ -40,6 +40,7 @@ extern "C" {
 /* CRYPTO ByteString */
 typedef struct cbs_st {
 	const uint8_t *data;
+	size_t initial_len;
 	size_t len;
 } CBS;
 
@@ -66,10 +67,15 @@ const uint8_t *CBS_data(const CBS *cbs);
 size_t CBS_len(const CBS *cbs);
 
 /*
+ * CBS_offset returns the current offset into the original data of |cbs|.
+ */
+size_t CBS_offset(const CBS *cbs);
+
+/*
  * CBS_stow copies the current contents of |cbs| into |*out_ptr| and
  * |*out_len|. If |*out_ptr| is not NULL, the contents are freed with
- * OPENSSL_free. It returns one on success and zero on allocation failure. On
- * success, |*out_ptr| should be freed with OPENSSL_free. If |cbs| is empty,
+ * free. It returns one on success and zero on allocation failure. On
+ * success, |*out_ptr| should be freed with free. If |cbs| is empty,
  * |*out_ptr| will be NULL.
  */
 int CBS_stow(const CBS *cbs, uint8_t **out_ptr, size_t *out_len);
@@ -77,13 +83,21 @@ int CBS_stow(const CBS *cbs, uint8_t **out_ptr, size_t *out_len);
 /*
  * CBS_strdup copies the current contents of |cbs| into |*out_ptr| as a
  * NUL-terminated C string. If |*out_ptr| is not NULL, the contents are freed
- * with OPENSSL_free. It returns one on success and zero on allocation
- * failure. On success, |*out_ptr| should be freed with OPENSSL_free.
+ * with free. It returns one on success and zero on allocation
+ * failure. On success, |*out_ptr| should be freed with free.
  *
  * NOTE: If |cbs| contains NUL bytes, the string will be truncated. Call
  * |CBS_contains_zero_byte(cbs)| to check for NUL bytes.
  */
 int CBS_strdup(const CBS *cbs, char **out_ptr);
+
+/*
+ * CBS_write_bytes writes all of the remaining data from |cbs| into |dst|
+ * if it is at most |dst_len| bytes.  If |copied| is not NULL, it will be set
+ * to the amount copied. It returns one on success and zero otherwise.
+ */
+int CBS_write_bytes(const CBS *cbs, uint8_t *dst, size_t dst_len,
+    size_t *copied);
 
 /*
  * CBS_contains_zero_byte returns one if the current contents of |cbs| contains
@@ -152,17 +166,48 @@ int CBS_get_u24_length_prefixed(CBS *cbs, CBS *out);
 
 /* Parsing ASN.1 */
 
-#define CBS_ASN1_BOOLEAN 0x1
-#define CBS_ASN1_INTEGER 0x2
-#define CBS_ASN1_BITSTRING 0x3
-#define CBS_ASN1_OCTETSTRING 0x4
-#define CBS_ASN1_OBJECT 0x6
-#define CBS_ASN1_ENUMERATED 0xa
-#define CBS_ASN1_SEQUENCE (0x10 | CBS_ASN1_CONSTRUCTED)
-#define CBS_ASN1_SET (0x11 | CBS_ASN1_CONSTRUCTED)
+/*
+ * While an identifier can be multiple octets, this library only handles the
+ * single octet variety currently.  This limits support up to tag number 30
+ * since tag number 31 is a reserved value to indicate multiple octets.
+ */
 
-#define CBS_ASN1_CONSTRUCTED 0x20
-#define CBS_ASN1_CONTEXT_SPECIFIC 0x80
+/* Bits 8 and 7: class tag type: See X.690 section 8.1.2.2. */
+#define CBS_ASN1_UNIVERSAL		0x00
+#define CBS_ASN1_APPLICATION		0x40
+#define CBS_ASN1_CONTEXT_SPECIFIC	0x80
+#define CBS_ASN1_PRIVATE		0xc0
+
+/* Bit 6: Primitive or constructed: See X.690 section 8.1.2.3. */
+#define CBS_ASN1_PRIMITIVE	0x00
+#define CBS_ASN1_CONSTRUCTED	0x20
+
+/*
+ * Bits 5 to 1 are the tag number.  See X.680 section 8.6 for tag numbers of
+ * the universal class.
+ */
+
+/*
+ * Common universal identifier octets.
+ * See X.690 section 8.1 and X.680 section 8.6 for universal tag numbers.
+ *
+ * Note: These definitions are the cause of some of the strange behavior in
+ * CBS's bs_ber.c.
+ *
+ * In BER, it is the sender's option to use primitive or constructed for
+ * bitstring (X.690 section 8.6.1) and octetstring (X.690 section 8.7.1).
+ *
+ * In DER, bitstring and octetstring are required to be primitive
+ * (X.690 section 10.2).
+ */
+#define CBS_ASN1_BOOLEAN     (CBS_ASN1_UNIVERSAL | CBS_ASN1_PRIMITIVE | 0x1)
+#define CBS_ASN1_INTEGER     (CBS_ASN1_UNIVERSAL | CBS_ASN1_PRIMITIVE | 0x2)
+#define CBS_ASN1_BITSTRING   (CBS_ASN1_UNIVERSAL | CBS_ASN1_PRIMITIVE | 0x3)
+#define CBS_ASN1_OCTETSTRING (CBS_ASN1_UNIVERSAL | CBS_ASN1_PRIMITIVE | 0x4)
+#define CBS_ASN1_OBJECT      (CBS_ASN1_UNIVERSAL | CBS_ASN1_PRIMITIVE | 0x6)
+#define CBS_ASN1_ENUMERATED  (CBS_ASN1_UNIVERSAL | CBS_ASN1_PRIMITIVE | 0xa)
+#define CBS_ASN1_SEQUENCE    (CBS_ASN1_UNIVERSAL | CBS_ASN1_CONSTRUCTED | 0x10)
+#define CBS_ASN1_SET         (CBS_ASN1_UNIVERSAL | CBS_ASN1_CONSTRUCTED | 0x11)
 
 /*
  * CBS_get_asn1 sets |*out| to the contents of DER-encoded, ASN.1 element (not
@@ -172,13 +217,13 @@ int CBS_get_u24_length_prefixed(CBS *cbs, CBS *out);
  *
  * Tag numbers greater than 30 are not supported (i.e. short form only).
  */
-int CBS_get_asn1(CBS *cbs, CBS *out, unsigned tag_value);
+int CBS_get_asn1(CBS *cbs, CBS *out, unsigned int tag_value);
 
 /*
  * CBS_get_asn1_element acts like |CBS_get_asn1| but |out| will include the
  * ASN.1 header bytes too.
  */
-int CBS_get_asn1_element(CBS *cbs, CBS *out, unsigned tag_value);
+int CBS_get_asn1_element(CBS *cbs, CBS *out, unsigned int tag_value);
 
 /*
  * CBS_peek_asn1_tag looks ahead at the next ASN.1 tag and returns one
@@ -187,19 +232,18 @@ int CBS_get_asn1_element(CBS *cbs, CBS *out, unsigned tag_value);
  * it returns one, CBS_get_asn1 may still fail if the rest of the
  * element is malformed.
  */
-int CBS_peek_asn1_tag(const CBS *cbs, unsigned tag_value);
+int CBS_peek_asn1_tag(const CBS *cbs, unsigned int tag_value);
 
 /*
  * CBS_get_any_asn1_element sets |*out| to contain the next ASN.1 element from
  * |*cbs| (including header bytes) and advances |*cbs|. It sets |*out_tag| to
- * the tag number and |*out_header_len| to the length of the ASN.1 header. If
- * the element has indefinite length then |*out| will only contain the
- * header. Each of |out|, |out_tag|, and |out_header_len| may be NULL to ignore
+ * the tag number and |*out_header_len| to the length of the ASN.1 header.
+ * Each of |out|, |out_tag|, and |out_header_len| may be NULL to ignore
  * the value.
  *
  * Tag numbers greater than 30 are not supported (i.e. short form only).
  */
-int CBS_get_any_asn1_element(CBS *cbs, CBS *out, unsigned *out_tag,
+int CBS_get_any_asn1_element(CBS *cbs, CBS *out, unsigned int *out_tag,
     size_t *out_header_len);
 
 /*
@@ -217,7 +261,8 @@ int CBS_get_asn1_uint64(CBS *cbs, uint64_t *out);
  * one on success, whether or not the element was present, and zero on
  * decode failure.
  */
-int CBS_get_optional_asn1(CBS *cbs, CBS *out, int *out_present, unsigned tag);
+int CBS_get_optional_asn1(CBS *cbs, CBS *out, int *out_present,
+    unsigned int tag);
 
 /*
  * CBS_get_optional_asn1_octet_string gets an optional
@@ -228,7 +273,7 @@ int CBS_get_optional_asn1(CBS *cbs, CBS *out, int *out_present, unsigned tag);
  * present, and zero on decode failure.
  */
 int CBS_get_optional_asn1_octet_string(CBS *cbs, CBS *out, int *out_present,
-    unsigned tag);
+    unsigned int tag);
 
 /*
  * CBS_get_optional_asn1_uint64 gets an optional explicitly-tagged
@@ -237,7 +282,7 @@ int CBS_get_optional_asn1_octet_string(CBS *cbs, CBS *out, int *out_present,
  * on success, whether or not the element was present, and zero on
  * decode failure.
  */
-int CBS_get_optional_asn1_uint64(CBS *cbs, uint64_t *out, unsigned tag,
+int CBS_get_optional_asn1_uint64(CBS *cbs, uint64_t *out, unsigned int tag,
     uint64_t default_value);
 
 /*
@@ -247,7 +292,7 @@ int CBS_get_optional_asn1_uint64(CBS *cbs, uint64_t *out, unsigned tag,
  * success, whether or not the element was present, and zero on decode
  * failure.
  */
-int CBS_get_optional_asn1_bool(CBS *cbs, int *out, unsigned tag,
+int CBS_get_optional_asn1_bool(CBS *cbs, int *out, unsigned int tag,
     int default_value);
 
 
@@ -335,7 +380,7 @@ void CBB_cleanup(CBB *cbb);
  * CBB_finish completes any pending length prefix and sets |*out_data| to a
  * malloced buffer and |*out_len| to the length of that buffer. The caller
  * takes ownership of the buffer and, unless the buffer was fixed with
- * |CBB_init_fixed|, must call |OPENSSL_free| when done.
+ * |CBB_init_fixed|, must call |free| when done.
  *
  * It can only be called on a "top level" |CBB|, i.e. one initialised with
  * |CBB_init| or |CBB_init_fixed|. It returns one on success and zero on
@@ -378,7 +423,7 @@ int CBB_add_u24_length_prefixed(CBB *cbb, CBB *out_contents);
  * single octet identifiers are supported. It returns one on success or zero
  * on error.
  */
-int CBB_add_asn1(CBB *cbb, CBB *out_contents, uint8_t tag);
+int CBB_add_asn1(CBB *cbb, CBB *out_contents, unsigned int tag);
 
 /*
  * CBB_add_bytes appends |len| bytes from |data| to |cbb|. It returns one on
@@ -398,19 +443,19 @@ int CBB_add_space(CBB *cbb, uint8_t **out_data, size_t len);
  * CBB_add_u8 appends an 8-bit number from |value| to |cbb|. It returns one on
  * success and zero otherwise.
  */
-int CBB_add_u8(CBB *cbb, uint8_t value);
+int CBB_add_u8(CBB *cbb, size_t value);
 
 /*
  * CBB_add_u8 appends a 16-bit, big-endian number from |value| to |cbb|. It
  * returns one on success and zero otherwise.
  */
-int CBB_add_u16(CBB *cbb, uint16_t value);
+int CBB_add_u16(CBB *cbb, size_t value);
 
 /*
  * CBB_add_u24 appends a 24-bit, big-endian number from |value| to |cbb|. It
  * returns one on success and zero otherwise.
  */
-int CBB_add_u24(CBB *cbb, uint32_t value);
+int CBB_add_u24(CBB *cbb, size_t value);
 
 /*
  * CBB_add_asn1_uint64 writes an ASN.1 INTEGER into |cbb| using |CBB_add_asn1|
@@ -421,22 +466,42 @@ int CBB_add_asn1_uint64(CBB *cbb, uint64_t value);
 
 #ifdef LIBRESSL_INTERNAL
 /*
- * CBS_asn1_ber_to_der reads an ASN.1 structure from |in|. If it finds
- * indefinite-length elements then it attempts to convert the BER data to DER
- * and sets |*out| and |*out_length| to describe a malloced buffer containing
- * the DER data. Additionally, |*in| will be advanced over the ASN.1 data.
+ * CBS_dup sets |out| to point to cbs's |data| and |len|.  It results in two
+ * CBS that point to the same buffer.
+ */
+void CBS_dup(const CBS *cbs, CBS *out);
+
+/*
+ * cbs_get_any_asn1_element sets |*out| to contain the next ASN.1 element from
+ * |*cbs| (including header bytes) and advances |*cbs|. It sets |*out_tag| to
+ * the tag number and |*out_header_len| to the length of the ASN.1 header. If
+ * strict mode is disabled and the element has indefinite length then |*out|
+ * will only contain the header. Each of |out|, |out_tag|, and
+ * |out_header_len| may be NULL to ignore the value.
+ *
+ * Tag numbers greater than 30 are not supported (i.e. short form only).
+ */
+int cbs_get_any_asn1_element_internal(CBS *cbs, CBS *out, unsigned int *out_tag,
+    size_t *out_header_len, int strict);
+
+/*
+ * CBS_asn1_indefinite_to_definite reads an ASN.1 structure from |in|. If it
+ * finds indefinite-length elements that otherwise appear to be valid DER, it
+ * attempts to convert the DER-like data to DER and sets |*out| and
+ * |*out_length| to describe a malloced buffer containing the DER data.
+ * Additionally, |*in| will be advanced over the ASN.1 data.
  *
  * If it doesn't find any indefinite-length elements then it sets |*out| to
  * NULL and |*in| is unmodified.
  *
- * A sufficiently complex ASN.1 structure will break this function because it's
- * not possible to generically convert BER to DER without knowledge of the
- * structure itself. However, this sufficies to handle the PKCS#7 and #12 output
+ * This is NOT a conversion from BER to DER.  There are many restrictions when
+ * dealing with DER data.  This is only concerned with one: indefinite vs.
+ * definite form. However, this suffices to handle the PKCS#7 and PKCS#12 output
  * from NSS.
  *
  * It returns one on success and zero otherwise.
  */
-int CBS_asn1_ber_to_der(CBS *in, uint8_t **out, size_t *out_len);
+int CBS_asn1_indefinite_to_definite(CBS *in, uint8_t **out, size_t *out_len);
 #endif /* LIBRESSL_INTERNAL */
 
 #if defined(__cplusplus)

@@ -1,4 +1,4 @@
-/* $OpenBSD: gostr341194.c,v 1.2 2014/11/09 23:06:52 miod Exp $ */
+/* $OpenBSD: gostr341194.c,v 1.4 2015/07/15 17:13:17 beck Exp $ */
 /*
  * Copyright (c) 2014 Dmitry Eremin-Solenikov <dbaryshkov@gmail.com>
  * Copyright (c) 2005-2006 Cryptocom LTD
@@ -238,7 +238,7 @@ GOSTR341194_Final(unsigned char *md, GOSTR341194_CTX * c)
 	unsigned char T[32];
 
 	if (c->num > 0) {
-		memset(p + c->num, 0, 32);
+		memset(p + c->num, 0, 32 - c->num);
 		hash_step(c, c->H, p);
 		add_blocks(32, c->S, p);
 	}
@@ -267,7 +267,7 @@ GOSTR341194(const unsigned char *d, size_t n, unsigned char *md, int nid)
 		return 0;
 	GOSTR341194_Update(&c, d, n);
 	GOSTR341194_Final(md, &c);
-	OPENSSL_cleanse(&c, sizeof(c));
+	explicit_bzero(&c, sizeof(c));
 	return (md);
 }
 #endif

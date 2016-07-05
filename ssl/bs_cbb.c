@@ -1,4 +1,4 @@
-/*	$OpenBSD: bs_cbb.c,v 1.4 2015/02/07 04:37:35 doug Exp $	*/
+/*	$OpenBSD: bs_cbb.c,v 1.12 2015/06/18 23:25:07 doug Exp $	*/
 /*
  * Copyright (c) 2014, Google Inc.
  *
@@ -36,35 +36,42 @@ cbb_init(CBB *cbb, uint8_t *buf, size_t cap)
 	base->cap = cap;
 	base->can_resize = 1;
 
-	memset(cbb, 0, sizeof(CBB));
 	cbb->base = base;
 	cbb->is_top_level = 1;
+
 	return 1;
 }
 
 int
 CBB_init(CBB *cbb, size_t initial_capacity)
 {
-	uint8_t *buf;
+	uint8_t *buf = NULL;
 
-	buf = malloc(initial_capacity);
-	if (initial_capacity > 0 && buf == NULL)
-		return 0;
+	memset(cbb, 0, sizeof(*cbb));
+
+	if (initial_capacity > 0) {
+		if ((buf = malloc(initial_capacity)) == NULL)
+			return 0;
+	}
 
 	if (!cbb_init(cbb, buf, initial_capacity)) {
 		free(buf);
 		return 0;
 	}
+
 	return 1;
 }
 
 int
 CBB_init_fixed(CBB *cbb, uint8_t *buf, size_t len)
 {
+	memset(cbb, 0, sizeof(*cbb));
+
 	if (!cbb_init(cbb, buf, len))
 		return 0;
 
 	cbb->base->can_resize = 0;
+
 	return 1;
 }
 
@@ -72,7 +79,7 @@ void
 CBB_cleanup(CBB *cbb)
 {
 	if (cbb->base) {
-		if (cbb->base->buf && cbb->base->can_resize)
+		if (cbb->base->can_resize)
 			free(cbb->base->buf);
 
 		free(cbb->base);
@@ -119,7 +126,7 @@ cbb_buffer_add(struct cbb_buffer_st *base, uint8_t **out, size_t len)
 }
 
 static int
-cbb_buffer_add_u(struct cbb_buffer_st *base, uint32_t v, size_t len_len)
+cbb_add_u(CBB *cbb, uint32_t v, size_t len_len)
 {
 	uint8_t *buf;
 	size_t i;
@@ -127,7 +134,10 @@ cbb_buffer_add_u(struct cbb_buffer_st *base, uint32_t v, size_t len_len)
 	if (len_len == 0)
 		return 1;
 
-	if (!cbb_buffer_add(base, &buf, len_len))
+	if (len_len > 4)
+		return 0;
+
+	if (!CBB_flush(cbb) || !cbb_buffer_add(cbb->base, &buf, len_len))
 		return 0;
 
 	for (i = len_len - 1; i < len_len; i--) {
@@ -190,40 +200,46 @@ CBB_flush(CBB *cbb)
 
 	if (cbb->pending_is_asn1) {
 		/*
-		 * For ASN.1 we assume that we'll only need a single byte for
-		 * the length.  If that turned out to be incorrect, we have to
-		 * move the contents along in order to make space.
+		 * For ASN.1, we assumed that we were using short form which
+		 * only requires a single byte for the length octet.
+		 *
+		 * If it turns out that we need long form, we have to move
+		 * the contents along in order to make space for more length
+		 * octets.
 		 */
-		size_t len_len;
+		size_t len_len = 1;  /* total number of length octets */
 		uint8_t initial_length_byte;
 
+		/* We already wrote 1 byte for the length. */
 		assert (cbb->pending_len_len == 1);
 
-		if (len > 0xfffffffe) {
-			/* Too large. */
-			return 0;
-		} else if (len > 0xffffff) {
+		/* Check for long form */
+		if (len > 0xfffffffe)
+			return 0;	/* 0xffffffff is reserved */
+		else if (len > 0xffffff)
 			len_len = 5;
-			initial_length_byte = 0x80 | 4;
-		} else if (len > 0xffff) {
+		else if (len > 0xffff)
 			len_len = 4;
-			initial_length_byte = 0x80 | 3;
-		} else if (len > 0xff) {
+		else if (len > 0xff)
 			len_len = 3;
-			initial_length_byte = 0x80 | 2;
-		} else if (len > 0x7f) {
+		else if (len > 0x7f)
 			len_len = 2;
-			initial_length_byte = 0x80 | 1;
-		} else {
-			len_len = 1;
+
+		if (len_len == 1) {
+			/* For short form, the initial byte is the length. */
 			initial_length_byte = len;
 			len = 0;
-		}
 
-		if (len_len != 1) {
+		} else {
+			/*
+			 * For long form, the initial byte is the number of
+			 * subsequent length octets (plus bit 8 set).
+			 */
+			initial_length_byte = 0x80 | (len_len - 1);
+
 			/*
 			 * We need to move the contents along in order to make
-			 * space.
+			 * space for the long form length octets.
 			 */
 			size_t extra_bytes = len_len - 1;
 			if (!cbb_buffer_add(cbb->base, NULL, extra_bytes))
@@ -294,15 +310,23 @@ CBB_add_u24_length_prefixed(CBB *cbb, CBB *out_contents)
 }
 
 int
-CBB_add_asn1(CBB *cbb, CBB *out_contents, uint8_t tag)
+CBB_add_asn1(CBB *cbb, CBB *out_contents, unsigned int tag)
 {
+	if (tag > UINT8_MAX)
+		return 0;
+
 	/* Long form identifier octets are not supported. */
 	if ((tag & 0x1f) == 0x1f)
 		return 0;
 
+	/* Short-form identifier octet only needs a single byte */
 	if (!CBB_flush(cbb) || !CBB_add_u8(cbb, tag))
 		return 0;
 
+	/*
+	 * Add 1 byte to cover the short-form length octet case.  If it turns
+	 * out we need long-form, it will be extended later.
+	 */
 	cbb->offset = cbb->base->len;
 	if (!CBB_add_u8(cbb, 0))
 		return 0;
@@ -321,7 +345,7 @@ CBB_add_bytes(CBB *cbb, const uint8_t *data, size_t len)
 {
 	uint8_t *dest;
 
-	if (!CBB_flush(cbb) || !cbb_buffer_add(cbb->base, &dest, len))
+	if (!CBB_add_space(cbb, &dest, len))
 		return 0;
 
 	memcpy(dest, data, len);
@@ -338,30 +362,30 @@ CBB_add_space(CBB *cbb, uint8_t **out_data, size_t len)
 }
 
 int
-CBB_add_u8(CBB *cbb, uint8_t value)
+CBB_add_u8(CBB *cbb, size_t value)
 {
-	if (!CBB_flush(cbb))
+	if (value > UINT8_MAX)
 		return 0;
 
-	return cbb_buffer_add_u(cbb->base, value, 1);
+	return cbb_add_u(cbb, (uint32_t)value, 1);
 }
 
 int
-CBB_add_u16(CBB *cbb, uint16_t value)
+CBB_add_u16(CBB *cbb, size_t value)
 {
-	if (!CBB_flush(cbb))
+	if (value > UINT16_MAX)
 		return 0;
 
-	return cbb_buffer_add_u(cbb->base, value, 2);
+	return cbb_add_u(cbb, (uint32_t)value, 2);
 }
 
 int
-CBB_add_u24(CBB *cbb, uint32_t value)
+CBB_add_u24(CBB *cbb, size_t value)
 {
-	if (!CBB_flush(cbb))
+	if (value > 0xffffffUL)
 		return 0;
 
-	return cbb_buffer_add_u(cbb->base, value, 3);
+	return cbb_add_u(cbb, (uint32_t)value, 3);
 }
 
 int
@@ -375,7 +399,23 @@ CBB_add_asn1_uint64(CBB *cbb, uint64_t value)
 		return 0;
 
 	for (i = 0; i < 8; i++) {
-		uint8_t byte = (value >> 8*(7-i)) & 0xff;
+		uint8_t byte = (value >> 8 * (7 - i)) & 0xff;
+
+		/*
+		 * ASN.1 restriction: first 9 bits cannot be all zeroes or
+		 * all ones.  Since this function only encodes unsigned
+		 * integers, the only concerns are not encoding leading
+		 * zeros and adding a padding byte if necessary.
+		 *
+		 * In practice, this means:
+		 * 1) Skip leading octets of all zero bits in the value
+		 * 2) After skipping the leading zero octets, if the next 9
+		 *    bits are all ones, add an all zero prefix octet (and
+		 *    set the high bit of the prefix octet if negative).
+		 *
+		 * Additionally, for an unsigned value, add an all zero
+		 * prefix if the high bit of the first octet would be one.
+		 */
 		if (!started) {
 			if (byte == 0)
 				/* Don't encode leading zeros. */

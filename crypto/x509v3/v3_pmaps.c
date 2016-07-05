@@ -1,4 +1,4 @@
-/* $OpenBSD: v3_pmaps.c,v 1.6 2015/02/10 05:43:09 jsing Exp $ */
+/* $OpenBSD: v3_pmaps.c,v 1.8 2015/07/25 16:00:14 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
  */
@@ -70,25 +70,66 @@ static STACK_OF(CONF_VALUE) *i2v_POLICY_MAPPINGS(
     const X509V3_EXT_METHOD *method, void *pmps, STACK_OF(CONF_VALUE) *extlist);
 
 const X509V3_EXT_METHOD v3_policy_mappings = {
-	NID_policy_mappings, 0,
-	ASN1_ITEM_ref(POLICY_MAPPINGS),
-	0, 0, 0, 0,
-	0, 0,
-	i2v_POLICY_MAPPINGS,
-	v2i_POLICY_MAPPINGS,
-	0, 0,
-	NULL
+	.ext_nid = NID_policy_mappings,
+	.ext_flags = 0,
+	.it = ASN1_ITEM_ref(POLICY_MAPPINGS),
+	.ext_new = NULL,
+	.ext_free = NULL,
+	.d2i = NULL,
+	.i2d = NULL,
+	.i2s = NULL,
+	.s2i = NULL,
+	.i2v = i2v_POLICY_MAPPINGS,
+	.v2i = v2i_POLICY_MAPPINGS,
+	.i2r = NULL,
+	.r2i = NULL,
+	.usr_data = NULL,
 };
 
-ASN1_SEQUENCE(POLICY_MAPPING) = {
-	ASN1_SIMPLE(POLICY_MAPPING, issuerDomainPolicy, ASN1_OBJECT),
-	ASN1_SIMPLE(POLICY_MAPPING, subjectDomainPolicy, ASN1_OBJECT)
-} ASN1_SEQUENCE_END(POLICY_MAPPING)
+static const ASN1_TEMPLATE POLICY_MAPPING_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(POLICY_MAPPING, issuerDomainPolicy),
+		.field_name = "issuerDomainPolicy",
+		.item = &ASN1_OBJECT_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(POLICY_MAPPING, subjectDomainPolicy),
+		.field_name = "subjectDomainPolicy",
+		.item = &ASN1_OBJECT_it,
+	},
+};
 
-ASN1_ITEM_TEMPLATE(POLICY_MAPPINGS) =
-ASN1_EX_TEMPLATE_TYPE(ASN1_TFLG_SEQUENCE_OF, 0, POLICY_MAPPINGS,
-    POLICY_MAPPING)
-ASN1_ITEM_TEMPLATE_END(POLICY_MAPPINGS)
+const ASN1_ITEM POLICY_MAPPING_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = POLICY_MAPPING_seq_tt,
+	.tcount = sizeof(POLICY_MAPPING_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(POLICY_MAPPING),
+	.sname = "POLICY_MAPPING",
+};
+
+static const ASN1_TEMPLATE POLICY_MAPPINGS_item_tt = {
+	.flags = ASN1_TFLG_SEQUENCE_OF,
+	.tag = 0,
+	.offset = 0,
+	.field_name = "POLICY_MAPPINGS",
+	.item = &POLICY_MAPPING_it,
+};
+
+const ASN1_ITEM POLICY_MAPPINGS_it = {
+	.itype = ASN1_ITYPE_PRIMITIVE,
+	.utype = -1,
+	.templates = &POLICY_MAPPINGS_item_tt,
+	.tcount = 0,
+	.funcs = NULL,
+	.size = 0,
+	.sname = "POLICY_MAPPINGS",
+};
 
 
 POLICY_MAPPING *

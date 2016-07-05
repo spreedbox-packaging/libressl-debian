@@ -1,4 +1,4 @@
-/* $OpenBSD: randfile.c,v 1.39 2014/07/14 00:01:39 deraadt Exp $ */
+/* $OpenBSD: randfile.c,v 1.41 2015/07/18 22:46:42 beck Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -90,7 +90,7 @@ int
 RAND_write_file(const char *file)
 {
 	unsigned char buf[BUFSIZE];
-	int i, ret = 0, rand_err = 0;
+	int i, ret = 0;
 	FILE *out = NULL;
 	int n, fd;
 	struct stat sb;
@@ -130,8 +130,8 @@ RAND_write_file(const char *file)
 	}
 
 	fclose(out);
-	OPENSSL_cleanse(buf, BUFSIZE);
-	return (rand_err ? -1 : ret);
+	explicit_bzero(buf, BUFSIZE);
+	return ret;
 }
 
 const char *

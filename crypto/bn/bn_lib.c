@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_lib.c,v 1.32 2014/07/11 08:44:48 jsing Exp $ */
+/* $OpenBSD: bn_lib.c,v 1.35 2016/03/04 16:23:30 deraadt Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -221,11 +221,11 @@ BN_clear_free(BIGNUM *a)
 		return;
 	bn_check_top(a);
 	if (a->d != NULL && !(BN_get_flags(a, BN_FLG_STATIC_DATA))) {
-		OPENSSL_cleanse(a->d, a->dmax * sizeof(a->d[0]));
+		explicit_bzero(a->d, a->dmax * sizeof(a->d[0]));
 		free(a->d);
 	}
 	i = BN_get_flags(a, BN_FLG_MALLOCED);
-	OPENSSL_cleanse(a, sizeof(BIGNUM));
+	explicit_bzero(a, sizeof(BIGNUM));
 	if (i)
 		free(a);
 }
@@ -295,7 +295,7 @@ bn_expand_internal(const BIGNUM *b, int words)
 			 * The fact that the loop is unrolled
 			 * 4-wise is a tribute to Intel. It's
 			 * the one that doesn't have enough
-			 * registers to accomodate more data.
+			 * registers to accommodate more data.
 			 * I'd unroll it 8-wise otherwise:-)
 			 *
 			 *		<appro@fy.chalmers.se>
@@ -395,7 +395,7 @@ bn_expand2(BIGNUM *b, int words)
 		if (!a)
 			return NULL;
 		if (b->d) {
-			OPENSSL_cleanse(b->d, b->dmax * sizeof(b->d[0]));
+			explicit_bzero(b->d, b->dmax * sizeof(b->d[0]));
 			free(b->d);
 		}
 		b->d = a;
@@ -548,6 +548,18 @@ BN_get_word(const BIGNUM *a)
 		return a->d[0];
 	/* a->top == 0 */
 	return 0;
+}
+
+BIGNUM *
+bn_expand(BIGNUM *a, int bits)
+{
+	if (bits > (INT_MAX - BN_BITS2 + 1))
+		return (NULL);
+
+	if (((bits + BN_BITS2 - 1) / BN_BITS2) <= a->dmax)
+		return (a);
+
+	return bn_expand2(a, (bits + BN_BITS2 - 1) / BN_BITS2);
 }
 
 int

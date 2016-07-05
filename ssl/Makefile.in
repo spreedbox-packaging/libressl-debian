@@ -91,10 +91,13 @@ build_triplet = @build@
 host_triplet = @host@
 subdir = ssl
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
-am__aclocal_m4_deps = $(top_srcdir)/m4/libtool.m4 \
-	$(top_srcdir)/m4/ltoptions.m4 $(top_srcdir)/m4/ltsugar.m4 \
-	$(top_srcdir)/m4/ltversion.m4 $(top_srcdir)/m4/lt~obsolete.m4 \
-	$(top_srcdir)/configure.ac
+am__aclocal_m4_deps = $(top_srcdir)/m4/check-hardening-options.m4 \
+	$(top_srcdir)/m4/check-libc.m4 \
+	$(top_srcdir)/m4/check-os-options.m4 \
+	$(top_srcdir)/m4/disable-compiler-warnings.m4 \
+	$(top_srcdir)/m4/libtool.m4 $(top_srcdir)/m4/ltoptions.m4 \
+	$(top_srcdir)/m4/ltsugar.m4 $(top_srcdir)/m4/ltversion.m4 \
+	$(top_srcdir)/m4/lt~obsolete.m4 $(top_srcdir)/configure.ac
 am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 	$(ACLOCAL_M4)
 DIST_COMMON = $(srcdir)/Makefile.am $(noinst_HEADERS) \
@@ -131,33 +134,23 @@ am__uninstall_files_from_dir = { \
   }
 am__installdirs = "$(DESTDIR)$(libdir)"
 LTLIBRARIES = $(lib_LTLIBRARIES)
-libssl_la_DEPENDENCIES = ../crypto/libcrypto.la
-am_libssl_la_OBJECTS = libssl_la-bio_ssl.lo libssl_la-bs_ber.lo \
-	libssl_la-bs_cbb.lo libssl_la-bs_cbs.lo libssl_la-d1_both.lo \
-	libssl_la-d1_clnt.lo libssl_la-d1_enc.lo libssl_la-d1_lib.lo \
-	libssl_la-d1_meth.lo libssl_la-d1_pkt.lo libssl_la-d1_srtp.lo \
-	libssl_la-d1_srvr.lo libssl_la-pqueue.lo libssl_la-s23_clnt.lo \
-	libssl_la-s23_lib.lo libssl_la-s23_meth.lo \
-	libssl_la-s23_pkt.lo libssl_la-s23_srvr.lo \
-	libssl_la-s3_both.lo libssl_la-s3_cbc.lo libssl_la-s3_clnt.lo \
-	libssl_la-s3_enc.lo libssl_la-s3_lib.lo libssl_la-s3_meth.lo \
-	libssl_la-s3_pkt.lo libssl_la-s3_srvr.lo libssl_la-ssl_algs.lo \
-	libssl_la-ssl_asn1.lo libssl_la-ssl_cert.lo \
-	libssl_la-ssl_ciph.lo libssl_la-ssl_err.lo \
-	libssl_la-ssl_err2.lo libssl_la-ssl_lib.lo \
-	libssl_la-ssl_rsa.lo libssl_la-ssl_sess.lo \
-	libssl_la-ssl_stat.lo libssl_la-ssl_txt.lo \
-	libssl_la-t1_clnt.lo libssl_la-t1_enc.lo libssl_la-t1_lib.lo \
-	libssl_la-t1_meth.lo libssl_la-t1_reneg.lo \
-	libssl_la-t1_srvr.lo
+libssl_la_DEPENDENCIES = $(abs_top_builddir)/crypto/libcrypto.la
+am_libssl_la_OBJECTS = bio_ssl.lo bs_ber.lo bs_cbb.lo bs_cbs.lo \
+	d1_both.lo d1_clnt.lo d1_enc.lo d1_lib.lo d1_meth.lo d1_pkt.lo \
+	d1_srtp.lo d1_srvr.lo pqueue.lo s23_clnt.lo s23_lib.lo \
+	s23_pkt.lo s23_srvr.lo s3_both.lo s3_cbc.lo s3_clnt.lo \
+	s3_lib.lo s3_pkt.lo s3_srvr.lo ssl_algs.lo ssl_asn1.lo \
+	ssl_cert.lo ssl_ciph.lo ssl_err.lo ssl_err2.lo ssl_lib.lo \
+	ssl_rsa.lo ssl_sess.lo ssl_stat.lo ssl_txt.lo t1_clnt.lo \
+	t1_enc.lo t1_lib.lo t1_meth.lo t1_reneg.lo t1_srvr.lo
 libssl_la_OBJECTS = $(am_libssl_la_OBJECTS)
 AM_V_lt = $(am__v_lt_@AM_V@)
 am__v_lt_ = $(am__v_lt_@AM_DEFAULT_V@)
 am__v_lt_0 = --silent
 am__v_lt_1 = 
 libssl_la_LINK = $(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) \
-	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(libssl_la_CFLAGS) \
-	$(CFLAGS) $(libssl_la_LDFLAGS) $(LDFLAGS) -o $@
+	$(LIBTOOLFLAGS) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
+	$(libssl_la_LDFLAGS) $(LDFLAGS) -o $@
 AM_V_P = $(am__v_P_@AM_V@)
 am__v_P_ = $(am__v_P_@AM_DEFAULT_V@)
 am__v_P_0 = false
@@ -274,6 +267,7 @@ NM = @NM@
 NMEDIT = @NMEDIT@
 OBJDUMP = @OBJDUMP@
 OBJEXT = @OBJEXT@
+OPENSSLDIR = @OPENSSLDIR@
 OTOOL = @OTOOL@
 OTOOL64 = @OTOOL64@
 PACKAGE = @PACKAGE@
@@ -291,7 +285,6 @@ SED = @SED@
 SET_MAKE = @SET_MAKE@
 SHELL = @SHELL@
 STRIP = @STRIP@
-USER_CFLAGS = @USER_CFLAGS@
 VERSION = @VERSION@
 abs_builddir = @abs_builddir@
 abs_srcdir = @abs_srcdir@
@@ -345,20 +338,19 @@ target_alias = @target_alias@
 top_build_prefix = @top_build_prefix@
 top_builddir = @top_builddir@
 top_srcdir = @top_srcdir@
-AM_CPPFLAGS = -I$(top_srcdir)/include -DLIBRESSL_INTERNAL
+AM_CFLAGS = 
+AM_CPPFLAGS = -I$(top_srcdir)/include -I$(top_srcdir)/include/compat -DLIBRESSL_INTERNAL
 lib_LTLIBRARIES = libssl.la
-EXTRA_DIST = VERSION
+EXTRA_DIST = VERSION CMakeLists.txt
 libssl_la_LDFLAGS = -version-info @LIBSSL_VERSION@ -no-undefined
-libssl_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
-libssl_la_LIBADD = ../crypto/libcrypto.la
+libssl_la_LIBADD = $(abs_top_builddir)/crypto/libcrypto.la
 libssl_la_SOURCES = bio_ssl.c bs_ber.c bs_cbb.c bs_cbs.c d1_both.c \
 	d1_clnt.c d1_enc.c d1_lib.c d1_meth.c d1_pkt.c d1_srtp.c \
-	d1_srvr.c pqueue.c s23_clnt.c s23_lib.c s23_meth.c s23_pkt.c \
-	s23_srvr.c s3_both.c s3_cbc.c s3_clnt.c s3_enc.c s3_lib.c \
-	s3_meth.c s3_pkt.c s3_srvr.c ssl_algs.c ssl_asn1.c ssl_cert.c \
-	ssl_ciph.c ssl_err.c ssl_err2.c ssl_lib.c ssl_rsa.c ssl_sess.c \
-	ssl_stat.c ssl_txt.c t1_clnt.c t1_enc.c t1_lib.c t1_meth.c \
-	t1_reneg.c t1_srvr.c
+	d1_srvr.c pqueue.c s23_clnt.c s23_lib.c s23_pkt.c s23_srvr.c \
+	s3_both.c s3_cbc.c s3_clnt.c s3_lib.c s3_pkt.c s3_srvr.c \
+	ssl_algs.c ssl_asn1.c ssl_cert.c ssl_ciph.c ssl_err.c \
+	ssl_err2.c ssl_lib.c ssl_rsa.c ssl_sess.c ssl_stat.c ssl_txt.c \
+	t1_clnt.c t1_enc.c t1_lib.c t1_meth.c t1_reneg.c t1_srvr.c
 noinst_HEADERS = srtp.h ssl_locl.h bytestring.h
 all: all-am
 
@@ -373,9 +365,9 @@ $(srcdir)/Makefile.in:  $(srcdir)/Makefile.am $(top_srcdir)/Makefile.am.common $
 	      exit 1;; \
 	  esac; \
 	done; \
-	echo ' cd $(top_srcdir) && $(AUTOMAKE) --gnu ssl/Makefile'; \
+	echo ' cd $(top_srcdir) && $(AUTOMAKE) --foreign ssl/Makefile'; \
 	$(am__cd) $(top_srcdir) && \
-	  $(AUTOMAKE) --gnu ssl/Makefile
+	  $(AUTOMAKE) --foreign ssl/Makefile
 Makefile: $(srcdir)/Makefile.in $(top_builddir)/config.status
 	@case '$?' in \
 	  *config.status*) \
@@ -439,49 +431,46 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-bio_ssl.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-bs_ber.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-bs_cbb.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-bs_cbs.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-d1_both.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-d1_clnt.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-d1_enc.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-d1_lib.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-d1_meth.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-d1_pkt.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-d1_srtp.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-d1_srvr.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-pqueue.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-s23_clnt.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-s23_lib.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-s23_meth.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-s23_pkt.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-s23_srvr.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-s3_both.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-s3_cbc.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-s3_clnt.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-s3_enc.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-s3_lib.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-s3_meth.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-s3_pkt.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-s3_srvr.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-ssl_algs.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-ssl_asn1.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-ssl_cert.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-ssl_ciph.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-ssl_err.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-ssl_err2.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-ssl_lib.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-ssl_rsa.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-ssl_sess.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-ssl_stat.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-ssl_txt.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-t1_clnt.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-t1_enc.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-t1_lib.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-t1_meth.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-t1_reneg.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/libssl_la-t1_srvr.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bio_ssl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bs_ber.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bs_cbb.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/bs_cbs.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/d1_both.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/d1_clnt.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/d1_enc.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/d1_lib.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/d1_meth.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/d1_pkt.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/d1_srtp.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/d1_srvr.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pqueue.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/s23_clnt.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/s23_lib.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/s23_pkt.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/s23_srvr.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/s3_both.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/s3_cbc.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/s3_clnt.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/s3_lib.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/s3_pkt.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/s3_srvr.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ssl_algs.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ssl_asn1.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ssl_cert.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ssl_ciph.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ssl_err.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ssl_err2.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ssl_lib.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ssl_rsa.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ssl_sess.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ssl_stat.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ssl_txt.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/t1_clnt.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/t1_enc.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/t1_lib.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/t1_meth.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/t1_reneg.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/t1_srvr.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	$(AM_V_CC)depbase=`echo $@ | sed 's|[^/]*$$|$(DEPDIR)/&|;s|\.o$$||'`;\
@@ -506,307 +495,6 @@ distclean-compile:
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='$<' object='$@' libtool=yes @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LTCOMPILE) -c -o $@ $<
-
-libssl_la-bio_ssl.lo: bio_ssl.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-bio_ssl.lo -MD -MP -MF $(DEPDIR)/libssl_la-bio_ssl.Tpo -c -o libssl_la-bio_ssl.lo `test -f 'bio_ssl.c' || echo '$(srcdir)/'`bio_ssl.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-bio_ssl.Tpo $(DEPDIR)/libssl_la-bio_ssl.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bio_ssl.c' object='libssl_la-bio_ssl.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-bio_ssl.lo `test -f 'bio_ssl.c' || echo '$(srcdir)/'`bio_ssl.c
-
-libssl_la-bs_ber.lo: bs_ber.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-bs_ber.lo -MD -MP -MF $(DEPDIR)/libssl_la-bs_ber.Tpo -c -o libssl_la-bs_ber.lo `test -f 'bs_ber.c' || echo '$(srcdir)/'`bs_ber.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-bs_ber.Tpo $(DEPDIR)/libssl_la-bs_ber.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bs_ber.c' object='libssl_la-bs_ber.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-bs_ber.lo `test -f 'bs_ber.c' || echo '$(srcdir)/'`bs_ber.c
-
-libssl_la-bs_cbb.lo: bs_cbb.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-bs_cbb.lo -MD -MP -MF $(DEPDIR)/libssl_la-bs_cbb.Tpo -c -o libssl_la-bs_cbb.lo `test -f 'bs_cbb.c' || echo '$(srcdir)/'`bs_cbb.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-bs_cbb.Tpo $(DEPDIR)/libssl_la-bs_cbb.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bs_cbb.c' object='libssl_la-bs_cbb.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-bs_cbb.lo `test -f 'bs_cbb.c' || echo '$(srcdir)/'`bs_cbb.c
-
-libssl_la-bs_cbs.lo: bs_cbs.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-bs_cbs.lo -MD -MP -MF $(DEPDIR)/libssl_la-bs_cbs.Tpo -c -o libssl_la-bs_cbs.lo `test -f 'bs_cbs.c' || echo '$(srcdir)/'`bs_cbs.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-bs_cbs.Tpo $(DEPDIR)/libssl_la-bs_cbs.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='bs_cbs.c' object='libssl_la-bs_cbs.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-bs_cbs.lo `test -f 'bs_cbs.c' || echo '$(srcdir)/'`bs_cbs.c
-
-libssl_la-d1_both.lo: d1_both.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-d1_both.lo -MD -MP -MF $(DEPDIR)/libssl_la-d1_both.Tpo -c -o libssl_la-d1_both.lo `test -f 'd1_both.c' || echo '$(srcdir)/'`d1_both.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-d1_both.Tpo $(DEPDIR)/libssl_la-d1_both.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='d1_both.c' object='libssl_la-d1_both.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-d1_both.lo `test -f 'd1_both.c' || echo '$(srcdir)/'`d1_both.c
-
-libssl_la-d1_clnt.lo: d1_clnt.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-d1_clnt.lo -MD -MP -MF $(DEPDIR)/libssl_la-d1_clnt.Tpo -c -o libssl_la-d1_clnt.lo `test -f 'd1_clnt.c' || echo '$(srcdir)/'`d1_clnt.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-d1_clnt.Tpo $(DEPDIR)/libssl_la-d1_clnt.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='d1_clnt.c' object='libssl_la-d1_clnt.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-d1_clnt.lo `test -f 'd1_clnt.c' || echo '$(srcdir)/'`d1_clnt.c
-
-libssl_la-d1_enc.lo: d1_enc.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-d1_enc.lo -MD -MP -MF $(DEPDIR)/libssl_la-d1_enc.Tpo -c -o libssl_la-d1_enc.lo `test -f 'd1_enc.c' || echo '$(srcdir)/'`d1_enc.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-d1_enc.Tpo $(DEPDIR)/libssl_la-d1_enc.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='d1_enc.c' object='libssl_la-d1_enc.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-d1_enc.lo `test -f 'd1_enc.c' || echo '$(srcdir)/'`d1_enc.c
-
-libssl_la-d1_lib.lo: d1_lib.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-d1_lib.lo -MD -MP -MF $(DEPDIR)/libssl_la-d1_lib.Tpo -c -o libssl_la-d1_lib.lo `test -f 'd1_lib.c' || echo '$(srcdir)/'`d1_lib.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-d1_lib.Tpo $(DEPDIR)/libssl_la-d1_lib.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='d1_lib.c' object='libssl_la-d1_lib.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-d1_lib.lo `test -f 'd1_lib.c' || echo '$(srcdir)/'`d1_lib.c
-
-libssl_la-d1_meth.lo: d1_meth.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-d1_meth.lo -MD -MP -MF $(DEPDIR)/libssl_la-d1_meth.Tpo -c -o libssl_la-d1_meth.lo `test -f 'd1_meth.c' || echo '$(srcdir)/'`d1_meth.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-d1_meth.Tpo $(DEPDIR)/libssl_la-d1_meth.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='d1_meth.c' object='libssl_la-d1_meth.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-d1_meth.lo `test -f 'd1_meth.c' || echo '$(srcdir)/'`d1_meth.c
-
-libssl_la-d1_pkt.lo: d1_pkt.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-d1_pkt.lo -MD -MP -MF $(DEPDIR)/libssl_la-d1_pkt.Tpo -c -o libssl_la-d1_pkt.lo `test -f 'd1_pkt.c' || echo '$(srcdir)/'`d1_pkt.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-d1_pkt.Tpo $(DEPDIR)/libssl_la-d1_pkt.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='d1_pkt.c' object='libssl_la-d1_pkt.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-d1_pkt.lo `test -f 'd1_pkt.c' || echo '$(srcdir)/'`d1_pkt.c
-
-libssl_la-d1_srtp.lo: d1_srtp.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-d1_srtp.lo -MD -MP -MF $(DEPDIR)/libssl_la-d1_srtp.Tpo -c -o libssl_la-d1_srtp.lo `test -f 'd1_srtp.c' || echo '$(srcdir)/'`d1_srtp.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-d1_srtp.Tpo $(DEPDIR)/libssl_la-d1_srtp.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='d1_srtp.c' object='libssl_la-d1_srtp.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-d1_srtp.lo `test -f 'd1_srtp.c' || echo '$(srcdir)/'`d1_srtp.c
-
-libssl_la-d1_srvr.lo: d1_srvr.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-d1_srvr.lo -MD -MP -MF $(DEPDIR)/libssl_la-d1_srvr.Tpo -c -o libssl_la-d1_srvr.lo `test -f 'd1_srvr.c' || echo '$(srcdir)/'`d1_srvr.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-d1_srvr.Tpo $(DEPDIR)/libssl_la-d1_srvr.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='d1_srvr.c' object='libssl_la-d1_srvr.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-d1_srvr.lo `test -f 'd1_srvr.c' || echo '$(srcdir)/'`d1_srvr.c
-
-libssl_la-pqueue.lo: pqueue.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-pqueue.lo -MD -MP -MF $(DEPDIR)/libssl_la-pqueue.Tpo -c -o libssl_la-pqueue.lo `test -f 'pqueue.c' || echo '$(srcdir)/'`pqueue.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-pqueue.Tpo $(DEPDIR)/libssl_la-pqueue.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='pqueue.c' object='libssl_la-pqueue.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-pqueue.lo `test -f 'pqueue.c' || echo '$(srcdir)/'`pqueue.c
-
-libssl_la-s23_clnt.lo: s23_clnt.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-s23_clnt.lo -MD -MP -MF $(DEPDIR)/libssl_la-s23_clnt.Tpo -c -o libssl_la-s23_clnt.lo `test -f 's23_clnt.c' || echo '$(srcdir)/'`s23_clnt.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-s23_clnt.Tpo $(DEPDIR)/libssl_la-s23_clnt.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='s23_clnt.c' object='libssl_la-s23_clnt.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-s23_clnt.lo `test -f 's23_clnt.c' || echo '$(srcdir)/'`s23_clnt.c
-
-libssl_la-s23_lib.lo: s23_lib.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-s23_lib.lo -MD -MP -MF $(DEPDIR)/libssl_la-s23_lib.Tpo -c -o libssl_la-s23_lib.lo `test -f 's23_lib.c' || echo '$(srcdir)/'`s23_lib.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-s23_lib.Tpo $(DEPDIR)/libssl_la-s23_lib.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='s23_lib.c' object='libssl_la-s23_lib.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-s23_lib.lo `test -f 's23_lib.c' || echo '$(srcdir)/'`s23_lib.c
-
-libssl_la-s23_meth.lo: s23_meth.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-s23_meth.lo -MD -MP -MF $(DEPDIR)/libssl_la-s23_meth.Tpo -c -o libssl_la-s23_meth.lo `test -f 's23_meth.c' || echo '$(srcdir)/'`s23_meth.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-s23_meth.Tpo $(DEPDIR)/libssl_la-s23_meth.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='s23_meth.c' object='libssl_la-s23_meth.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-s23_meth.lo `test -f 's23_meth.c' || echo '$(srcdir)/'`s23_meth.c
-
-libssl_la-s23_pkt.lo: s23_pkt.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-s23_pkt.lo -MD -MP -MF $(DEPDIR)/libssl_la-s23_pkt.Tpo -c -o libssl_la-s23_pkt.lo `test -f 's23_pkt.c' || echo '$(srcdir)/'`s23_pkt.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-s23_pkt.Tpo $(DEPDIR)/libssl_la-s23_pkt.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='s23_pkt.c' object='libssl_la-s23_pkt.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-s23_pkt.lo `test -f 's23_pkt.c' || echo '$(srcdir)/'`s23_pkt.c
-
-libssl_la-s23_srvr.lo: s23_srvr.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-s23_srvr.lo -MD -MP -MF $(DEPDIR)/libssl_la-s23_srvr.Tpo -c -o libssl_la-s23_srvr.lo `test -f 's23_srvr.c' || echo '$(srcdir)/'`s23_srvr.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-s23_srvr.Tpo $(DEPDIR)/libssl_la-s23_srvr.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='s23_srvr.c' object='libssl_la-s23_srvr.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-s23_srvr.lo `test -f 's23_srvr.c' || echo '$(srcdir)/'`s23_srvr.c
-
-libssl_la-s3_both.lo: s3_both.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-s3_both.lo -MD -MP -MF $(DEPDIR)/libssl_la-s3_both.Tpo -c -o libssl_la-s3_both.lo `test -f 's3_both.c' || echo '$(srcdir)/'`s3_both.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-s3_both.Tpo $(DEPDIR)/libssl_la-s3_both.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='s3_both.c' object='libssl_la-s3_both.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-s3_both.lo `test -f 's3_both.c' || echo '$(srcdir)/'`s3_both.c
-
-libssl_la-s3_cbc.lo: s3_cbc.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-s3_cbc.lo -MD -MP -MF $(DEPDIR)/libssl_la-s3_cbc.Tpo -c -o libssl_la-s3_cbc.lo `test -f 's3_cbc.c' || echo '$(srcdir)/'`s3_cbc.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-s3_cbc.Tpo $(DEPDIR)/libssl_la-s3_cbc.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='s3_cbc.c' object='libssl_la-s3_cbc.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-s3_cbc.lo `test -f 's3_cbc.c' || echo '$(srcdir)/'`s3_cbc.c
-
-libssl_la-s3_clnt.lo: s3_clnt.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-s3_clnt.lo -MD -MP -MF $(DEPDIR)/libssl_la-s3_clnt.Tpo -c -o libssl_la-s3_clnt.lo `test -f 's3_clnt.c' || echo '$(srcdir)/'`s3_clnt.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-s3_clnt.Tpo $(DEPDIR)/libssl_la-s3_clnt.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='s3_clnt.c' object='libssl_la-s3_clnt.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-s3_clnt.lo `test -f 's3_clnt.c' || echo '$(srcdir)/'`s3_clnt.c
-
-libssl_la-s3_enc.lo: s3_enc.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-s3_enc.lo -MD -MP -MF $(DEPDIR)/libssl_la-s3_enc.Tpo -c -o libssl_la-s3_enc.lo `test -f 's3_enc.c' || echo '$(srcdir)/'`s3_enc.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-s3_enc.Tpo $(DEPDIR)/libssl_la-s3_enc.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='s3_enc.c' object='libssl_la-s3_enc.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-s3_enc.lo `test -f 's3_enc.c' || echo '$(srcdir)/'`s3_enc.c
-
-libssl_la-s3_lib.lo: s3_lib.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-s3_lib.lo -MD -MP -MF $(DEPDIR)/libssl_la-s3_lib.Tpo -c -o libssl_la-s3_lib.lo `test -f 's3_lib.c' || echo '$(srcdir)/'`s3_lib.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-s3_lib.Tpo $(DEPDIR)/libssl_la-s3_lib.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='s3_lib.c' object='libssl_la-s3_lib.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-s3_lib.lo `test -f 's3_lib.c' || echo '$(srcdir)/'`s3_lib.c
-
-libssl_la-s3_meth.lo: s3_meth.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-s3_meth.lo -MD -MP -MF $(DEPDIR)/libssl_la-s3_meth.Tpo -c -o libssl_la-s3_meth.lo `test -f 's3_meth.c' || echo '$(srcdir)/'`s3_meth.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-s3_meth.Tpo $(DEPDIR)/libssl_la-s3_meth.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='s3_meth.c' object='libssl_la-s3_meth.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-s3_meth.lo `test -f 's3_meth.c' || echo '$(srcdir)/'`s3_meth.c
-
-libssl_la-s3_pkt.lo: s3_pkt.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-s3_pkt.lo -MD -MP -MF $(DEPDIR)/libssl_la-s3_pkt.Tpo -c -o libssl_la-s3_pkt.lo `test -f 's3_pkt.c' || echo '$(srcdir)/'`s3_pkt.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-s3_pkt.Tpo $(DEPDIR)/libssl_la-s3_pkt.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='s3_pkt.c' object='libssl_la-s3_pkt.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-s3_pkt.lo `test -f 's3_pkt.c' || echo '$(srcdir)/'`s3_pkt.c
-
-libssl_la-s3_srvr.lo: s3_srvr.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-s3_srvr.lo -MD -MP -MF $(DEPDIR)/libssl_la-s3_srvr.Tpo -c -o libssl_la-s3_srvr.lo `test -f 's3_srvr.c' || echo '$(srcdir)/'`s3_srvr.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-s3_srvr.Tpo $(DEPDIR)/libssl_la-s3_srvr.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='s3_srvr.c' object='libssl_la-s3_srvr.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-s3_srvr.lo `test -f 's3_srvr.c' || echo '$(srcdir)/'`s3_srvr.c
-
-libssl_la-ssl_algs.lo: ssl_algs.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-ssl_algs.lo -MD -MP -MF $(DEPDIR)/libssl_la-ssl_algs.Tpo -c -o libssl_la-ssl_algs.lo `test -f 'ssl_algs.c' || echo '$(srcdir)/'`ssl_algs.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-ssl_algs.Tpo $(DEPDIR)/libssl_la-ssl_algs.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ssl_algs.c' object='libssl_la-ssl_algs.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-ssl_algs.lo `test -f 'ssl_algs.c' || echo '$(srcdir)/'`ssl_algs.c
-
-libssl_la-ssl_asn1.lo: ssl_asn1.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-ssl_asn1.lo -MD -MP -MF $(DEPDIR)/libssl_la-ssl_asn1.Tpo -c -o libssl_la-ssl_asn1.lo `test -f 'ssl_asn1.c' || echo '$(srcdir)/'`ssl_asn1.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-ssl_asn1.Tpo $(DEPDIR)/libssl_la-ssl_asn1.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ssl_asn1.c' object='libssl_la-ssl_asn1.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-ssl_asn1.lo `test -f 'ssl_asn1.c' || echo '$(srcdir)/'`ssl_asn1.c
-
-libssl_la-ssl_cert.lo: ssl_cert.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-ssl_cert.lo -MD -MP -MF $(DEPDIR)/libssl_la-ssl_cert.Tpo -c -o libssl_la-ssl_cert.lo `test -f 'ssl_cert.c' || echo '$(srcdir)/'`ssl_cert.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-ssl_cert.Tpo $(DEPDIR)/libssl_la-ssl_cert.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ssl_cert.c' object='libssl_la-ssl_cert.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-ssl_cert.lo `test -f 'ssl_cert.c' || echo '$(srcdir)/'`ssl_cert.c
-
-libssl_la-ssl_ciph.lo: ssl_ciph.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-ssl_ciph.lo -MD -MP -MF $(DEPDIR)/libssl_la-ssl_ciph.Tpo -c -o libssl_la-ssl_ciph.lo `test -f 'ssl_ciph.c' || echo '$(srcdir)/'`ssl_ciph.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-ssl_ciph.Tpo $(DEPDIR)/libssl_la-ssl_ciph.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ssl_ciph.c' object='libssl_la-ssl_ciph.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-ssl_ciph.lo `test -f 'ssl_ciph.c' || echo '$(srcdir)/'`ssl_ciph.c
-
-libssl_la-ssl_err.lo: ssl_err.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-ssl_err.lo -MD -MP -MF $(DEPDIR)/libssl_la-ssl_err.Tpo -c -o libssl_la-ssl_err.lo `test -f 'ssl_err.c' || echo '$(srcdir)/'`ssl_err.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-ssl_err.Tpo $(DEPDIR)/libssl_la-ssl_err.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ssl_err.c' object='libssl_la-ssl_err.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-ssl_err.lo `test -f 'ssl_err.c' || echo '$(srcdir)/'`ssl_err.c
-
-libssl_la-ssl_err2.lo: ssl_err2.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-ssl_err2.lo -MD -MP -MF $(DEPDIR)/libssl_la-ssl_err2.Tpo -c -o libssl_la-ssl_err2.lo `test -f 'ssl_err2.c' || echo '$(srcdir)/'`ssl_err2.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-ssl_err2.Tpo $(DEPDIR)/libssl_la-ssl_err2.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ssl_err2.c' object='libssl_la-ssl_err2.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-ssl_err2.lo `test -f 'ssl_err2.c' || echo '$(srcdir)/'`ssl_err2.c
-
-libssl_la-ssl_lib.lo: ssl_lib.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-ssl_lib.lo -MD -MP -MF $(DEPDIR)/libssl_la-ssl_lib.Tpo -c -o libssl_la-ssl_lib.lo `test -f 'ssl_lib.c' || echo '$(srcdir)/'`ssl_lib.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-ssl_lib.Tpo $(DEPDIR)/libssl_la-ssl_lib.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ssl_lib.c' object='libssl_la-ssl_lib.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-ssl_lib.lo `test -f 'ssl_lib.c' || echo '$(srcdir)/'`ssl_lib.c
-
-libssl_la-ssl_rsa.lo: ssl_rsa.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-ssl_rsa.lo -MD -MP -MF $(DEPDIR)/libssl_la-ssl_rsa.Tpo -c -o libssl_la-ssl_rsa.lo `test -f 'ssl_rsa.c' || echo '$(srcdir)/'`ssl_rsa.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-ssl_rsa.Tpo $(DEPDIR)/libssl_la-ssl_rsa.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ssl_rsa.c' object='libssl_la-ssl_rsa.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-ssl_rsa.lo `test -f 'ssl_rsa.c' || echo '$(srcdir)/'`ssl_rsa.c
-
-libssl_la-ssl_sess.lo: ssl_sess.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-ssl_sess.lo -MD -MP -MF $(DEPDIR)/libssl_la-ssl_sess.Tpo -c -o libssl_la-ssl_sess.lo `test -f 'ssl_sess.c' || echo '$(srcdir)/'`ssl_sess.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-ssl_sess.Tpo $(DEPDIR)/libssl_la-ssl_sess.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ssl_sess.c' object='libssl_la-ssl_sess.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-ssl_sess.lo `test -f 'ssl_sess.c' || echo '$(srcdir)/'`ssl_sess.c
-
-libssl_la-ssl_stat.lo: ssl_stat.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-ssl_stat.lo -MD -MP -MF $(DEPDIR)/libssl_la-ssl_stat.Tpo -c -o libssl_la-ssl_stat.lo `test -f 'ssl_stat.c' || echo '$(srcdir)/'`ssl_stat.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-ssl_stat.Tpo $(DEPDIR)/libssl_la-ssl_stat.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ssl_stat.c' object='libssl_la-ssl_stat.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-ssl_stat.lo `test -f 'ssl_stat.c' || echo '$(srcdir)/'`ssl_stat.c
-
-libssl_la-ssl_txt.lo: ssl_txt.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-ssl_txt.lo -MD -MP -MF $(DEPDIR)/libssl_la-ssl_txt.Tpo -c -o libssl_la-ssl_txt.lo `test -f 'ssl_txt.c' || echo '$(srcdir)/'`ssl_txt.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-ssl_txt.Tpo $(DEPDIR)/libssl_la-ssl_txt.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ssl_txt.c' object='libssl_la-ssl_txt.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-ssl_txt.lo `test -f 'ssl_txt.c' || echo '$(srcdir)/'`ssl_txt.c
-
-libssl_la-t1_clnt.lo: t1_clnt.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-t1_clnt.lo -MD -MP -MF $(DEPDIR)/libssl_la-t1_clnt.Tpo -c -o libssl_la-t1_clnt.lo `test -f 't1_clnt.c' || echo '$(srcdir)/'`t1_clnt.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-t1_clnt.Tpo $(DEPDIR)/libssl_la-t1_clnt.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='t1_clnt.c' object='libssl_la-t1_clnt.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-t1_clnt.lo `test -f 't1_clnt.c' || echo '$(srcdir)/'`t1_clnt.c
-
-libssl_la-t1_enc.lo: t1_enc.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-t1_enc.lo -MD -MP -MF $(DEPDIR)/libssl_la-t1_enc.Tpo -c -o libssl_la-t1_enc.lo `test -f 't1_enc.c' || echo '$(srcdir)/'`t1_enc.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-t1_enc.Tpo $(DEPDIR)/libssl_la-t1_enc.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='t1_enc.c' object='libssl_la-t1_enc.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-t1_enc.lo `test -f 't1_enc.c' || echo '$(srcdir)/'`t1_enc.c
-
-libssl_la-t1_lib.lo: t1_lib.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-t1_lib.lo -MD -MP -MF $(DEPDIR)/libssl_la-t1_lib.Tpo -c -o libssl_la-t1_lib.lo `test -f 't1_lib.c' || echo '$(srcdir)/'`t1_lib.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-t1_lib.Tpo $(DEPDIR)/libssl_la-t1_lib.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='t1_lib.c' object='libssl_la-t1_lib.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-t1_lib.lo `test -f 't1_lib.c' || echo '$(srcdir)/'`t1_lib.c
-
-libssl_la-t1_meth.lo: t1_meth.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-t1_meth.lo -MD -MP -MF $(DEPDIR)/libssl_la-t1_meth.Tpo -c -o libssl_la-t1_meth.lo `test -f 't1_meth.c' || echo '$(srcdir)/'`t1_meth.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-t1_meth.Tpo $(DEPDIR)/libssl_la-t1_meth.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='t1_meth.c' object='libssl_la-t1_meth.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-t1_meth.lo `test -f 't1_meth.c' || echo '$(srcdir)/'`t1_meth.c
-
-libssl_la-t1_reneg.lo: t1_reneg.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-t1_reneg.lo -MD -MP -MF $(DEPDIR)/libssl_la-t1_reneg.Tpo -c -o libssl_la-t1_reneg.lo `test -f 't1_reneg.c' || echo '$(srcdir)/'`t1_reneg.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-t1_reneg.Tpo $(DEPDIR)/libssl_la-t1_reneg.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='t1_reneg.c' object='libssl_la-t1_reneg.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-t1_reneg.lo `test -f 't1_reneg.c' || echo '$(srcdir)/'`t1_reneg.c
-
-libssl_la-t1_srvr.lo: t1_srvr.c
-@am__fastdepCC_TRUE@	$(AM_V_CC)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -MT libssl_la-t1_srvr.lo -MD -MP -MF $(DEPDIR)/libssl_la-t1_srvr.Tpo -c -o libssl_la-t1_srvr.lo `test -f 't1_srvr.c' || echo '$(srcdir)/'`t1_srvr.c
-@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/libssl_la-t1_srvr.Tpo $(DEPDIR)/libssl_la-t1_srvr.Plo
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='t1_srvr.c' object='libssl_la-t1_srvr.lo' libtool=yes @AMDEPBACKSLASH@
-@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
-@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(LIBTOOL) $(AM_V_lt) --tag=CC $(AM_LIBTOOLFLAGS) $(LIBTOOLFLAGS) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(libssl_la_CFLAGS) $(CFLAGS) -c -o libssl_la-t1_srvr.lo `test -f 't1_srvr.c' || echo '$(srcdir)/'`t1_srvr.c
 
 mostlyclean-libtool:
 	-rm -f *.lo

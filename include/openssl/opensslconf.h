@@ -1,11 +1,14 @@
 #include <openssl/opensslfeatures.h>
 /* crypto/opensslconf.h.in */
 
+#if defined(_MSC_VER) && !defined(__attribute__)
+#define __attribute__(a)
+#endif
+
 /* Generate 80386 code? */
 #undef I386_ONLY
 
 #if defined(HEADER_CRYPTLIB_H) && !defined(OPENSSLDIR)
-#define ENGINESDIR "/usr/lib/engines"
 #define OPENSSLDIR "/etc/ssl"
 #endif
 

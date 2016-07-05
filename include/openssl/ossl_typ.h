@@ -1,4 +1,4 @@
-/* $OpenBSD$ */
+/* $OpenBSD: ossl_typ.h,v 1.12 2014/06/12 15:49:27 deraadt Exp $ */
 /* ====================================================================
  * Copyright (c) 1998-2001 The OpenSSL Project.  All rights reserved.
  *
@@ -58,25 +58,6 @@
 
 #include <openssl/opensslconf.h>
 
-#ifdef NO_ASN1_TYPEDEFS
-#define ASN1_INTEGER		ASN1_STRING
-#define ASN1_ENUMERATED		ASN1_STRING
-#define ASN1_BIT_STRING		ASN1_STRING
-#define ASN1_OCTET_STRING	ASN1_STRING
-#define ASN1_PRINTABLESTRING	ASN1_STRING
-#define ASN1_T61STRING		ASN1_STRING
-#define ASN1_IA5STRING		ASN1_STRING
-#define ASN1_UTCTIME		ASN1_STRING
-#define ASN1_GENERALIZEDTIME	ASN1_STRING
-#define ASN1_TIME		ASN1_STRING
-#define ASN1_GENERALSTRING	ASN1_STRING
-#define ASN1_UNIVERSALSTRING	ASN1_STRING
-#define ASN1_BMPSTRING		ASN1_STRING
-#define ASN1_VISIBLESTRING	ASN1_STRING
-#define ASN1_UTF8STRING		ASN1_STRING
-#define ASN1_BOOLEAN		int
-#define ASN1_NULL		int
-#else
 typedef struct asn1_string_st ASN1_INTEGER;
 typedef struct asn1_string_st ASN1_ENUMERATED;
 typedef struct asn1_string_st ASN1_BIT_STRING;
@@ -95,10 +76,25 @@ typedef struct asn1_string_st ASN1_UTF8STRING;
 typedef struct asn1_string_st ASN1_STRING;
 typedef int ASN1_BOOLEAN;
 typedef int ASN1_NULL;
-#endif
 
 typedef struct ASN1_ITEM_st ASN1_ITEM;
 typedef struct asn1_pctx_st ASN1_PCTX;
+
+#if defined(_WIN32) && defined(__WINCRYPT_H__)
+#ifndef LIBRESSL_INTERNAL
+#ifdef _MSC_VER
+#pragma message("Warning, overriding WinCrypt defines")
+#else
+#warning overriding WinCrypt defines
+#endif
+#endif
+#undef X509_NAME
+#undef X509_CERT_PAIR
+#undef X509_EXTENSIONS
+#undef OCSP_REQUEST
+#undef OCSP_RESPONSE
+#undef PKCS7_ISSUER_AND_SERIAL
+#endif
 
 #ifdef BIGNUM
 #undef BIGNUM

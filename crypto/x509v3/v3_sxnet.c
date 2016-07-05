@@ -1,4 +1,4 @@
-/* $OpenBSD: v3_sxnet.c,v 1.12 2015/02/09 16:03:11 jsing Exp $ */
+/* $OpenBSD: v3_sxnet.c,v 1.16 2015/07/29 16:13:49 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -75,25 +75,54 @@ static int sxnet_i2r(X509V3_EXT_METHOD *method, SXNET *sx, BIO *out,
 static SXNET * sxnet_v2i(X509V3_EXT_METHOD *method, X509V3_CTX *ctx,
     STACK_OF(CONF_VALUE) *nval);
 #endif
+
 const X509V3_EXT_METHOD v3_sxnet = {
-	NID_sxnet, X509V3_EXT_MULTILINE, ASN1_ITEM_ref(SXNET),
-	0, 0, 0, 0,
-	0, 0,
-	0,
+	.ext_nid = NID_sxnet,
+	.ext_flags = X509V3_EXT_MULTILINE,
+	.it = ASN1_ITEM_ref(SXNET),
+	.ext_new = NULL,
+	.ext_free = NULL,
+	.d2i = NULL,
+	.i2d = NULL,
+	.i2s = NULL,
+	.s2i = NULL,
+	.i2v = NULL,
 #ifdef SXNET_TEST
-	(X509V3_EXT_V2I)sxnet_v2i,
+	.v2i = (X509V3_EXT_V2I)sxnet_v2i,
 #else
-	0,
+	.v2i = NULL,
 #endif
-	(X509V3_EXT_I2R)sxnet_i2r,
-	0,
-	NULL
+	.i2r = (X509V3_EXT_I2R)sxnet_i2r,
+	.r2i = NULL,
+	.usr_data = NULL,
 };
 
-ASN1_SEQUENCE(SXNETID) = {
-	ASN1_SIMPLE(SXNETID, zone, ASN1_INTEGER),
-	ASN1_SIMPLE(SXNETID, user, ASN1_OCTET_STRING)
-} ASN1_SEQUENCE_END(SXNETID)
+static const ASN1_TEMPLATE SXNETID_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(SXNETID, zone),
+		.field_name = "zone",
+		.item = &ASN1_INTEGER_it,
+	},
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(SXNETID, user),
+		.field_name = "user",
+		.item = &ASN1_OCTET_STRING_it,
+	},
+};
+
+const ASN1_ITEM SXNETID_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = SXNETID_seq_tt,
+	.tcount = sizeof(SXNETID_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(SXNETID),
+	.sname = "SXNETID",
+};
 
 
 SXNETID *
@@ -121,10 +150,32 @@ SXNETID_free(SXNETID *a)
 	ASN1_item_free((ASN1_VALUE *)a, &SXNETID_it);
 }
 
-ASN1_SEQUENCE(SXNET) = {
-	ASN1_SIMPLE(SXNET, version, ASN1_INTEGER),
-	ASN1_SEQUENCE_OF(SXNET, ids, SXNETID)
-} ASN1_SEQUENCE_END(SXNET)
+static const ASN1_TEMPLATE SXNET_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(SXNET, version),
+		.field_name = "version",
+		.item = &ASN1_INTEGER_it,
+	},
+	{
+		.flags = ASN1_TFLG_SEQUENCE_OF,
+		.tag = 0,
+		.offset = offsetof(SXNET, ids),
+		.field_name = "ids",
+		.item = &SXNETID_it,
+	},
+};
+
+const ASN1_ITEM SXNET_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = SXNET_seq_tt,
+	.tcount = sizeof(SXNET_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(SXNET),
+	.sname = "SXNET",
+};
 
 
 SXNET *
@@ -167,7 +218,7 @@ sxnet_i2r(X509V3_EXT_METHOD *method, SXNET *sx, BIO *out, int indent)
 		tmp = i2s_ASN1_INTEGER(NULL, id->zone);
 		BIO_printf(out, "\n%*sZone: %s, User: ", indent, "", tmp);
 		free(tmp);
-		M_ASN1_OCTET_STRING_print(out, id->user);
+		ASN1_STRING_print(out, id->user);
 	}
 	return 1;
 }
@@ -221,10 +272,10 @@ SXNET_add_id_ulong(SXNET **psx, unsigned long lzone, char *user, int userlen)
 {
 	ASN1_INTEGER *izone = NULL;
 
-	if (!(izone = M_ASN1_INTEGER_new()) ||
+	if (!(izone = ASN1_INTEGER_new()) ||
 	    !ASN1_INTEGER_set(izone, lzone)) {
 		X509V3err(X509V3_F_SXNET_ADD_ID_ULONG, ERR_R_MALLOC_FAILURE);
-		M_ASN1_INTEGER_free(izone);
+		ASN1_INTEGER_free(izone);
 		return 0;
 	}
 	return SXNET_add_id_INTEGER(psx, izone, user, userlen);
@@ -272,7 +323,7 @@ SXNET_add_id_INTEGER(SXNET **psx, ASN1_INTEGER *zone, char *user, int userlen)
 	if (userlen == -1)
 		userlen = strlen(user);
 
-	if (!M_ASN1_OCTET_STRING_set(id->user, user, userlen))
+	if (!ASN1_STRING_set(id->user, user, userlen))
 		goto err;
 	if (!sk_SXNETID_push(sx->ids, id))
 		goto err;
@@ -299,7 +350,7 @@ SXNET_get_id_asc(SXNET *sx, char *zone)
 		return NULL;
 	}
 	oct = SXNET_get_id_INTEGER(sx, izone);
-	M_ASN1_INTEGER_free(izone);
+	ASN1_INTEGER_free(izone);
 	return oct;
 }
 
@@ -309,14 +360,14 @@ SXNET_get_id_ulong(SXNET *sx, unsigned long lzone)
 	ASN1_INTEGER *izone = NULL;
 	ASN1_OCTET_STRING *oct;
 
-	if (!(izone = M_ASN1_INTEGER_new()) ||
+	if (!(izone = ASN1_INTEGER_new()) ||
 	    !ASN1_INTEGER_set(izone, lzone)) {
 		X509V3err(X509V3_F_SXNET_GET_ID_ULONG, ERR_R_MALLOC_FAILURE);
-		M_ASN1_INTEGER_free(izone);
+		ASN1_INTEGER_free(izone);
 		return NULL;
 	}
 	oct = SXNET_get_id_INTEGER(sx, izone);
-	M_ASN1_INTEGER_free(izone);
+	ASN1_INTEGER_free(izone);
 	return oct;
 }
 
@@ -328,7 +379,7 @@ SXNET_get_id_INTEGER(SXNET *sx, ASN1_INTEGER *zone)
 
 	for (i = 0; i < sk_SXNETID_num(sx->ids); i++) {
 		id = sk_SXNETID_value(sx->ids, i);
-		if (!M_ASN1_INTEGER_cmp(id->zone, zone))
+		if (!ASN1_STRING_cmp(id->zone, zone))
 			return id->user;
 	}
 	return NULL;

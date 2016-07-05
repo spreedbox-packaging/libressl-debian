@@ -1,4 +1,4 @@
-/* $OpenBSD: bn_recp.c,v 1.10 2014/06/12 15:49:28 deraadt Exp $ */
+/* $OpenBSD: bn_recp.c,v 1.12 2015/03/21 08:05:20 doug Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -161,8 +161,10 @@ BN_div_recp(BIGNUM *dv, BIGNUM *rem, const BIGNUM *m, BN_RECP_CTX *recp,
 
 	if (BN_ucmp(m, &(recp->N)) < 0) {
 		BN_zero(d);
-		if (!BN_copy(r, m))
+		if (!BN_copy(r, m)) {
+			BN_CTX_end(ctx);
 			return 0;
+		}
 		BN_CTX_end(ctx);
 		return (1);
 	}
@@ -181,9 +183,11 @@ BN_div_recp(BIGNUM *dv, BIGNUM *rem, const BIGNUM *m, BN_RECP_CTX *recp,
 
 	/* Nr := round(2^i / N) */
 	if (i != recp->shift)
-		recp->shift = BN_reciprocal(&(recp->Nr), &(recp->N), i, ctx); /* BN_reciprocal returns i, or -1 for an error */
-		if (recp->shift == -1)
-			goto err;
+		recp->shift = BN_reciprocal(&(recp->Nr), &(recp->N), i, ctx);
+
+	/* BN_reciprocal returns i, or -1 for an error */
+	if (recp->shift == -1)
+		goto err;
 
 	/* d := |round(round(m / 2^BN_num_bits(N)) * recp->Nr / 2^(i - BN_num_bits(N)))|
 	 *    = |round(round(m / 2^BN_num_bits(N)) * round(2^i / N) / 2^(i - BN_num_bits(N)))|
