@@ -1,2 +1,3 @@
 rename_libraries.patch
 change_include_path.patch
+rng_improvements.patch
