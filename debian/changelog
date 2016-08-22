@@ -1,3 +1,9 @@
+libressl (2.4.2-1ppa1~trusty2) trusty; urgency=low
+
+  * Updated RNG improvements patch for libressl 2.4.2.
+
+ -- Joachim Bauch <bauch@struktur.de>  Mon, 22 Aug 2016 15:52:57 +0200
+
 libressl (2.4.2-1ppa1~trusty1) trusty; urgency=low
 
   * Imported Upstream version 2.4.2
