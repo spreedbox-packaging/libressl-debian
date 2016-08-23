@@ -1,0 +1,6787 @@
+Description: Add ARM optimizations from BoringSSL.
+ This patch adds various ARM optimizations from BoringSSL upstream commit
+ 29e5cf7209292ba9d979a2d9bb6822a2114492b0.
+Author: Joachim Bauch <bauch@struktur.de>
+--- a/configure.ac
++++ b/configure.ac
+@@ -82,9 +82,16 @@
+ 	*sparc*)
+ 		CPPFLAGS="$CPPFLAGS -D__STRICT_ALIGNMENT"
+ 		;;
++	*aarch64*)
++		# TODO(jojo): Use dedicated ARM64 optimizations.
++		AS_IF([test "x$BSWAP4" = "xyes"],,
++		    CPPFLAGS="$CPPFLAGS -D__STRICT_ALIGNMENT")
++		host_cpu=arm
++		;;
+ 	*arm*)
+ 		AS_IF([test "x$BSWAP4" = "xyes"],,
+ 		    CPPFLAGS="$CPPFLAGS -D__STRICT_ALIGNMENT")
++		host_cpu=arm
+ 		;;
+ 	*amd64*)
+ 		host_cpu=x86_64
+@@ -109,6 +116,8 @@
+ AM_CONDITIONAL([OPENSSL_NO_ASM], [test "x$enable_asm" = "xno"])
+ 
+ # Conditionally enable assembly by default
++AM_CONDITIONAL([HOST_ASM_ELF_ARM],
++    [test "x$HOST_ABI" = "xelf" -a "$host_cpu" = "arm" -a "x$enable_asm" != "xno"])
+ AM_CONDITIONAL([HOST_ASM_ELF_X86_64],
+     [test "x$HOST_ABI" = "xelf" -a "$host_cpu" = "x86_64" -a "x$enable_asm" != "xno"])
+ AM_CONDITIONAL([HOST_ASM_MACOSX_X86_64],
+--- a/crypto/Makefile.am
++++ b/crypto/Makefile.am
+@@ -104,6 +104,7 @@
+ libressl_crypto_la_SOURCES =
+ EXTRA_libressl_crypto_la_SOURCES =
+ 
++include Makefile.am.elf-arm
+ include Makefile.am.elf-x86_64
+ include Makefile.am.macosx-x86_64
+ 
+--- /dev/null
++++ b/crypto/Makefile.am.elf-arm
+@@ -0,0 +1,22 @@
++.pl.S:
++	perl $< > $@
++
++ASM_ARM_ELF = boringssl/aes/asm/aes-armv4.S
++ASM_ARM_ELF += boringssl/aes/asm/bsaes-armv7.S
++ASM_ARM_ELF += boringssl/bn/asm/armv4-mont.S
++ASM_ARM_ELF += boringssl/sha/asm/sha1-armv4-large.S
++ASM_ARM_ELF += boringssl/sha/asm/sha256-armv4.S
++ASM_ARM_ELF += boringssl/sha/asm/sha512-armv4.S
++
++EXTRA_DIST += $(ASM_ARM_ELF)
++
++if HOST_ASM_ELF_ARM
++libressl_crypto_la_CPPFLAGS += -DAES_ASM
++libressl_crypto_la_CPPFLAGS += -DBSAES_ASM
++libressl_crypto_la_CPPFLAGS += -DOPENSSL_BN_ASM_MONT
++libressl_crypto_la_CPPFLAGS += -DOPENSSL_ARM
++libressl_crypto_la_CPPFLAGS += -DSHA1_ASM
++libressl_crypto_la_CPPFLAGS += -DSHA256_ASM
++libressl_crypto_la_CPPFLAGS += -DSHA512_ASM
++libressl_crypto_la_SOURCES += $(ASM_ARM_ELF)
++endif
+--- a/crypto/aes/aes_core.c
++++ b/crypto/aes/aes_core.c
+@@ -39,6 +39,7 @@
+ #include "aes_locl.h"
+ 
+ #ifndef AES_ASM
++
+ /*
+ Te0[x] = S [x].[02, 01, 01, 03];
+ Te1[x] = S [x].[03, 02, 01, 01];
+@@ -1163,6 +1164,35 @@
+ 
+ #else /* AES_ASM */
+ 
++#if defined(OPENSSL_ARM) || defined(OPENSSL_AARCH64)
++
++/* In this case several functions are provided by asm code. However, one cannot
++ * control asm symbol visibility with command line flags and such so they are
++ * always hidden and wrapped by these C functions, which can be so
++ * controlled. */
++
++void asm_AES_encrypt(const uint8_t *in, uint8_t *out, const AES_KEY *key);
++void AES_encrypt(const unsigned char *in, unsigned char *out, const AES_KEY *key) {
++  asm_AES_encrypt(in, out, key);
++}
++
++void asm_AES_decrypt(const uint8_t *in, uint8_t *out, const AES_KEY *key);
++void AES_decrypt(const unsigned char *in, unsigned char *out, const AES_KEY *key) {
++  asm_AES_decrypt(in, out, key);
++}
++
++int asm_AES_set_encrypt_key(const uint8_t *key, unsigned bits, AES_KEY *aeskey);
++int AES_set_encrypt_key(const unsigned char *key, const int bits, AES_KEY *aeskey) {
++  return asm_AES_set_encrypt_key(key, bits, aeskey);
++}
++
++int asm_AES_set_decrypt_key(const uint8_t *key, unsigned bits, AES_KEY *aeskey);
++int AES_set_decrypt_key(const unsigned char *key, const int bits, AES_KEY *aeskey) {
++  return asm_AES_set_decrypt_key(key, bits, aeskey);
++}
++
++#else
++
+ static const u8 Te4[256] = {
+ 	0x63U, 0x7cU, 0x77U, 0x7bU, 0xf2U, 0x6bU, 0x6fU, 0xc5U,
+ 	0x30U, 0x01U, 0x67U, 0x2bU, 0xfeU, 0xd7U, 0xabU, 0x76U,
+@@ -1371,4 +1401,6 @@
+ 	return 0;
+ }
+ 
++#endif
++
+ #endif /* AES_ASM */
+--- /dev/null
++++ b/include/openssl/arm_arch.h
+@@ -0,0 +1,120 @@
++/* ====================================================================
++ * Copyright (c) 1998-2011 The OpenSSL Project.  All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright
++ *    notice, this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright
++ *    notice, this list of conditions and the following disclaimer in
++ *    the documentation and/or other materials provided with the
++ *    distribution.
++ *
++ * 3. All advertising materials mentioning features or use of this
++ *    software must display the following acknowledgment:
++ *    "This product includes software developed by the OpenSSL Project
++ *    for use in the OpenSSL Toolkit. (http://www.openssl.org/)"
++ *
++ * 4. The names "OpenSSL Toolkit" and "OpenSSL Project" must not be used to
++ *    endorse or promote products derived from this software without
++ *    prior written permission. For written permission, please contact
++ *    openssl-core@openssl.org.
++ *
++ * 5. Products derived from this software may not be called "OpenSSL"
++ *    nor may "OpenSSL" appear in their names without prior written
++ *    permission of the OpenSSL Project.
++ *
++ * 6. Redistributions of any form whatsoever must retain the following
++ *    acknowledgment:
++ *    "This product includes software developed by the OpenSSL Project
++ *    for use in the OpenSSL Toolkit (http://www.openssl.org/)"
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE OpenSSL PROJECT ``AS IS'' AND ANY
++ * EXPRESSED OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
++ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE OpenSSL PROJECT OR
++ * ITS CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
++ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
++ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
++ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT,
++ * STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED
++ * OF THE POSSIBILITY OF SUCH DAMAGE.
++ * ====================================================================
++ *
++ * This product includes cryptographic software written by Eric Young
++ * (eay@cryptsoft.com).  This product includes software written by Tim
++ * Hudson (tjh@cryptsoft.com). */
++
++#ifndef OPENSSL_HEADER_ARM_ARCH_H
++#define OPENSSL_HEADER_ARM_ARCH_H
++
++#if !defined(__ARM_ARCH__)
++# if defined(__CC_ARM)
++#  define __ARM_ARCH__ __TARGET_ARCH_ARM
++#  if defined(__BIG_ENDIAN)
++#   define __ARMEB__
++#  else
++#   define __ARMEL__
++#  endif
++# elif defined(__GNUC__)
++#  if defined(__aarch64__)
++#    define __ARM_ARCH__ 8
++#    if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
++#      define __ARMEB__
++#    else
++#      define __ARMEL__
++#    endif
++  /* Why doesn't gcc define __ARM_ARCH__? Instead it defines
++   * bunch of below macros. See all_architectires[] table in
++   * gcc/config/arm/arm.c. On a side note it defines
++   * __ARMEL__/__ARMEB__ for little-/big-endian. */
++#  elif	defined(__ARM_ARCH)
++#    define __ARM_ARCH__ __ARM_ARCH
++#  elif	defined(__ARM_ARCH_8A__)
++#    define __ARM_ARCH__ 8
++#  elif	defined(__ARM_ARCH_7__)	|| defined(__ARM_ARCH_7A__)	|| \
++	defined(__ARM_ARCH_7R__)|| defined(__ARM_ARCH_7M__)	|| \
++	defined(__ARM_ARCH_7EM__)
++#   define __ARM_ARCH__ 7
++#  elif	defined(__ARM_ARCH_6__)	|| defined(__ARM_ARCH_6J__)	|| \
++	defined(__ARM_ARCH_6K__)|| defined(__ARM_ARCH_6M__)	|| \
++	defined(__ARM_ARCH_6Z__)|| defined(__ARM_ARCH_6ZK__)	|| \
++	defined(__ARM_ARCH_6T2__)
++#   define __ARM_ARCH__ 6
++#  elif	defined(__ARM_ARCH_5__)	|| defined(__ARM_ARCH_5T__)	|| \
++	defined(__ARM_ARCH_5E__)|| defined(__ARM_ARCH_5TE__)	|| \
++	defined(__ARM_ARCH_5TEJ__)
++#   define __ARM_ARCH__ 5
++#  elif	defined(__ARM_ARCH_4__)	|| defined(__ARM_ARCH_4T__)
++#   define __ARM_ARCH__ 4
++#  else
++#   error "unsupported ARM architecture"
++#  endif
++# endif
++#endif
++
++/* Even when building for 32-bit ARM, support for aarch64 crypto instructions
++ * will be included. */
++#define __ARM_MAX_ARCH__ 8
++
++/* ARMV7_NEON is true when a NEON unit is present in the current CPU. */
++#define ARMV7_NEON (1 << 0)
++
++/* ARMV8_AES indicates support for hardware AES instructions. */
++#define ARMV8_AES (1 << 2)
++
++/* ARMV8_SHA1 indicates support for hardware SHA-1 instructions. */
++#define ARMV8_SHA1 (1 << 3)
++
++/* ARMV8_SHA256 indicates support for hardware SHA-256 instructions. */
++#define ARMV8_SHA256 (1 << 4)
++
++/* ARMV8_PMULL indicates support for carryless multiplication. */
++#define ARMV8_PMULL (1 << 5)
++
++#endif  /* OPENSSL_HEADER_ARM_ARCH_H */
+--- /dev/null
++++ b/crypto/boringssl/aes/asm/aes-armv4.pl
+@@ -0,0 +1,1244 @@
++#!/usr/bin/env perl
++
++# ====================================================================
++# Written by Andy Polyakov <appro@openssl.org> for the OpenSSL
++# project. The module is, however, dual licensed under OpenSSL and
++# CRYPTOGAMS licenses depending on where you obtain it. For further
++# details see http://www.openssl.org/~appro/cryptogams/.
++# ====================================================================
++
++# AES for ARMv4
++
++# January 2007.
++#
++# Code uses single 1K S-box and is >2 times faster than code generated
++# by gcc-3.4.1. This is thanks to unique feature of ARMv4 ISA, which
++# allows to merge logical or arithmetic operation with shift or rotate
++# in one instruction and emit combined result every cycle. The module
++# is endian-neutral. The performance is ~42 cycles/byte for 128-bit
++# key [on single-issue Xscale PXA250 core].
++
++# May 2007.
++#
++# AES_set_[en|de]crypt_key is added.
++
++# July 2010.
++#
++# Rescheduling for dual-issue pipeline resulted in 12% improvement on
++# Cortex A8 core and ~25 cycles per byte processed with 128-bit key.
++
++# February 2011.
++#
++# Profiler-assisted and platform-specific optimization resulted in 16%
++# improvement on Cortex A8 core and ~21.5 cycles per byte.
++
++$flavour = shift;
++if ($flavour=~/\w[\w\-]*\.\w+$/) { $output=$flavour; undef $flavour; }
++else { while (($output=shift) && ($output!~/\w[\w\-]*\.\w+$/)) {} }
++
++if ($flavour && $flavour ne "void") {
++    $0 =~ m/(.*[\/\\])[^\/\\]+$/; $dir=$1;
++    ( $xlate="${dir}arm-xlate.pl" and -f $xlate ) or
++    ( $xlate="${dir}../../perlasm/arm-xlate.pl" and -f $xlate) or
++    die "can't locate arm-xlate.pl";
++
++    open STDOUT,"| \"$^X\" $xlate $flavour $output";
++} else {
++    open STDOUT,">$output";
++}
++
++$s0="r0";
++$s1="r1";
++$s2="r2";
++$s3="r3";
++$t1="r4";
++$t2="r5";
++$t3="r6";
++$i1="r7";
++$i2="r8";
++$i3="r9";
++
++$tbl="r10";
++$key="r11";
++$rounds="r12";
++
++$code=<<___;
++#if defined(__arm__)
++#ifndef __KERNEL__
++# include <openssl/arm_arch.h>
++#else
++# define __ARM_ARCH__ __LINUX_ARM_ARCH__
++#endif
++
++.text
++#if __ARM_ARCH__<7
++.code	32
++#else
++.syntax	unified
++# if defined(__thumb2__) && !defined(__APPLE__)
++.thumb
++# else
++.code	32
++# endif
++#endif
++
++.type	AES_Te,%object
++.align	5
++AES_Te:
++.word	0xc66363a5, 0xf87c7c84, 0xee777799, 0xf67b7b8d
++.word	0xfff2f20d, 0xd66b6bbd, 0xde6f6fb1, 0x91c5c554
++.word	0x60303050, 0x02010103, 0xce6767a9, 0x562b2b7d
++.word	0xe7fefe19, 0xb5d7d762, 0x4dababe6, 0xec76769a
++.word	0x8fcaca45, 0x1f82829d, 0x89c9c940, 0xfa7d7d87
++.word	0xeffafa15, 0xb25959eb, 0x8e4747c9, 0xfbf0f00b
++.word	0x41adadec, 0xb3d4d467, 0x5fa2a2fd, 0x45afafea
++.word	0x239c9cbf, 0x53a4a4f7, 0xe4727296, 0x9bc0c05b
++.word	0x75b7b7c2, 0xe1fdfd1c, 0x3d9393ae, 0x4c26266a
++.word	0x6c36365a, 0x7e3f3f41, 0xf5f7f702, 0x83cccc4f
++.word	0x6834345c, 0x51a5a5f4, 0xd1e5e534, 0xf9f1f108
++.word	0xe2717193, 0xabd8d873, 0x62313153, 0x2a15153f
++.word	0x0804040c, 0x95c7c752, 0x46232365, 0x9dc3c35e
++.word	0x30181828, 0x379696a1, 0x0a05050f, 0x2f9a9ab5
++.word	0x0e070709, 0x24121236, 0x1b80809b, 0xdfe2e23d
++.word	0xcdebeb26, 0x4e272769, 0x7fb2b2cd, 0xea75759f
++.word	0x1209091b, 0x1d83839e, 0x582c2c74, 0x341a1a2e
++.word	0x361b1b2d, 0xdc6e6eb2, 0xb45a5aee, 0x5ba0a0fb
++.word	0xa45252f6, 0x763b3b4d, 0xb7d6d661, 0x7db3b3ce
++.word	0x5229297b, 0xdde3e33e, 0x5e2f2f71, 0x13848497
++.word	0xa65353f5, 0xb9d1d168, 0x00000000, 0xc1eded2c
++.word	0x40202060, 0xe3fcfc1f, 0x79b1b1c8, 0xb65b5bed
++.word	0xd46a6abe, 0x8dcbcb46, 0x67bebed9, 0x7239394b
++.word	0x944a4ade, 0x984c4cd4, 0xb05858e8, 0x85cfcf4a
++.word	0xbbd0d06b, 0xc5efef2a, 0x4faaaae5, 0xedfbfb16
++.word	0x864343c5, 0x9a4d4dd7, 0x66333355, 0x11858594
++.word	0x8a4545cf, 0xe9f9f910, 0x04020206, 0xfe7f7f81
++.word	0xa05050f0, 0x783c3c44, 0x259f9fba, 0x4ba8a8e3
++.word	0xa25151f3, 0x5da3a3fe, 0x804040c0, 0x058f8f8a
++.word	0x3f9292ad, 0x219d9dbc, 0x70383848, 0xf1f5f504
++.word	0x63bcbcdf, 0x77b6b6c1, 0xafdada75, 0x42212163
++.word	0x20101030, 0xe5ffff1a, 0xfdf3f30e, 0xbfd2d26d
++.word	0x81cdcd4c, 0x180c0c14, 0x26131335, 0xc3ecec2f
++.word	0xbe5f5fe1, 0x359797a2, 0x884444cc, 0x2e171739
++.word	0x93c4c457, 0x55a7a7f2, 0xfc7e7e82, 0x7a3d3d47
++.word	0xc86464ac, 0xba5d5de7, 0x3219192b, 0xe6737395
++.word	0xc06060a0, 0x19818198, 0x9e4f4fd1, 0xa3dcdc7f
++.word	0x44222266, 0x542a2a7e, 0x3b9090ab, 0x0b888883
++.word	0x8c4646ca, 0xc7eeee29, 0x6bb8b8d3, 0x2814143c
++.word	0xa7dede79, 0xbc5e5ee2, 0x160b0b1d, 0xaddbdb76
++.word	0xdbe0e03b, 0x64323256, 0x743a3a4e, 0x140a0a1e
++.word	0x924949db, 0x0c06060a, 0x4824246c, 0xb85c5ce4
++.word	0x9fc2c25d, 0xbdd3d36e, 0x43acacef, 0xc46262a6
++.word	0x399191a8, 0x319595a4, 0xd3e4e437, 0xf279798b
++.word	0xd5e7e732, 0x8bc8c843, 0x6e373759, 0xda6d6db7
++.word	0x018d8d8c, 0xb1d5d564, 0x9c4e4ed2, 0x49a9a9e0
++.word	0xd86c6cb4, 0xac5656fa, 0xf3f4f407, 0xcfeaea25
++.word	0xca6565af, 0xf47a7a8e, 0x47aeaee9, 0x10080818
++.word	0x6fbabad5, 0xf0787888, 0x4a25256f, 0x5c2e2e72
++.word	0x381c1c24, 0x57a6a6f1, 0x73b4b4c7, 0x97c6c651
++.word	0xcbe8e823, 0xa1dddd7c, 0xe874749c, 0x3e1f1f21
++.word	0x964b4bdd, 0x61bdbddc, 0x0d8b8b86, 0x0f8a8a85
++.word	0xe0707090, 0x7c3e3e42, 0x71b5b5c4, 0xcc6666aa
++.word	0x904848d8, 0x06030305, 0xf7f6f601, 0x1c0e0e12
++.word	0xc26161a3, 0x6a35355f, 0xae5757f9, 0x69b9b9d0
++.word	0x17868691, 0x99c1c158, 0x3a1d1d27, 0x279e9eb9
++.word	0xd9e1e138, 0xebf8f813, 0x2b9898b3, 0x22111133
++.word	0xd26969bb, 0xa9d9d970, 0x078e8e89, 0x339494a7
++.word	0x2d9b9bb6, 0x3c1e1e22, 0x15878792, 0xc9e9e920
++.word	0x87cece49, 0xaa5555ff, 0x50282878, 0xa5dfdf7a
++.word	0x038c8c8f, 0x59a1a1f8, 0x09898980, 0x1a0d0d17
++.word	0x65bfbfda, 0xd7e6e631, 0x844242c6, 0xd06868b8
++.word	0x824141c3, 0x299999b0, 0x5a2d2d77, 0x1e0f0f11
++.word	0x7bb0b0cb, 0xa85454fc, 0x6dbbbbd6, 0x2c16163a
++@ Te4[256]
++.byte	0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5
++.byte	0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76
++.byte	0xca, 0x82, 0xc9, 0x7d, 0xfa, 0x59, 0x47, 0xf0
++.byte	0xad, 0xd4, 0xa2, 0xaf, 0x9c, 0xa4, 0x72, 0xc0
++.byte	0xb7, 0xfd, 0x93, 0x26, 0x36, 0x3f, 0xf7, 0xcc
++.byte	0x34, 0xa5, 0xe5, 0xf1, 0x71, 0xd8, 0x31, 0x15
++.byte	0x04, 0xc7, 0x23, 0xc3, 0x18, 0x96, 0x05, 0x9a
++.byte	0x07, 0x12, 0x80, 0xe2, 0xeb, 0x27, 0xb2, 0x75
++.byte	0x09, 0x83, 0x2c, 0x1a, 0x1b, 0x6e, 0x5a, 0xa0
++.byte	0x52, 0x3b, 0xd6, 0xb3, 0x29, 0xe3, 0x2f, 0x84
++.byte	0x53, 0xd1, 0x00, 0xed, 0x20, 0xfc, 0xb1, 0x5b
++.byte	0x6a, 0xcb, 0xbe, 0x39, 0x4a, 0x4c, 0x58, 0xcf
++.byte	0xd0, 0xef, 0xaa, 0xfb, 0x43, 0x4d, 0x33, 0x85
++.byte	0x45, 0xf9, 0x02, 0x7f, 0x50, 0x3c, 0x9f, 0xa8
++.byte	0x51, 0xa3, 0x40, 0x8f, 0x92, 0x9d, 0x38, 0xf5
++.byte	0xbc, 0xb6, 0xda, 0x21, 0x10, 0xff, 0xf3, 0xd2
++.byte	0xcd, 0x0c, 0x13, 0xec, 0x5f, 0x97, 0x44, 0x17
++.byte	0xc4, 0xa7, 0x7e, 0x3d, 0x64, 0x5d, 0x19, 0x73
++.byte	0x60, 0x81, 0x4f, 0xdc, 0x22, 0x2a, 0x90, 0x88
++.byte	0x46, 0xee, 0xb8, 0x14, 0xde, 0x5e, 0x0b, 0xdb
++.byte	0xe0, 0x32, 0x3a, 0x0a, 0x49, 0x06, 0x24, 0x5c
++.byte	0xc2, 0xd3, 0xac, 0x62, 0x91, 0x95, 0xe4, 0x79
++.byte	0xe7, 0xc8, 0x37, 0x6d, 0x8d, 0xd5, 0x4e, 0xa9
++.byte	0x6c, 0x56, 0xf4, 0xea, 0x65, 0x7a, 0xae, 0x08
++.byte	0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6
++.byte	0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a
++.byte	0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e
++.byte	0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e
++.byte	0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94
++.byte	0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf
++.byte	0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68
++.byte	0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
++@ rcon[]
++.word	0x01000000, 0x02000000, 0x04000000, 0x08000000
++.word	0x10000000, 0x20000000, 0x40000000, 0x80000000
++.word	0x1B000000, 0x36000000, 0, 0, 0, 0, 0, 0
++.size	AES_Te,.-AES_Te
++
++@ void asm_AES_encrypt(const unsigned char *in, unsigned char *out,
++@ 		       const AES_KEY *key) {
++.global asm_AES_encrypt
++.type   asm_AES_encrypt,%function
++.align	5
++asm_AES_encrypt:
++#if __ARM_ARCH__<7
++	sub	r3,pc,#8		@ asm_AES_encrypt
++#else
++	adr	r3,asm_AES_encrypt
++#endif
++	stmdb   sp!,{r1,r4-r12,lr}
++#ifdef	__APPLE__
++	adr	$tbl,AES_Te
++#else
++	sub	$tbl,r3,#asm_AES_encrypt-AES_Te	@ Te
++#endif
++	mov	$rounds,r0		@ inp
++	mov	$key,r2
++#if __ARM_ARCH__<7
++	ldrb	$s0,[$rounds,#3]	@ load input data in endian-neutral
++	ldrb	$t1,[$rounds,#2]	@ manner...
++	ldrb	$t2,[$rounds,#1]
++	ldrb	$t3,[$rounds,#0]
++	orr	$s0,$s0,$t1,lsl#8
++	ldrb	$s1,[$rounds,#7]
++	orr	$s0,$s0,$t2,lsl#16
++	ldrb	$t1,[$rounds,#6]
++	orr	$s0,$s0,$t3,lsl#24
++	ldrb	$t2,[$rounds,#5]
++	ldrb	$t3,[$rounds,#4]
++	orr	$s1,$s1,$t1,lsl#8
++	ldrb	$s2,[$rounds,#11]
++	orr	$s1,$s1,$t2,lsl#16
++	ldrb	$t1,[$rounds,#10]
++	orr	$s1,$s1,$t3,lsl#24
++	ldrb	$t2,[$rounds,#9]
++	ldrb	$t3,[$rounds,#8]
++	orr	$s2,$s2,$t1,lsl#8
++	ldrb	$s3,[$rounds,#15]
++	orr	$s2,$s2,$t2,lsl#16
++	ldrb	$t1,[$rounds,#14]
++	orr	$s2,$s2,$t3,lsl#24
++	ldrb	$t2,[$rounds,#13]
++	ldrb	$t3,[$rounds,#12]
++	orr	$s3,$s3,$t1,lsl#8
++	orr	$s3,$s3,$t2,lsl#16
++	orr	$s3,$s3,$t3,lsl#24
++#else
++	ldr	$s0,[$rounds,#0]
++	ldr	$s1,[$rounds,#4]
++	ldr	$s2,[$rounds,#8]
++	ldr	$s3,[$rounds,#12]
++#ifdef __ARMEL__
++	rev	$s0,$s0
++	rev	$s1,$s1
++	rev	$s2,$s2
++	rev	$s3,$s3
++#endif
++#endif
++	bl	_armv4_AES_encrypt
++
++	ldr	$rounds,[sp],#4		@ pop out
++#if __ARM_ARCH__>=7
++#ifdef __ARMEL__
++	rev	$s0,$s0
++	rev	$s1,$s1
++	rev	$s2,$s2
++	rev	$s3,$s3
++#endif
++	str	$s0,[$rounds,#0]
++	str	$s1,[$rounds,#4]
++	str	$s2,[$rounds,#8]
++	str	$s3,[$rounds,#12]
++#else
++	mov	$t1,$s0,lsr#24		@ write output in endian-neutral
++	mov	$t2,$s0,lsr#16		@ manner...
++	mov	$t3,$s0,lsr#8
++	strb	$t1,[$rounds,#0]
++	strb	$t2,[$rounds,#1]
++	mov	$t1,$s1,lsr#24
++	strb	$t3,[$rounds,#2]
++	mov	$t2,$s1,lsr#16
++	strb	$s0,[$rounds,#3]
++	mov	$t3,$s1,lsr#8
++	strb	$t1,[$rounds,#4]
++	strb	$t2,[$rounds,#5]
++	mov	$t1,$s2,lsr#24
++	strb	$t3,[$rounds,#6]
++	mov	$t2,$s2,lsr#16
++	strb	$s1,[$rounds,#7]
++	mov	$t3,$s2,lsr#8
++	strb	$t1,[$rounds,#8]
++	strb	$t2,[$rounds,#9]
++	mov	$t1,$s3,lsr#24
++	strb	$t3,[$rounds,#10]
++	mov	$t2,$s3,lsr#16
++	strb	$s2,[$rounds,#11]
++	mov	$t3,$s3,lsr#8
++	strb	$t1,[$rounds,#12]
++	strb	$t2,[$rounds,#13]
++	strb	$t3,[$rounds,#14]
++	strb	$s3,[$rounds,#15]
++#endif
++#if __ARM_ARCH__>=5
++	ldmia	sp!,{r4-r12,pc}
++#else
++	ldmia   sp!,{r4-r12,lr}
++	tst	lr,#1
++	moveq	pc,lr			@ be binary compatible with V4, yet
++	bx	lr			@ interoperable with Thumb ISA:-)
++#endif
++.size	asm_AES_encrypt,.-asm_AES_encrypt
++
++.type   _armv4_AES_encrypt,%function
++.align	2
++_armv4_AES_encrypt:
++	str	lr,[sp,#-4]!		@ push lr
++	ldmia	$key!,{$t1-$i1}
++	eor	$s0,$s0,$t1
++	ldr	$rounds,[$key,#240-16]
++	eor	$s1,$s1,$t2
++	eor	$s2,$s2,$t3
++	eor	$s3,$s3,$i1
++	sub	$rounds,$rounds,#1
++	mov	lr,#255
++
++	and	$i1,lr,$s0
++	and	$i2,lr,$s0,lsr#8
++	and	$i3,lr,$s0,lsr#16
++	mov	$s0,$s0,lsr#24
++.Lenc_loop:
++	ldr	$t1,[$tbl,$i1,lsl#2]	@ Te3[s0>>0]
++	and	$i1,lr,$s1,lsr#16	@ i0
++	ldr	$t2,[$tbl,$i2,lsl#2]	@ Te2[s0>>8]
++	and	$i2,lr,$s1
++	ldr	$t3,[$tbl,$i3,lsl#2]	@ Te1[s0>>16]
++	and	$i3,lr,$s1,lsr#8
++	ldr	$s0,[$tbl,$s0,lsl#2]	@ Te0[s0>>24]
++	mov	$s1,$s1,lsr#24
++
++	ldr	$i1,[$tbl,$i1,lsl#2]	@ Te1[s1>>16]
++	ldr	$i2,[$tbl,$i2,lsl#2]	@ Te3[s1>>0]
++	ldr	$i3,[$tbl,$i3,lsl#2]	@ Te2[s1>>8]
++	eor	$s0,$s0,$i1,ror#8
++	ldr	$s1,[$tbl,$s1,lsl#2]	@ Te0[s1>>24]
++	and	$i1,lr,$s2,lsr#8	@ i0
++	eor	$t2,$t2,$i2,ror#8
++	and	$i2,lr,$s2,lsr#16	@ i1
++	eor	$t3,$t3,$i3,ror#8
++	and	$i3,lr,$s2
++	ldr	$i1,[$tbl,$i1,lsl#2]	@ Te2[s2>>8]
++	eor	$s1,$s1,$t1,ror#24
++	ldr	$i2,[$tbl,$i2,lsl#2]	@ Te1[s2>>16]
++	mov	$s2,$s2,lsr#24
++
++	ldr	$i3,[$tbl,$i3,lsl#2]	@ Te3[s2>>0]
++	eor	$s0,$s0,$i1,ror#16
++	ldr	$s2,[$tbl,$s2,lsl#2]	@ Te0[s2>>24]
++	and	$i1,lr,$s3		@ i0
++	eor	$s1,$s1,$i2,ror#8
++	and	$i2,lr,$s3,lsr#8	@ i1
++	eor	$t3,$t3,$i3,ror#16
++	and	$i3,lr,$s3,lsr#16	@ i2
++	ldr	$i1,[$tbl,$i1,lsl#2]	@ Te3[s3>>0]
++	eor	$s2,$s2,$t2,ror#16
++	ldr	$i2,[$tbl,$i2,lsl#2]	@ Te2[s3>>8]
++	mov	$s3,$s3,lsr#24
++
++	ldr	$i3,[$tbl,$i3,lsl#2]	@ Te1[s3>>16]
++	eor	$s0,$s0,$i1,ror#24
++	ldr	$i1,[$key],#16
++	eor	$s1,$s1,$i2,ror#16
++	ldr	$s3,[$tbl,$s3,lsl#2]	@ Te0[s3>>24]
++	eor	$s2,$s2,$i3,ror#8
++	ldr	$t1,[$key,#-12]
++	eor	$s3,$s3,$t3,ror#8
++
++	ldr	$t2,[$key,#-8]
++	eor	$s0,$s0,$i1
++	ldr	$t3,[$key,#-4]
++	and	$i1,lr,$s0
++	eor	$s1,$s1,$t1
++	and	$i2,lr,$s0,lsr#8
++	eor	$s2,$s2,$t2
++	and	$i3,lr,$s0,lsr#16
++	eor	$s3,$s3,$t3
++	mov	$s0,$s0,lsr#24
++
++	subs	$rounds,$rounds,#1
++	bne	.Lenc_loop
++
++	add	$tbl,$tbl,#2
++
++	ldrb	$t1,[$tbl,$i1,lsl#2]	@ Te4[s0>>0]
++	and	$i1,lr,$s1,lsr#16	@ i0
++	ldrb	$t2,[$tbl,$i2,lsl#2]	@ Te4[s0>>8]
++	and	$i2,lr,$s1
++	ldrb	$t3,[$tbl,$i3,lsl#2]	@ Te4[s0>>16]
++	and	$i3,lr,$s1,lsr#8
++	ldrb	$s0,[$tbl,$s0,lsl#2]	@ Te4[s0>>24]
++	mov	$s1,$s1,lsr#24
++
++	ldrb	$i1,[$tbl,$i1,lsl#2]	@ Te4[s1>>16]
++	ldrb	$i2,[$tbl,$i2,lsl#2]	@ Te4[s1>>0]
++	ldrb	$i3,[$tbl,$i3,lsl#2]	@ Te4[s1>>8]
++	eor	$s0,$i1,$s0,lsl#8
++	ldrb	$s1,[$tbl,$s1,lsl#2]	@ Te4[s1>>24]
++	and	$i1,lr,$s2,lsr#8	@ i0
++	eor	$t2,$i2,$t2,lsl#8
++	and	$i2,lr,$s2,lsr#16	@ i1
++	eor	$t3,$i3,$t3,lsl#8
++	and	$i3,lr,$s2
++	ldrb	$i1,[$tbl,$i1,lsl#2]	@ Te4[s2>>8]
++	eor	$s1,$t1,$s1,lsl#24
++	ldrb	$i2,[$tbl,$i2,lsl#2]	@ Te4[s2>>16]
++	mov	$s2,$s2,lsr#24
++
++	ldrb	$i3,[$tbl,$i3,lsl#2]	@ Te4[s2>>0]
++	eor	$s0,$i1,$s0,lsl#8
++	ldrb	$s2,[$tbl,$s2,lsl#2]	@ Te4[s2>>24]
++	and	$i1,lr,$s3		@ i0
++	eor	$s1,$s1,$i2,lsl#16
++	and	$i2,lr,$s3,lsr#8	@ i1
++	eor	$t3,$i3,$t3,lsl#8
++	and	$i3,lr,$s3,lsr#16	@ i2
++	ldrb	$i1,[$tbl,$i1,lsl#2]	@ Te4[s3>>0]
++	eor	$s2,$t2,$s2,lsl#24
++	ldrb	$i2,[$tbl,$i2,lsl#2]	@ Te4[s3>>8]
++	mov	$s3,$s3,lsr#24
++
++	ldrb	$i3,[$tbl,$i3,lsl#2]	@ Te4[s3>>16]
++	eor	$s0,$i1,$s0,lsl#8
++	ldr	$i1,[$key,#0]
++	ldrb	$s3,[$tbl,$s3,lsl#2]	@ Te4[s3>>24]
++	eor	$s1,$s1,$i2,lsl#8
++	ldr	$t1,[$key,#4]
++	eor	$s2,$s2,$i3,lsl#16
++	ldr	$t2,[$key,#8]
++	eor	$s3,$t3,$s3,lsl#24
++	ldr	$t3,[$key,#12]
++
++	eor	$s0,$s0,$i1
++	eor	$s1,$s1,$t1
++	eor	$s2,$s2,$t2
++	eor	$s3,$s3,$t3
++
++	sub	$tbl,$tbl,#2
++	ldr	pc,[sp],#4		@ pop and return
++.size	_armv4_AES_encrypt,.-_armv4_AES_encrypt
++
++.global asm_AES_set_encrypt_key
++.type   asm_AES_set_encrypt_key,%function
++.align	5
++asm_AES_set_encrypt_key:
++_armv4_AES_set_encrypt_key:
++#if __ARM_ARCH__<7
++	sub	r3,pc,#8		@ asm_AES_set_encrypt_key
++#else
++	adr	r3,asm_AES_set_encrypt_key
++#endif
++	teq	r0,#0
++#if __ARM_ARCH__>=7
++	itt	eq			@ Thumb2 thing, sanity check in ARM
++#endif
++	moveq	r0,#-1
++	beq	.Labrt
++	teq	r2,#0
++#if __ARM_ARCH__>=7
++	itt	eq			@ Thumb2 thing, sanity check in ARM
++#endif
++	moveq	r0,#-1
++	beq	.Labrt
++
++	teq	r1,#128
++	beq	.Lok
++	teq	r1,#192
++	beq	.Lok
++	teq	r1,#256
++#if __ARM_ARCH__>=7
++	itt	ne			@ Thumb2 thing, sanity check in ARM
++#endif
++	movne	r0,#-1
++	bne	.Labrt
++
++.Lok:	stmdb   sp!,{r4-r12,lr}
++	mov	$rounds,r0		@ inp
++	mov	lr,r1			@ bits
++	mov	$key,r2			@ key
++
++#ifdef	__APPLE__
++	adr	$tbl,AES_Te+1024				@ Te4
++#else
++	sub	$tbl,r3,#_armv4_AES_set_encrypt_key-AES_Te-1024	@ Te4
++#endif
++
++#if __ARM_ARCH__<7
++	ldrb	$s0,[$rounds,#3]	@ load input data in endian-neutral
++	ldrb	$t1,[$rounds,#2]	@ manner...
++	ldrb	$t2,[$rounds,#1]
++	ldrb	$t3,[$rounds,#0]
++	orr	$s0,$s0,$t1,lsl#8
++	ldrb	$s1,[$rounds,#7]
++	orr	$s0,$s0,$t2,lsl#16
++	ldrb	$t1,[$rounds,#6]
++	orr	$s0,$s0,$t3,lsl#24
++	ldrb	$t2,[$rounds,#5]
++	ldrb	$t3,[$rounds,#4]
++	orr	$s1,$s1,$t1,lsl#8
++	ldrb	$s2,[$rounds,#11]
++	orr	$s1,$s1,$t2,lsl#16
++	ldrb	$t1,[$rounds,#10]
++	orr	$s1,$s1,$t3,lsl#24
++	ldrb	$t2,[$rounds,#9]
++	ldrb	$t3,[$rounds,#8]
++	orr	$s2,$s2,$t1,lsl#8
++	ldrb	$s3,[$rounds,#15]
++	orr	$s2,$s2,$t2,lsl#16
++	ldrb	$t1,[$rounds,#14]
++	orr	$s2,$s2,$t3,lsl#24
++	ldrb	$t2,[$rounds,#13]
++	ldrb	$t3,[$rounds,#12]
++	orr	$s3,$s3,$t1,lsl#8
++	str	$s0,[$key],#16
++	orr	$s3,$s3,$t2,lsl#16
++	str	$s1,[$key,#-12]
++	orr	$s3,$s3,$t3,lsl#24
++	str	$s2,[$key,#-8]
++	str	$s3,[$key,#-4]
++#else
++	ldr	$s0,[$rounds,#0]
++	ldr	$s1,[$rounds,#4]
++	ldr	$s2,[$rounds,#8]
++	ldr	$s3,[$rounds,#12]
++#ifdef __ARMEL__
++	rev	$s0,$s0
++	rev	$s1,$s1
++	rev	$s2,$s2
++	rev	$s3,$s3
++#endif
++	str	$s0,[$key],#16
++	str	$s1,[$key,#-12]
++	str	$s2,[$key,#-8]
++	str	$s3,[$key,#-4]
++#endif
++
++	teq	lr,#128
++	bne	.Lnot128
++	mov	$rounds,#10
++	str	$rounds,[$key,#240-16]
++	add	$t3,$tbl,#256			@ rcon
++	mov	lr,#255
++
++.L128_loop:
++	and	$t2,lr,$s3,lsr#24
++	and	$i1,lr,$s3,lsr#16
++	ldrb	$t2,[$tbl,$t2]
++	and	$i2,lr,$s3,lsr#8
++	ldrb	$i1,[$tbl,$i1]
++	and	$i3,lr,$s3
++	ldrb	$i2,[$tbl,$i2]
++	orr	$t2,$t2,$i1,lsl#24
++	ldrb	$i3,[$tbl,$i3]
++	orr	$t2,$t2,$i2,lsl#16
++	ldr	$t1,[$t3],#4			@ rcon[i++]
++	orr	$t2,$t2,$i3,lsl#8
++	eor	$t2,$t2,$t1
++	eor	$s0,$s0,$t2			@ rk[4]=rk[0]^...
++	eor	$s1,$s1,$s0			@ rk[5]=rk[1]^rk[4]
++	str	$s0,[$key],#16
++	eor	$s2,$s2,$s1			@ rk[6]=rk[2]^rk[5]
++	str	$s1,[$key,#-12]
++	eor	$s3,$s3,$s2			@ rk[7]=rk[3]^rk[6]
++	str	$s2,[$key,#-8]
++	subs	$rounds,$rounds,#1
++	str	$s3,[$key,#-4]
++	bne	.L128_loop
++	sub	r2,$key,#176
++	b	.Ldone
++
++.Lnot128:
++#if __ARM_ARCH__<7
++	ldrb	$i2,[$rounds,#19]
++	ldrb	$t1,[$rounds,#18]
++	ldrb	$t2,[$rounds,#17]
++	ldrb	$t3,[$rounds,#16]
++	orr	$i2,$i2,$t1,lsl#8
++	ldrb	$i3,[$rounds,#23]
++	orr	$i2,$i2,$t2,lsl#16
++	ldrb	$t1,[$rounds,#22]
++	orr	$i2,$i2,$t3,lsl#24
++	ldrb	$t2,[$rounds,#21]
++	ldrb	$t3,[$rounds,#20]
++	orr	$i3,$i3,$t1,lsl#8
++	orr	$i3,$i3,$t2,lsl#16
++	str	$i2,[$key],#8
++	orr	$i3,$i3,$t3,lsl#24
++	str	$i3,[$key,#-4]
++#else
++	ldr	$i2,[$rounds,#16]
++	ldr	$i3,[$rounds,#20]
++#ifdef __ARMEL__
++	rev	$i2,$i2
++	rev	$i3,$i3
++#endif
++	str	$i2,[$key],#8
++	str	$i3,[$key,#-4]
++#endif
++
++	teq	lr,#192
++	bne	.Lnot192
++	mov	$rounds,#12
++	str	$rounds,[$key,#240-24]
++	add	$t3,$tbl,#256			@ rcon
++	mov	lr,#255
++	mov	$rounds,#8
++
++.L192_loop:
++	and	$t2,lr,$i3,lsr#24
++	and	$i1,lr,$i3,lsr#16
++	ldrb	$t2,[$tbl,$t2]
++	and	$i2,lr,$i3,lsr#8
++	ldrb	$i1,[$tbl,$i1]
++	and	$i3,lr,$i3
++	ldrb	$i2,[$tbl,$i2]
++	orr	$t2,$t2,$i1,lsl#24
++	ldrb	$i3,[$tbl,$i3]
++	orr	$t2,$t2,$i2,lsl#16
++	ldr	$t1,[$t3],#4			@ rcon[i++]
++	orr	$t2,$t2,$i3,lsl#8
++	eor	$i3,$t2,$t1
++	eor	$s0,$s0,$i3			@ rk[6]=rk[0]^...
++	eor	$s1,$s1,$s0			@ rk[7]=rk[1]^rk[6]
++	str	$s0,[$key],#24
++	eor	$s2,$s2,$s1			@ rk[8]=rk[2]^rk[7]
++	str	$s1,[$key,#-20]
++	eor	$s3,$s3,$s2			@ rk[9]=rk[3]^rk[8]
++	str	$s2,[$key,#-16]
++	subs	$rounds,$rounds,#1
++	str	$s3,[$key,#-12]
++#if __ARM_ARCH__>=7
++	itt	eq				@ Thumb2 thing, sanity check in ARM
++#endif
++	subeq	r2,$key,#216
++	beq	.Ldone
++
++	ldr	$i1,[$key,#-32]
++	ldr	$i2,[$key,#-28]
++	eor	$i1,$i1,$s3			@ rk[10]=rk[4]^rk[9]
++	eor	$i3,$i2,$i1			@ rk[11]=rk[5]^rk[10]
++	str	$i1,[$key,#-8]
++	str	$i3,[$key,#-4]
++	b	.L192_loop
++
++.Lnot192:
++#if __ARM_ARCH__<7
++	ldrb	$i2,[$rounds,#27]
++	ldrb	$t1,[$rounds,#26]
++	ldrb	$t2,[$rounds,#25]
++	ldrb	$t3,[$rounds,#24]
++	orr	$i2,$i2,$t1,lsl#8
++	ldrb	$i3,[$rounds,#31]
++	orr	$i2,$i2,$t2,lsl#16
++	ldrb	$t1,[$rounds,#30]
++	orr	$i2,$i2,$t3,lsl#24
++	ldrb	$t2,[$rounds,#29]
++	ldrb	$t3,[$rounds,#28]
++	orr	$i3,$i3,$t1,lsl#8
++	orr	$i3,$i3,$t2,lsl#16
++	str	$i2,[$key],#8
++	orr	$i3,$i3,$t3,lsl#24
++	str	$i3,[$key,#-4]
++#else
++	ldr	$i2,[$rounds,#24]
++	ldr	$i3,[$rounds,#28]
++#ifdef __ARMEL__
++	rev	$i2,$i2
++	rev	$i3,$i3
++#endif
++	str	$i2,[$key],#8
++	str	$i3,[$key,#-4]
++#endif
++
++	mov	$rounds,#14
++	str	$rounds,[$key,#240-32]
++	add	$t3,$tbl,#256			@ rcon
++	mov	lr,#255
++	mov	$rounds,#7
++
++.L256_loop:
++	and	$t2,lr,$i3,lsr#24
++	and	$i1,lr,$i3,lsr#16
++	ldrb	$t2,[$tbl,$t2]
++	and	$i2,lr,$i3,lsr#8
++	ldrb	$i1,[$tbl,$i1]
++	and	$i3,lr,$i3
++	ldrb	$i2,[$tbl,$i2]
++	orr	$t2,$t2,$i1,lsl#24
++	ldrb	$i3,[$tbl,$i3]
++	orr	$t2,$t2,$i2,lsl#16
++	ldr	$t1,[$t3],#4			@ rcon[i++]
++	orr	$t2,$t2,$i3,lsl#8
++	eor	$i3,$t2,$t1
++	eor	$s0,$s0,$i3			@ rk[8]=rk[0]^...
++	eor	$s1,$s1,$s0			@ rk[9]=rk[1]^rk[8]
++	str	$s0,[$key],#32
++	eor	$s2,$s2,$s1			@ rk[10]=rk[2]^rk[9]
++	str	$s1,[$key,#-28]
++	eor	$s3,$s3,$s2			@ rk[11]=rk[3]^rk[10]
++	str	$s2,[$key,#-24]
++	subs	$rounds,$rounds,#1
++	str	$s3,[$key,#-20]
++#if __ARM_ARCH__>=7
++	itt	eq				@ Thumb2 thing, sanity check in ARM
++#endif
++	subeq	r2,$key,#256
++	beq	.Ldone
++
++	and	$t2,lr,$s3
++	and	$i1,lr,$s3,lsr#8
++	ldrb	$t2,[$tbl,$t2]
++	and	$i2,lr,$s3,lsr#16
++	ldrb	$i1,[$tbl,$i1]
++	and	$i3,lr,$s3,lsr#24
++	ldrb	$i2,[$tbl,$i2]
++	orr	$t2,$t2,$i1,lsl#8
++	ldrb	$i3,[$tbl,$i3]
++	orr	$t2,$t2,$i2,lsl#16
++	ldr	$t1,[$key,#-48]
++	orr	$t2,$t2,$i3,lsl#24
++
++	ldr	$i1,[$key,#-44]
++	ldr	$i2,[$key,#-40]
++	eor	$t1,$t1,$t2			@ rk[12]=rk[4]^...
++	ldr	$i3,[$key,#-36]
++	eor	$i1,$i1,$t1			@ rk[13]=rk[5]^rk[12]
++	str	$t1,[$key,#-16]
++	eor	$i2,$i2,$i1			@ rk[14]=rk[6]^rk[13]
++	str	$i1,[$key,#-12]
++	eor	$i3,$i3,$i2			@ rk[15]=rk[7]^rk[14]
++	str	$i2,[$key,#-8]
++	str	$i3,[$key,#-4]
++	b	.L256_loop
++
++.align	2
++.Ldone:	mov	r0,#0
++	ldmia   sp!,{r4-r12,lr}
++.Labrt:
++#if __ARM_ARCH__>=5
++	ret				@ bx lr
++#else
++	tst	lr,#1
++	moveq	pc,lr			@ be binary compatible with V4, yet
++	bx	lr			@ interoperable with Thumb ISA:-)
++#endif
++.size	asm_AES_set_encrypt_key,.-asm_AES_set_encrypt_key
++
++.global asm_AES_set_decrypt_key
++.type   asm_AES_set_decrypt_key,%function
++.align	5
++asm_AES_set_decrypt_key:
++	str	lr,[sp,#-4]!            @ push lr
++	bl	_armv4_AES_set_encrypt_key
++	teq	r0,#0
++	ldr	lr,[sp],#4              @ pop lr
++	bne	.Labrt
++
++	mov	r0,r2			@ asm_AES_set_encrypt_key preserves r2,
++	mov	r1,r2			@ which is AES_KEY *key
++	b	_armv4_AES_set_enc2dec_key
++.size	asm_AES_set_decrypt_key,.-asm_AES_set_decrypt_key
++
++@ void AES_set_enc2dec_key(const AES_KEY *inp,AES_KEY *out)
++.global	AES_set_enc2dec_key
++.type	AES_set_enc2dec_key,%function
++.align	5
++AES_set_enc2dec_key:
++_armv4_AES_set_enc2dec_key:
++	stmdb   sp!,{r4-r12,lr}
++
++	ldr	$rounds,[r0,#240]
++	mov	$i1,r0			@ input
++	add	$i2,r0,$rounds,lsl#4
++	mov	$key,r1			@ ouput
++	add	$tbl,r1,$rounds,lsl#4
++	str	$rounds,[r1,#240]
++
++.Linv:	ldr	$s0,[$i1],#16
++	ldr	$s1,[$i1,#-12]
++	ldr	$s2,[$i1,#-8]
++	ldr	$s3,[$i1,#-4]
++	ldr	$t1,[$i2],#-16
++	ldr	$t2,[$i2,#16+4]
++	ldr	$t3,[$i2,#16+8]
++	ldr	$i3,[$i2,#16+12]
++	str	$s0,[$tbl],#-16
++	str	$s1,[$tbl,#16+4]
++	str	$s2,[$tbl,#16+8]
++	str	$s3,[$tbl,#16+12]
++	str	$t1,[$key],#16
++	str	$t2,[$key,#-12]
++	str	$t3,[$key,#-8]
++	str	$i3,[$key,#-4]
++	teq	$i1,$i2
++	bne	.Linv
++
++	ldr	$s0,[$i1]
++	ldr	$s1,[$i1,#4]
++	ldr	$s2,[$i1,#8]
++	ldr	$s3,[$i1,#12]
++	str	$s0,[$key]
++	str	$s1,[$key,#4]
++	str	$s2,[$key,#8]
++	str	$s3,[$key,#12]
++	sub	$key,$key,$rounds,lsl#3
++___
++$mask80=$i1;
++$mask1b=$i2;
++$mask7f=$i3;
++$code.=<<___;
++	ldr	$s0,[$key,#16]!		@ prefetch tp1
++	mov	$mask80,#0x80
++	mov	$mask1b,#0x1b
++	orr	$mask80,$mask80,#0x8000
++	orr	$mask1b,$mask1b,#0x1b00
++	orr	$mask80,$mask80,$mask80,lsl#16
++	orr	$mask1b,$mask1b,$mask1b,lsl#16
++	sub	$rounds,$rounds,#1
++	mvn	$mask7f,$mask80
++	mov	$rounds,$rounds,lsl#2	@ (rounds-1)*4
++
++.Lmix:	and	$t1,$s0,$mask80
++	and	$s1,$s0,$mask7f
++	sub	$t1,$t1,$t1,lsr#7
++	and	$t1,$t1,$mask1b
++	eor	$s1,$t1,$s1,lsl#1	@ tp2
++
++	and	$t1,$s1,$mask80
++	and	$s2,$s1,$mask7f
++	sub	$t1,$t1,$t1,lsr#7
++	and	$t1,$t1,$mask1b
++	eor	$s2,$t1,$s2,lsl#1	@ tp4
++
++	and	$t1,$s2,$mask80
++	and	$s3,$s2,$mask7f
++	sub	$t1,$t1,$t1,lsr#7
++	and	$t1,$t1,$mask1b
++	eor	$s3,$t1,$s3,lsl#1	@ tp8
++
++	eor	$t1,$s1,$s2
++	eor	$t2,$s0,$s3		@ tp9
++	eor	$t1,$t1,$s3		@ tpe
++	eor	$t1,$t1,$s1,ror#24
++	eor	$t1,$t1,$t2,ror#24	@ ^= ROTATE(tpb=tp9^tp2,8)
++	eor	$t1,$t1,$s2,ror#16
++	eor	$t1,$t1,$t2,ror#16	@ ^= ROTATE(tpd=tp9^tp4,16)
++	eor	$t1,$t1,$t2,ror#8	@ ^= ROTATE(tp9,24)
++
++	ldr	$s0,[$key,#4]		@ prefetch tp1
++	str	$t1,[$key],#4
++	subs	$rounds,$rounds,#1
++	bne	.Lmix
++
++	mov	r0,#0
++#if __ARM_ARCH__>=5
++	ldmia	sp!,{r4-r12,pc}
++#else
++	ldmia   sp!,{r4-r12,lr}
++	tst	lr,#1
++	moveq	pc,lr			@ be binary compatible with V4, yet
++	bx	lr			@ interoperable with Thumb ISA:-)
++#endif
++.size	AES_set_enc2dec_key,.-AES_set_enc2dec_key
++
++.type	AES_Td,%object
++.align	5
++AES_Td:
++.word	0x51f4a750, 0x7e416553, 0x1a17a4c3, 0x3a275e96
++.word	0x3bab6bcb, 0x1f9d45f1, 0xacfa58ab, 0x4be30393
++.word	0x2030fa55, 0xad766df6, 0x88cc7691, 0xf5024c25
++.word	0x4fe5d7fc, 0xc52acbd7, 0x26354480, 0xb562a38f
++.word	0xdeb15a49, 0x25ba1b67, 0x45ea0e98, 0x5dfec0e1
++.word	0xc32f7502, 0x814cf012, 0x8d4697a3, 0x6bd3f9c6
++.word	0x038f5fe7, 0x15929c95, 0xbf6d7aeb, 0x955259da
++.word	0xd4be832d, 0x587421d3, 0x49e06929, 0x8ec9c844
++.word	0x75c2896a, 0xf48e7978, 0x99583e6b, 0x27b971dd
++.word	0xbee14fb6, 0xf088ad17, 0xc920ac66, 0x7dce3ab4
++.word	0x63df4a18, 0xe51a3182, 0x97513360, 0x62537f45
++.word	0xb16477e0, 0xbb6bae84, 0xfe81a01c, 0xf9082b94
++.word	0x70486858, 0x8f45fd19, 0x94de6c87, 0x527bf8b7
++.word	0xab73d323, 0x724b02e2, 0xe31f8f57, 0x6655ab2a
++.word	0xb2eb2807, 0x2fb5c203, 0x86c57b9a, 0xd33708a5
++.word	0x302887f2, 0x23bfa5b2, 0x02036aba, 0xed16825c
++.word	0x8acf1c2b, 0xa779b492, 0xf307f2f0, 0x4e69e2a1
++.word	0x65daf4cd, 0x0605bed5, 0xd134621f, 0xc4a6fe8a
++.word	0x342e539d, 0xa2f355a0, 0x058ae132, 0xa4f6eb75
++.word	0x0b83ec39, 0x4060efaa, 0x5e719f06, 0xbd6e1051
++.word	0x3e218af9, 0x96dd063d, 0xdd3e05ae, 0x4de6bd46
++.word	0x91548db5, 0x71c45d05, 0x0406d46f, 0x605015ff
++.word	0x1998fb24, 0xd6bde997, 0x894043cc, 0x67d99e77
++.word	0xb0e842bd, 0x07898b88, 0xe7195b38, 0x79c8eedb
++.word	0xa17c0a47, 0x7c420fe9, 0xf8841ec9, 0x00000000
++.word	0x09808683, 0x322bed48, 0x1e1170ac, 0x6c5a724e
++.word	0xfd0efffb, 0x0f853856, 0x3daed51e, 0x362d3927
++.word	0x0a0fd964, 0x685ca621, 0x9b5b54d1, 0x24362e3a
++.word	0x0c0a67b1, 0x9357e70f, 0xb4ee96d2, 0x1b9b919e
++.word	0x80c0c54f, 0x61dc20a2, 0x5a774b69, 0x1c121a16
++.word	0xe293ba0a, 0xc0a02ae5, 0x3c22e043, 0x121b171d
++.word	0x0e090d0b, 0xf28bc7ad, 0x2db6a8b9, 0x141ea9c8
++.word	0x57f11985, 0xaf75074c, 0xee99ddbb, 0xa37f60fd
++.word	0xf701269f, 0x5c72f5bc, 0x44663bc5, 0x5bfb7e34
++.word	0x8b432976, 0xcb23c6dc, 0xb6edfc68, 0xb8e4f163
++.word	0xd731dcca, 0x42638510, 0x13972240, 0x84c61120
++.word	0x854a247d, 0xd2bb3df8, 0xaef93211, 0xc729a16d
++.word	0x1d9e2f4b, 0xdcb230f3, 0x0d8652ec, 0x77c1e3d0
++.word	0x2bb3166c, 0xa970b999, 0x119448fa, 0x47e96422
++.word	0xa8fc8cc4, 0xa0f03f1a, 0x567d2cd8, 0x223390ef
++.word	0x87494ec7, 0xd938d1c1, 0x8ccaa2fe, 0x98d40b36
++.word	0xa6f581cf, 0xa57ade28, 0xdab78e26, 0x3fadbfa4
++.word	0x2c3a9de4, 0x5078920d, 0x6a5fcc9b, 0x547e4662
++.word	0xf68d13c2, 0x90d8b8e8, 0x2e39f75e, 0x82c3aff5
++.word	0x9f5d80be, 0x69d0937c, 0x6fd52da9, 0xcf2512b3
++.word	0xc8ac993b, 0x10187da7, 0xe89c636e, 0xdb3bbb7b
++.word	0xcd267809, 0x6e5918f4, 0xec9ab701, 0x834f9aa8
++.word	0xe6956e65, 0xaaffe67e, 0x21bccf08, 0xef15e8e6
++.word	0xbae79bd9, 0x4a6f36ce, 0xea9f09d4, 0x29b07cd6
++.word	0x31a4b2af, 0x2a3f2331, 0xc6a59430, 0x35a266c0
++.word	0x744ebc37, 0xfc82caa6, 0xe090d0b0, 0x33a7d815
++.word	0xf104984a, 0x41ecdaf7, 0x7fcd500e, 0x1791f62f
++.word	0x764dd68d, 0x43efb04d, 0xccaa4d54, 0xe49604df
++.word	0x9ed1b5e3, 0x4c6a881b, 0xc12c1fb8, 0x4665517f
++.word	0x9d5eea04, 0x018c355d, 0xfa877473, 0xfb0b412e
++.word	0xb3671d5a, 0x92dbd252, 0xe9105633, 0x6dd64713
++.word	0x9ad7618c, 0x37a10c7a, 0x59f8148e, 0xeb133c89
++.word	0xcea927ee, 0xb761c935, 0xe11ce5ed, 0x7a47b13c
++.word	0x9cd2df59, 0x55f2733f, 0x1814ce79, 0x73c737bf
++.word	0x53f7cdea, 0x5ffdaa5b, 0xdf3d6f14, 0x7844db86
++.word	0xcaaff381, 0xb968c43e, 0x3824342c, 0xc2a3405f
++.word	0x161dc372, 0xbce2250c, 0x283c498b, 0xff0d9541
++.word	0x39a80171, 0x080cb3de, 0xd8b4e49c, 0x6456c190
++.word	0x7bcb8461, 0xd532b670, 0x486c5c74, 0xd0b85742
++@ Td4[256]
++.byte	0x52, 0x09, 0x6a, 0xd5, 0x30, 0x36, 0xa5, 0x38
++.byte	0xbf, 0x40, 0xa3, 0x9e, 0x81, 0xf3, 0xd7, 0xfb
++.byte	0x7c, 0xe3, 0x39, 0x82, 0x9b, 0x2f, 0xff, 0x87
++.byte	0x34, 0x8e, 0x43, 0x44, 0xc4, 0xde, 0xe9, 0xcb
++.byte	0x54, 0x7b, 0x94, 0x32, 0xa6, 0xc2, 0x23, 0x3d
++.byte	0xee, 0x4c, 0x95, 0x0b, 0x42, 0xfa, 0xc3, 0x4e
++.byte	0x08, 0x2e, 0xa1, 0x66, 0x28, 0xd9, 0x24, 0xb2
++.byte	0x76, 0x5b, 0xa2, 0x49, 0x6d, 0x8b, 0xd1, 0x25
++.byte	0x72, 0xf8, 0xf6, 0x64, 0x86, 0x68, 0x98, 0x16
++.byte	0xd4, 0xa4, 0x5c, 0xcc, 0x5d, 0x65, 0xb6, 0x92
++.byte	0x6c, 0x70, 0x48, 0x50, 0xfd, 0xed, 0xb9, 0xda
++.byte	0x5e, 0x15, 0x46, 0x57, 0xa7, 0x8d, 0x9d, 0x84
++.byte	0x90, 0xd8, 0xab, 0x00, 0x8c, 0xbc, 0xd3, 0x0a
++.byte	0xf7, 0xe4, 0x58, 0x05, 0xb8, 0xb3, 0x45, 0x06
++.byte	0xd0, 0x2c, 0x1e, 0x8f, 0xca, 0x3f, 0x0f, 0x02
++.byte	0xc1, 0xaf, 0xbd, 0x03, 0x01, 0x13, 0x8a, 0x6b
++.byte	0x3a, 0x91, 0x11, 0x41, 0x4f, 0x67, 0xdc, 0xea
++.byte	0x97, 0xf2, 0xcf, 0xce, 0xf0, 0xb4, 0xe6, 0x73
++.byte	0x96, 0xac, 0x74, 0x22, 0xe7, 0xad, 0x35, 0x85
++.byte	0xe2, 0xf9, 0x37, 0xe8, 0x1c, 0x75, 0xdf, 0x6e
++.byte	0x47, 0xf1, 0x1a, 0x71, 0x1d, 0x29, 0xc5, 0x89
++.byte	0x6f, 0xb7, 0x62, 0x0e, 0xaa, 0x18, 0xbe, 0x1b
++.byte	0xfc, 0x56, 0x3e, 0x4b, 0xc6, 0xd2, 0x79, 0x20
++.byte	0x9a, 0xdb, 0xc0, 0xfe, 0x78, 0xcd, 0x5a, 0xf4
++.byte	0x1f, 0xdd, 0xa8, 0x33, 0x88, 0x07, 0xc7, 0x31
++.byte	0xb1, 0x12, 0x10, 0x59, 0x27, 0x80, 0xec, 0x5f
++.byte	0x60, 0x51, 0x7f, 0xa9, 0x19, 0xb5, 0x4a, 0x0d
++.byte	0x2d, 0xe5, 0x7a, 0x9f, 0x93, 0xc9, 0x9c, 0xef
++.byte	0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0
++.byte	0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61
++.byte	0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26
++.byte	0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d
++.size	AES_Td,.-AES_Td
++
++@ void asm_AES_decrypt(const unsigned char *in, unsigned char *out,
++@ 		       const AES_KEY *key) {
++.global asm_AES_decrypt
++.type   asm_AES_decrypt,%function
++.align	5
++asm_AES_decrypt:
++#if __ARM_ARCH__<7
++	sub	r3,pc,#8		@ asm_AES_decrypt
++#else
++	adr	r3,asm_AES_decrypt
++#endif
++	stmdb   sp!,{r1,r4-r12,lr}
++#ifdef	__APPLE__
++	adr	$tbl,AES_Td
++#else
++	sub	$tbl,r3,#asm_AES_decrypt-AES_Td	@ Td
++#endif
++	mov	$rounds,r0		@ inp
++	mov	$key,r2
++#if __ARM_ARCH__<7
++	ldrb	$s0,[$rounds,#3]	@ load input data in endian-neutral
++	ldrb	$t1,[$rounds,#2]	@ manner...
++	ldrb	$t2,[$rounds,#1]
++	ldrb	$t3,[$rounds,#0]
++	orr	$s0,$s0,$t1,lsl#8
++	ldrb	$s1,[$rounds,#7]
++	orr	$s0,$s0,$t2,lsl#16
++	ldrb	$t1,[$rounds,#6]
++	orr	$s0,$s0,$t3,lsl#24
++	ldrb	$t2,[$rounds,#5]
++	ldrb	$t3,[$rounds,#4]
++	orr	$s1,$s1,$t1,lsl#8
++	ldrb	$s2,[$rounds,#11]
++	orr	$s1,$s1,$t2,lsl#16
++	ldrb	$t1,[$rounds,#10]
++	orr	$s1,$s1,$t3,lsl#24
++	ldrb	$t2,[$rounds,#9]
++	ldrb	$t3,[$rounds,#8]
++	orr	$s2,$s2,$t1,lsl#8
++	ldrb	$s3,[$rounds,#15]
++	orr	$s2,$s2,$t2,lsl#16
++	ldrb	$t1,[$rounds,#14]
++	orr	$s2,$s2,$t3,lsl#24
++	ldrb	$t2,[$rounds,#13]
++	ldrb	$t3,[$rounds,#12]
++	orr	$s3,$s3,$t1,lsl#8
++	orr	$s3,$s3,$t2,lsl#16
++	orr	$s3,$s3,$t3,lsl#24
++#else
++	ldr	$s0,[$rounds,#0]
++	ldr	$s1,[$rounds,#4]
++	ldr	$s2,[$rounds,#8]
++	ldr	$s3,[$rounds,#12]
++#ifdef __ARMEL__
++	rev	$s0,$s0
++	rev	$s1,$s1
++	rev	$s2,$s2
++	rev	$s3,$s3
++#endif
++#endif
++	bl	_armv4_AES_decrypt
++
++	ldr	$rounds,[sp],#4		@ pop out
++#if __ARM_ARCH__>=7
++#ifdef __ARMEL__
++	rev	$s0,$s0
++	rev	$s1,$s1
++	rev	$s2,$s2
++	rev	$s3,$s3
++#endif
++	str	$s0,[$rounds,#0]
++	str	$s1,[$rounds,#4]
++	str	$s2,[$rounds,#8]
++	str	$s3,[$rounds,#12]
++#else
++	mov	$t1,$s0,lsr#24		@ write output in endian-neutral
++	mov	$t2,$s0,lsr#16		@ manner...
++	mov	$t3,$s0,lsr#8
++	strb	$t1,[$rounds,#0]
++	strb	$t2,[$rounds,#1]
++	mov	$t1,$s1,lsr#24
++	strb	$t3,[$rounds,#2]
++	mov	$t2,$s1,lsr#16
++	strb	$s0,[$rounds,#3]
++	mov	$t3,$s1,lsr#8
++	strb	$t1,[$rounds,#4]
++	strb	$t2,[$rounds,#5]
++	mov	$t1,$s2,lsr#24
++	strb	$t3,[$rounds,#6]
++	mov	$t2,$s2,lsr#16
++	strb	$s1,[$rounds,#7]
++	mov	$t3,$s2,lsr#8
++	strb	$t1,[$rounds,#8]
++	strb	$t2,[$rounds,#9]
++	mov	$t1,$s3,lsr#24
++	strb	$t3,[$rounds,#10]
++	mov	$t2,$s3,lsr#16
++	strb	$s2,[$rounds,#11]
++	mov	$t3,$s3,lsr#8
++	strb	$t1,[$rounds,#12]
++	strb	$t2,[$rounds,#13]
++	strb	$t3,[$rounds,#14]
++	strb	$s3,[$rounds,#15]
++#endif
++#if __ARM_ARCH__>=5
++	ldmia	sp!,{r4-r12,pc}
++#else
++	ldmia   sp!,{r4-r12,lr}
++	tst	lr,#1
++	moveq	pc,lr			@ be binary compatible with V4, yet
++	bx	lr			@ interoperable with Thumb ISA:-)
++#endif
++.size	asm_AES_decrypt,.-asm_AES_decrypt
++
++.type   _armv4_AES_decrypt,%function
++.align	2
++_armv4_AES_decrypt:
++	str	lr,[sp,#-4]!		@ push lr
++	ldmia	$key!,{$t1-$i1}
++	eor	$s0,$s0,$t1
++	ldr	$rounds,[$key,#240-16]
++	eor	$s1,$s1,$t2
++	eor	$s2,$s2,$t3
++	eor	$s3,$s3,$i1
++	sub	$rounds,$rounds,#1
++	mov	lr,#255
++
++	and	$i1,lr,$s0,lsr#16
++	and	$i2,lr,$s0,lsr#8
++	and	$i3,lr,$s0
++	mov	$s0,$s0,lsr#24
++.Ldec_loop:
++	ldr	$t1,[$tbl,$i1,lsl#2]	@ Td1[s0>>16]
++	and	$i1,lr,$s1		@ i0
++	ldr	$t2,[$tbl,$i2,lsl#2]	@ Td2[s0>>8]
++	and	$i2,lr,$s1,lsr#16
++	ldr	$t3,[$tbl,$i3,lsl#2]	@ Td3[s0>>0]
++	and	$i3,lr,$s1,lsr#8
++	ldr	$s0,[$tbl,$s0,lsl#2]	@ Td0[s0>>24]
++	mov	$s1,$s1,lsr#24
++
++	ldr	$i1,[$tbl,$i1,lsl#2]	@ Td3[s1>>0]
++	ldr	$i2,[$tbl,$i2,lsl#2]	@ Td1[s1>>16]
++	ldr	$i3,[$tbl,$i3,lsl#2]	@ Td2[s1>>8]
++	eor	$s0,$s0,$i1,ror#24
++	ldr	$s1,[$tbl,$s1,lsl#2]	@ Td0[s1>>24]
++	and	$i1,lr,$s2,lsr#8	@ i0
++	eor	$t2,$i2,$t2,ror#8
++	and	$i2,lr,$s2		@ i1
++	eor	$t3,$i3,$t3,ror#8
++	and	$i3,lr,$s2,lsr#16
++	ldr	$i1,[$tbl,$i1,lsl#2]	@ Td2[s2>>8]
++	eor	$s1,$s1,$t1,ror#8
++	ldr	$i2,[$tbl,$i2,lsl#2]	@ Td3[s2>>0]
++	mov	$s2,$s2,lsr#24
++
++	ldr	$i3,[$tbl,$i3,lsl#2]	@ Td1[s2>>16]
++	eor	$s0,$s0,$i1,ror#16
++	ldr	$s2,[$tbl,$s2,lsl#2]	@ Td0[s2>>24]
++	and	$i1,lr,$s3,lsr#16	@ i0
++	eor	$s1,$s1,$i2,ror#24
++	and	$i2,lr,$s3,lsr#8	@ i1
++	eor	$t3,$i3,$t3,ror#8
++	and	$i3,lr,$s3		@ i2
++	ldr	$i1,[$tbl,$i1,lsl#2]	@ Td1[s3>>16]
++	eor	$s2,$s2,$t2,ror#8
++	ldr	$i2,[$tbl,$i2,lsl#2]	@ Td2[s3>>8]
++	mov	$s3,$s3,lsr#24
++
++	ldr	$i3,[$tbl,$i3,lsl#2]	@ Td3[s3>>0]
++	eor	$s0,$s0,$i1,ror#8
++	ldr	$i1,[$key],#16
++	eor	$s1,$s1,$i2,ror#16
++	ldr	$s3,[$tbl,$s3,lsl#2]	@ Td0[s3>>24]
++	eor	$s2,$s2,$i3,ror#24
++
++	ldr	$t1,[$key,#-12]
++	eor	$s0,$s0,$i1
++	ldr	$t2,[$key,#-8]
++	eor	$s3,$s3,$t3,ror#8
++	ldr	$t3,[$key,#-4]
++	and	$i1,lr,$s0,lsr#16
++	eor	$s1,$s1,$t1
++	and	$i2,lr,$s0,lsr#8
++	eor	$s2,$s2,$t2
++	and	$i3,lr,$s0
++	eor	$s3,$s3,$t3
++	mov	$s0,$s0,lsr#24
++
++	subs	$rounds,$rounds,#1
++	bne	.Ldec_loop
++
++	add	$tbl,$tbl,#1024
++
++	ldr	$t2,[$tbl,#0]		@ prefetch Td4
++	ldr	$t3,[$tbl,#32]
++	ldr	$t1,[$tbl,#64]
++	ldr	$t2,[$tbl,#96]
++	ldr	$t3,[$tbl,#128]
++	ldr	$t1,[$tbl,#160]
++	ldr	$t2,[$tbl,#192]
++	ldr	$t3,[$tbl,#224]
++
++	ldrb	$s0,[$tbl,$s0]		@ Td4[s0>>24]
++	ldrb	$t1,[$tbl,$i1]		@ Td4[s0>>16]
++	and	$i1,lr,$s1		@ i0
++	ldrb	$t2,[$tbl,$i2]		@ Td4[s0>>8]
++	and	$i2,lr,$s1,lsr#16
++	ldrb	$t3,[$tbl,$i3]		@ Td4[s0>>0]
++	and	$i3,lr,$s1,lsr#8
++
++	add	$s1,$tbl,$s1,lsr#24
++	ldrb	$i1,[$tbl,$i1]		@ Td4[s1>>0]
++	ldrb	$s1,[$s1]		@ Td4[s1>>24]
++	ldrb	$i2,[$tbl,$i2]		@ Td4[s1>>16]
++	eor	$s0,$i1,$s0,lsl#24
++	ldrb	$i3,[$tbl,$i3]		@ Td4[s1>>8]
++	eor	$s1,$t1,$s1,lsl#8
++	and	$i1,lr,$s2,lsr#8	@ i0
++	eor	$t2,$t2,$i2,lsl#8
++	and	$i2,lr,$s2		@ i1
++	ldrb	$i1,[$tbl,$i1]		@ Td4[s2>>8]
++	eor	$t3,$t3,$i3,lsl#8
++	ldrb	$i2,[$tbl,$i2]		@ Td4[s2>>0]
++	and	$i3,lr,$s2,lsr#16
++
++	add	$s2,$tbl,$s2,lsr#24
++	ldrb	$s2,[$s2]		@ Td4[s2>>24]
++	eor	$s0,$s0,$i1,lsl#8
++	ldrb	$i3,[$tbl,$i3]		@ Td4[s2>>16]
++	eor	$s1,$i2,$s1,lsl#16
++	and	$i1,lr,$s3,lsr#16	@ i0
++	eor	$s2,$t2,$s2,lsl#16
++	and	$i2,lr,$s3,lsr#8	@ i1
++	ldrb	$i1,[$tbl,$i1]		@ Td4[s3>>16]
++	eor	$t3,$t3,$i3,lsl#16
++	ldrb	$i2,[$tbl,$i2]		@ Td4[s3>>8]
++	and	$i3,lr,$s3		@ i2
++
++	add	$s3,$tbl,$s3,lsr#24
++	ldrb	$i3,[$tbl,$i3]		@ Td4[s3>>0]
++	ldrb	$s3,[$s3]		@ Td4[s3>>24]
++	eor	$s0,$s0,$i1,lsl#16
++	ldr	$i1,[$key,#0]
++	eor	$s1,$s1,$i2,lsl#8
++	ldr	$t1,[$key,#4]
++	eor	$s2,$i3,$s2,lsl#8
++	ldr	$t2,[$key,#8]
++	eor	$s3,$t3,$s3,lsl#24
++	ldr	$t3,[$key,#12]
++
++	eor	$s0,$s0,$i1
++	eor	$s1,$s1,$t1
++	eor	$s2,$s2,$t2
++	eor	$s3,$s3,$t3
++
++	sub	$tbl,$tbl,#1024
++	ldr	pc,[sp],#4		@ pop and return
++.size	_armv4_AES_decrypt,.-_armv4_AES_decrypt
++.asciz	"AES for ARMv4, CRYPTOGAMS by <appro\@openssl.org>"
++.align	2
++
++#endif
++___
++
++$code =~ s/\bbx\s+lr\b/.word\t0xe12fff1e/gm;	# make it possible to compile with -march=armv4
++$code =~ s/\bret\b/bx\tlr/gm;
++
++open SELF,$0;
++while(<SELF>) {
++	next if (/^#!/);
++	last if (!s/^#/@/ and !/^$/);
++	print;
++}
++close SELF;
++
++print $code;
++close STDOUT;	# enforce flush
+--- /dev/null
++++ b/crypto/boringssl/aes/asm/bsaes-armv7.pl
+@@ -0,0 +1,2487 @@
++#!/usr/bin/env perl
++
++# ====================================================================
++# Written by Andy Polyakov <appro@openssl.org> for the OpenSSL
++# project. The module is, however, dual licensed under OpenSSL and
++# CRYPTOGAMS licenses depending on where you obtain it. For further
++# details see http://www.openssl.org/~appro/cryptogams/.
++#
++# Specific modes and adaptation for Linux kernel by Ard Biesheuvel
++# <ard.biesheuvel@linaro.org>. Permission to use under GPL terms is
++# granted.
++# ====================================================================
++
++# Bit-sliced AES for ARM NEON
++#
++# February 2012.
++#
++# This implementation is direct adaptation of bsaes-x86_64 module for
++# ARM NEON. Except that this module is endian-neutral [in sense that
++# it can be compiled for either endianness] by courtesy of vld1.8's
++# neutrality. Initial version doesn't implement interface to OpenSSL,
++# only low-level primitives and unsupported entry points, just enough
++# to collect performance results, which for Cortex-A8 core are:
++#
++# encrypt	19.5 cycles per byte processed with 128-bit key
++# decrypt	22.1 cycles per byte processed with 128-bit key
++# key conv.	440  cycles per 128-bit key/0.18 of 8x block
++#
++# Snapdragon S4 encrypts byte in 17.6 cycles and decrypts in 19.7,
++# which is [much] worse than anticipated (for further details see
++# http://www.openssl.org/~appro/Snapdragon-S4.html).
++#
++# Cortex-A15 manages in 14.2/16.1 cycles [when integer-only code
++# manages in 20.0 cycles].
++#
++# When comparing to x86_64 results keep in mind that NEON unit is
++# [mostly] single-issue and thus can't [fully] benefit from
++# instruction-level parallelism. And when comparing to aes-armv4
++# results keep in mind key schedule conversion overhead (see
++# bsaes-x86_64.pl for further details)...
++#
++#						<appro@openssl.org>
++
++# April-August 2013
++#
++# Add CBC, CTR and XTS subroutines, adapt for kernel use.
++#
++#					<ard.biesheuvel@linaro.org>
++
++$flavour = shift;
++if ($flavour=~/\w[\w\-]*\.\w+$/) { $output=$flavour; undef $flavour; }
++else { while (($output=shift) && ($output!~/\w[\w\-]*\.\w+$/)) {} }
++
++if ($flavour && $flavour ne "void") {
++    $0 =~ m/(.*[\/\\])[^\/\\]+$/; $dir=$1;
++    ( $xlate="${dir}arm-xlate.pl" and -f $xlate ) or
++    ( $xlate="${dir}../../perlasm/arm-xlate.pl" and -f $xlate) or
++    die "can't locate arm-xlate.pl";
++
++    open STDOUT,"| \"$^X\" $xlate $flavour $output";
++} else {
++    open STDOUT,">$output";
++}
++
++my ($inp,$out,$len,$key)=("r0","r1","r2","r3");
++my @XMM=map("q$_",(0..15));
++
++{
++my ($key,$rounds,$const)=("r4","r5","r6");
++
++sub Dlo()   { shift=~m|q([1]?[0-9])|?"d".($1*2):"";     }
++sub Dhi()   { shift=~m|q([1]?[0-9])|?"d".($1*2+1):"";   }
++
++sub Sbox {
++# input in  lsb > [b0, b1, b2, b3, b4, b5, b6, b7] < msb
++# output in lsb > [b0, b1, b4, b6, b3, b7, b2, b5] < msb
++my @b=@_[0..7];
++my @t=@_[8..11];
++my @s=@_[12..15];
++	&InBasisChange	(@b);
++	&Inv_GF256	(@b[6,5,0,3,7,1,4,2],@t,@s);
++	&OutBasisChange	(@b[7,1,4,2,6,5,0,3]);
++}
++
++sub InBasisChange {
++# input in  lsb > [b0, b1, b2, b3, b4, b5, b6, b7] < msb
++# output in lsb > [b6, b5, b0, b3, b7, b1, b4, b2] < msb 
++my @b=@_[0..7];
++$code.=<<___;
++	veor	@b[2], @b[2], @b[1]
++	veor	@b[5], @b[5], @b[6]
++	veor	@b[3], @b[3], @b[0]
++	veor	@b[6], @b[6], @b[2]
++	veor	@b[5], @b[5], @b[0]
++
++	veor	@b[6], @b[6], @b[3]
++	veor	@b[3], @b[3], @b[7]
++	veor	@b[7], @b[7], @b[5]
++	veor	@b[3], @b[3], @b[4]
++	veor	@b[4], @b[4], @b[5]
++
++	veor	@b[2], @b[2], @b[7]
++	veor	@b[3], @b[3], @b[1]
++	veor	@b[1], @b[1], @b[5]
++___
++}
++
++sub OutBasisChange {
++# input in  lsb > [b0, b1, b2, b3, b4, b5, b6, b7] < msb
++# output in lsb > [b6, b1, b2, b4, b7, b0, b3, b5] < msb
++my @b=@_[0..7];
++$code.=<<___;
++	veor	@b[0], @b[0], @b[6]
++	veor	@b[1], @b[1], @b[4]
++	veor	@b[4], @b[4], @b[6]
++	veor	@b[2], @b[2], @b[0]
++	veor	@b[6], @b[6], @b[1]
++
++	veor	@b[1], @b[1], @b[5]
++	veor	@b[5], @b[5], @b[3]
++	veor	@b[3], @b[3], @b[7]
++	veor	@b[7], @b[7], @b[5]
++	veor	@b[2], @b[2], @b[5]
++
++	veor	@b[4], @b[4], @b[7]
++___
++}
++
++sub InvSbox {
++# input in lsb 	> [b0, b1, b2, b3, b4, b5, b6, b7] < msb
++# output in lsb	> [b0, b1, b6, b4, b2, b7, b3, b5] < msb
++my @b=@_[0..7];
++my @t=@_[8..11];
++my @s=@_[12..15];
++	&InvInBasisChange	(@b);
++	&Inv_GF256		(@b[5,1,2,6,3,7,0,4],@t,@s);
++	&InvOutBasisChange	(@b[3,7,0,4,5,1,2,6]);
++}
++
++sub InvInBasisChange {		# OutBasisChange in reverse (with twist)
++my @b=@_[5,1,2,6,3,7,0,4];
++$code.=<<___
++	 veor	@b[1], @b[1], @b[7]
++	veor	@b[4], @b[4], @b[7]
++
++	veor	@b[7], @b[7], @b[5]
++	 veor	@b[1], @b[1], @b[3]
++	veor	@b[2], @b[2], @b[5]
++	veor	@b[3], @b[3], @b[7]
++
++	veor	@b[6], @b[6], @b[1]
++	veor	@b[2], @b[2], @b[0]
++	 veor	@b[5], @b[5], @b[3]
++	veor	@b[4], @b[4], @b[6]
++	veor	@b[0], @b[0], @b[6]
++	veor	@b[1], @b[1], @b[4]
++___
++}
++
++sub InvOutBasisChange {		# InBasisChange in reverse
++my @b=@_[2,5,7,3,6,1,0,4];
++$code.=<<___;
++	veor	@b[1], @b[1], @b[5]
++	veor	@b[2], @b[2], @b[7]
++
++	veor	@b[3], @b[3], @b[1]
++	veor	@b[4], @b[4], @b[5]
++	veor	@b[7], @b[7], @b[5]
++	veor	@b[3], @b[3], @b[4]
++	 veor 	@b[5], @b[5], @b[0]
++	veor	@b[3], @b[3], @b[7]
++	 veor	@b[6], @b[6], @b[2]
++	 veor	@b[2], @b[2], @b[1]
++	veor	@b[6], @b[6], @b[3]
++
++	veor	@b[3], @b[3], @b[0]
++	veor	@b[5], @b[5], @b[6]
++___
++}
++
++sub Mul_GF4 {
++#;*************************************************************
++#;* Mul_GF4: Input x0-x1,y0-y1 Output x0-x1 Temp t0 (8) *
++#;*************************************************************
++my ($x0,$x1,$y0,$y1,$t0,$t1)=@_;
++$code.=<<___;
++	veor 	$t0, $y0, $y1
++	vand	$t0, $t0, $x0
++	veor	$x0, $x0, $x1
++	vand	$t1, $x1, $y0
++	vand	$x0, $x0, $y1
++	veor	$x1, $t1, $t0
++	veor	$x0, $x0, $t1
++___
++}
++
++sub Mul_GF4_N {				# not used, see next subroutine
++# multiply and scale by N
++my ($x0,$x1,$y0,$y1,$t0)=@_;
++$code.=<<___;
++	veor	$t0, $y0, $y1
++	vand	$t0, $t0, $x0
++	veor	$x0, $x0, $x1
++	vand	$x1, $x1, $y0
++	vand	$x0, $x0, $y1
++	veor	$x1, $x1, $x0
++	veor	$x0, $x0, $t0
++___
++}
++
++sub Mul_GF4_N_GF4 {
++# interleaved Mul_GF4_N and Mul_GF4
++my ($x0,$x1,$y0,$y1,$t0,
++    $x2,$x3,$y2,$y3,$t1)=@_;
++$code.=<<___;
++	veor	$t0, $y0, $y1
++	 veor 	$t1, $y2, $y3
++	vand	$t0, $t0, $x0
++	 vand	$t1, $t1, $x2
++	veor	$x0, $x0, $x1
++	 veor	$x2, $x2, $x3
++	vand	$x1, $x1, $y0
++	 vand	$x3, $x3, $y2
++	vand	$x0, $x0, $y1
++	 vand	$x2, $x2, $y3
++	veor	$x1, $x1, $x0
++	 veor	$x2, $x2, $x3
++	veor	$x0, $x0, $t0
++	 veor	$x3, $x3, $t1
++___
++}
++sub Mul_GF16_2 {
++my @x=@_[0..7];
++my @y=@_[8..11];
++my @t=@_[12..15];
++$code.=<<___;
++	veor	@t[0], @x[0], @x[2]
++	veor	@t[1], @x[1], @x[3]
++___
++	&Mul_GF4  	(@x[0], @x[1], @y[0], @y[1], @t[2..3]);
++$code.=<<___;
++	veor	@y[0], @y[0], @y[2]
++	veor	@y[1], @y[1], @y[3]
++___
++	Mul_GF4_N_GF4	(@t[0], @t[1], @y[0], @y[1], @t[3],
++			 @x[2], @x[3], @y[2], @y[3], @t[2]);
++$code.=<<___;
++	veor	@x[0], @x[0], @t[0]
++	veor	@x[2], @x[2], @t[0]
++	veor	@x[1], @x[1], @t[1]
++	veor	@x[3], @x[3], @t[1]
++
++	veor	@t[0], @x[4], @x[6]
++	veor	@t[1], @x[5], @x[7]
++___
++	&Mul_GF4_N_GF4	(@t[0], @t[1], @y[0], @y[1], @t[3],
++			 @x[6], @x[7], @y[2], @y[3], @t[2]);
++$code.=<<___;
++	veor	@y[0], @y[0], @y[2]
++	veor	@y[1], @y[1], @y[3]
++___
++	&Mul_GF4  	(@x[4], @x[5], @y[0], @y[1], @t[2..3]);
++$code.=<<___;
++	veor	@x[4], @x[4], @t[0]
++	veor	@x[6], @x[6], @t[0]
++	veor	@x[5], @x[5], @t[1]
++	veor	@x[7], @x[7], @t[1]
++___
++}
++sub Inv_GF256 {
++#;********************************************************************
++#;* Inv_GF256: Input x0-x7 Output x0-x7 Temp t0-t3,s0-s3 (144)       *
++#;********************************************************************
++my @x=@_[0..7];
++my @t=@_[8..11];
++my @s=@_[12..15];
++# direct optimizations from hardware
++$code.=<<___;
++	veor	@t[3], @x[4], @x[6]
++	veor	@t[2], @x[5], @x[7]
++	veor	@t[1], @x[1], @x[3]
++	veor	@s[1], @x[7], @x[6]
++	 vmov	@t[0], @t[2]
++	veor	@s[0], @x[0], @x[2]
++
++	vorr	@t[2], @t[2], @t[1]
++	veor	@s[3], @t[3], @t[0]
++	vand	@s[2], @t[3], @s[0]
++	vorr	@t[3], @t[3], @s[0]
++	veor	@s[0], @s[0], @t[1]
++	vand	@t[0], @t[0], @t[1]
++	veor	@t[1], @x[3], @x[2]
++	vand	@s[3], @s[3], @s[0]
++	vand	@s[1], @s[1], @t[1]
++	veor	@t[1], @x[4], @x[5]
++	veor	@s[0], @x[1], @x[0]
++	veor	@t[3], @t[3], @s[1]
++	veor	@t[2], @t[2], @s[1]
++	vand	@s[1], @t[1], @s[0]
++	vorr	@t[1], @t[1], @s[0]
++	veor	@t[3], @t[3], @s[3]
++	veor	@t[0], @t[0], @s[1]
++	veor	@t[2], @t[2], @s[2]
++	veor	@t[1], @t[1], @s[3]
++	veor	@t[0], @t[0], @s[2]
++	vand	@s[0], @x[7], @x[3]
++	veor	@t[1], @t[1], @s[2]
++	vand	@s[1], @x[6], @x[2]
++	vand	@s[2], @x[5], @x[1]
++	vorr	@s[3], @x[4], @x[0]
++	veor	@t[3], @t[3], @s[0]
++	veor	@t[1], @t[1], @s[2]
++	veor	@t[0], @t[0], @s[3]
++	veor	@t[2], @t[2], @s[1]
++
++	@ Inv_GF16 \t0, \t1, \t2, \t3, \s0, \s1, \s2, \s3
++
++	@ new smaller inversion
++
++	vand	@s[2], @t[3], @t[1]
++	vmov	@s[0], @t[0]
++
++	veor	@s[1], @t[2], @s[2]
++	veor	@s[3], @t[0], @s[2]
++	veor	@s[2], @t[0], @s[2]	@ @s[2]=@s[3]
++
++	vbsl	@s[1], @t[1], @t[0]
++	vbsl	@s[3], @t[3], @t[2]
++	veor	@t[3], @t[3], @t[2]
++
++	vbsl	@s[0], @s[1], @s[2]
++	vbsl	@t[0], @s[2], @s[1]
++
++	vand	@s[2], @s[0], @s[3]
++	veor	@t[1], @t[1], @t[0]
++
++	veor	@s[2], @s[2], @t[3]
++___
++# output in s3, s2, s1, t1
++
++# Mul_GF16_2 \x0, \x1, \x2, \x3, \x4, \x5, \x6, \x7, \t2, \t3, \t0, \t1, \s0, \s1, \s2, \s3
++
++# Mul_GF16_2 \x0, \x1, \x2, \x3, \x4, \x5, \x6, \x7, \s3, \s2, \s1, \t1, \s0, \t0, \t2, \t3
++	&Mul_GF16_2(@x,@s[3,2,1],@t[1],@s[0],@t[0,2,3]);
++
++### output msb > [x3,x2,x1,x0,x7,x6,x5,x4] < lsb
++}
++
++# AES linear components
++
++sub ShiftRows {
++my @x=@_[0..7];
++my @t=@_[8..11];
++my $mask=pop;
++$code.=<<___;
++	vldmia	$key!, {@t[0]-@t[3]}
++	veor	@t[0], @t[0], @x[0]
++	veor	@t[1], @t[1], @x[1]
++	vtbl.8	`&Dlo(@x[0])`, {@t[0]}, `&Dlo($mask)`
++	vtbl.8	`&Dhi(@x[0])`, {@t[0]}, `&Dhi($mask)`
++	vldmia	$key!, {@t[0]}
++	veor	@t[2], @t[2], @x[2]
++	vtbl.8	`&Dlo(@x[1])`, {@t[1]}, `&Dlo($mask)`
++	vtbl.8	`&Dhi(@x[1])`, {@t[1]}, `&Dhi($mask)`
++	vldmia	$key!, {@t[1]}
++	veor	@t[3], @t[3], @x[3]
++	vtbl.8	`&Dlo(@x[2])`, {@t[2]}, `&Dlo($mask)`
++	vtbl.8	`&Dhi(@x[2])`, {@t[2]}, `&Dhi($mask)`
++	vldmia	$key!, {@t[2]}
++	vtbl.8	`&Dlo(@x[3])`, {@t[3]}, `&Dlo($mask)`
++	vtbl.8	`&Dhi(@x[3])`, {@t[3]}, `&Dhi($mask)`
++	vldmia	$key!, {@t[3]}
++	veor	@t[0], @t[0], @x[4]
++	veor	@t[1], @t[1], @x[5]
++	vtbl.8	`&Dlo(@x[4])`, {@t[0]}, `&Dlo($mask)`
++	vtbl.8	`&Dhi(@x[4])`, {@t[0]}, `&Dhi($mask)`
++	veor	@t[2], @t[2], @x[6]
++	vtbl.8	`&Dlo(@x[5])`, {@t[1]}, `&Dlo($mask)`
++	vtbl.8	`&Dhi(@x[5])`, {@t[1]}, `&Dhi($mask)`
++	veor	@t[3], @t[3], @x[7]
++	vtbl.8	`&Dlo(@x[6])`, {@t[2]}, `&Dlo($mask)`
++	vtbl.8	`&Dhi(@x[6])`, {@t[2]}, `&Dhi($mask)`
++	vtbl.8	`&Dlo(@x[7])`, {@t[3]}, `&Dlo($mask)`
++	vtbl.8	`&Dhi(@x[7])`, {@t[3]}, `&Dhi($mask)`
++___
++}
++
++sub MixColumns {
++# modified to emit output in order suitable for feeding back to aesenc[last]
++my @x=@_[0..7];
++my @t=@_[8..15];
++my $inv=@_[16];	# optional
++$code.=<<___;
++	vext.8	@t[0], @x[0], @x[0], #12	@ x0 <<< 32
++	vext.8	@t[1], @x[1], @x[1], #12
++	 veor	@x[0], @x[0], @t[0]		@ x0 ^ (x0 <<< 32)
++	vext.8	@t[2], @x[2], @x[2], #12
++	 veor	@x[1], @x[1], @t[1]
++	vext.8	@t[3], @x[3], @x[3], #12
++	 veor	@x[2], @x[2], @t[2]
++	vext.8	@t[4], @x[4], @x[4], #12
++	 veor	@x[3], @x[3], @t[3]
++	vext.8	@t[5], @x[5], @x[5], #12
++	 veor	@x[4], @x[4], @t[4]
++	vext.8	@t[6], @x[6], @x[6], #12
++	 veor	@x[5], @x[5], @t[5]
++	vext.8	@t[7], @x[7], @x[7], #12
++	 veor	@x[6], @x[6], @t[6]
++
++	veor	@t[1], @t[1], @x[0]
++	 veor	@x[7], @x[7], @t[7]
++	 vext.8	@x[0], @x[0], @x[0], #8		@ (x0 ^ (x0 <<< 32)) <<< 64)
++	veor	@t[2], @t[2], @x[1]
++	veor	@t[0], @t[0], @x[7]
++	veor	@t[1], @t[1], @x[7]
++	 vext.8	@x[1], @x[1], @x[1], #8
++	veor	@t[5], @t[5], @x[4]
++	 veor	@x[0], @x[0], @t[0]
++	veor	@t[6], @t[6], @x[5]
++	 veor	@x[1], @x[1], @t[1]
++	 vext.8	@t[0], @x[4], @x[4], #8
++	veor	@t[4], @t[4], @x[3]
++	 vext.8	@t[1], @x[5], @x[5], #8
++	veor	@t[7], @t[7], @x[6]
++	 vext.8	@x[4], @x[3], @x[3], #8
++	veor	@t[3], @t[3], @x[2]
++	 vext.8	@x[5], @x[7], @x[7], #8
++	veor	@t[4], @t[4], @x[7]
++	 vext.8	@x[3], @x[6], @x[6], #8
++	veor	@t[3], @t[3], @x[7]
++	 vext.8	@x[6], @x[2], @x[2], #8
++	veor	@x[7], @t[1], @t[5]
++___
++$code.=<<___ if (!$inv);
++	veor	@x[2], @t[0], @t[4]
++	veor	@x[4], @x[4], @t[3]
++	veor	@x[5], @x[5], @t[7]
++	veor	@x[3], @x[3], @t[6]
++	 @ vmov	@x[2], @t[0]
++	veor	@x[6], @x[6], @t[2]
++	 @ vmov	@x[7], @t[1]
++___
++$code.=<<___ if ($inv);
++	veor	@t[3], @t[3], @x[4]
++	veor	@x[5], @x[5], @t[7]
++	veor	@x[2], @x[3], @t[6]
++	veor	@x[3], @t[0], @t[4]
++	veor	@x[4], @x[6], @t[2]
++	vmov	@x[6], @t[3]
++	 @ vmov	@x[7], @t[1]
++___
++}
++
++sub InvMixColumns_orig {
++my @x=@_[0..7];
++my @t=@_[8..15];
++
++$code.=<<___;
++	@ multiplication by 0x0e
++	vext.8	@t[7], @x[7], @x[7], #12
++	vmov	@t[2], @x[2]
++	veor	@x[2], @x[2], @x[5]		@ 2 5
++	veor	@x[7], @x[7], @x[5]		@ 7 5
++	vext.8	@t[0], @x[0], @x[0], #12
++	vmov	@t[5], @x[5]
++	veor	@x[5], @x[5], @x[0]		@ 5 0		[1]
++	veor	@x[0], @x[0], @x[1]		@ 0 1
++	vext.8	@t[1], @x[1], @x[1], #12
++	veor	@x[1], @x[1], @x[2]		@ 1 25
++	veor	@x[0], @x[0], @x[6]		@ 01 6		[2]
++	vext.8	@t[3], @x[3], @x[3], #12
++	veor	@x[1], @x[1], @x[3]		@ 125 3		[4]
++	veor	@x[2], @x[2], @x[0]		@ 25 016	[3]
++	veor	@x[3], @x[3], @x[7]		@ 3 75
++	veor	@x[7], @x[7], @x[6]		@ 75 6		[0]
++	vext.8	@t[6], @x[6], @x[6], #12
++	vmov	@t[4], @x[4]
++	veor	@x[6], @x[6], @x[4]		@ 6 4
++	veor	@x[4], @x[4], @x[3]		@ 4 375		[6]
++	veor	@x[3], @x[3], @x[7]		@ 375 756=36
++	veor	@x[6], @x[6], @t[5]		@ 64 5		[7]
++	veor	@x[3], @x[3], @t[2]		@ 36 2
++	vext.8	@t[5], @t[5], @t[5], #12
++	veor	@x[3], @x[3], @t[4]		@ 362 4		[5]
++___
++					my @y = @x[7,5,0,2,1,3,4,6];
++$code.=<<___;
++	@ multiplication by 0x0b
++	veor	@y[1], @y[1], @y[0]
++	veor	@y[0], @y[0], @t[0]
++	vext.8	@t[2], @t[2], @t[2], #12
++	veor	@y[1], @y[1], @t[1]
++	veor	@y[0], @y[0], @t[5]
++	vext.8	@t[4], @t[4], @t[4], #12
++	veor	@y[1], @y[1], @t[6]
++	veor	@y[0], @y[0], @t[7]
++	veor	@t[7], @t[7], @t[6]		@ clobber t[7]
++
++	veor	@y[3], @y[3], @t[0]
++	 veor	@y[1], @y[1], @y[0]
++	vext.8	@t[0], @t[0], @t[0], #12
++	veor	@y[2], @y[2], @t[1]
++	veor	@y[4], @y[4], @t[1]
++	vext.8	@t[1], @t[1], @t[1], #12
++	veor	@y[2], @y[2], @t[2]
++	veor	@y[3], @y[3], @t[2]
++	veor	@y[5], @y[5], @t[2]
++	veor	@y[2], @y[2], @t[7]
++	vext.8	@t[2], @t[2], @t[2], #12
++	veor	@y[3], @y[3], @t[3]
++	veor	@y[6], @y[6], @t[3]
++	veor	@y[4], @y[4], @t[3]
++	veor	@y[7], @y[7], @t[4]
++	vext.8	@t[3], @t[3], @t[3], #12
++	veor	@y[5], @y[5], @t[4]
++	veor	@y[7], @y[7], @t[7]
++	veor	@t[7], @t[7], @t[5]		@ clobber t[7] even more
++	veor	@y[3], @y[3], @t[5]
++	veor	@y[4], @y[4], @t[4]
++
++	veor	@y[5], @y[5], @t[7]
++	vext.8	@t[4], @t[4], @t[4], #12
++	veor	@y[6], @y[6], @t[7]
++	veor	@y[4], @y[4], @t[7]
++
++	veor	@t[7], @t[7], @t[5]
++	vext.8	@t[5], @t[5], @t[5], #12
++
++	@ multiplication by 0x0d
++	veor	@y[4], @y[4], @y[7]
++	 veor	@t[7], @t[7], @t[6]		@ restore t[7]
++	veor	@y[7], @y[7], @t[4]
++	vext.8	@t[6], @t[6], @t[6], #12
++	veor	@y[2], @y[2], @t[0]
++	veor	@y[7], @y[7], @t[5]
++	vext.8	@t[7], @t[7], @t[7], #12
++	veor	@y[2], @y[2], @t[2]
++
++	veor	@y[3], @y[3], @y[1]
++	veor	@y[1], @y[1], @t[1]
++	veor	@y[0], @y[0], @t[0]
++	veor	@y[3], @y[3], @t[0]
++	veor	@y[1], @y[1], @t[5]
++	veor	@y[0], @y[0], @t[5]
++	vext.8	@t[0], @t[0], @t[0], #12
++	veor	@y[1], @y[1], @t[7]
++	veor	@y[0], @y[0], @t[6]
++	veor	@y[3], @y[3], @y[1]
++	veor	@y[4], @y[4], @t[1]
++	vext.8	@t[1], @t[1], @t[1], #12
++
++	veor	@y[7], @y[7], @t[7]
++	veor	@y[4], @y[4], @t[2]
++	veor	@y[5], @y[5], @t[2]
++	veor	@y[2], @y[2], @t[6]
++	veor	@t[6], @t[6], @t[3]		@ clobber t[6]
++	vext.8	@t[2], @t[2], @t[2], #12
++	veor	@y[4], @y[4], @y[7]
++	veor	@y[3], @y[3], @t[6]
++
++	veor	@y[6], @y[6], @t[6]
++	veor	@y[5], @y[5], @t[5]
++	vext.8	@t[5], @t[5], @t[5], #12
++	veor	@y[6], @y[6], @t[4]
++	vext.8	@t[4], @t[4], @t[4], #12
++	veor	@y[5], @y[5], @t[6]
++	veor	@y[6], @y[6], @t[7]
++	vext.8	@t[7], @t[7], @t[7], #12
++	veor	@t[6], @t[6], @t[3]		@ restore t[6]
++	vext.8	@t[3], @t[3], @t[3], #12
++
++	@ multiplication by 0x09
++	veor	@y[4], @y[4], @y[1]
++	veor	@t[1], @t[1], @y[1]		@ t[1]=y[1]
++	veor	@t[0], @t[0], @t[5]		@ clobber t[0]
++	vext.8	@t[6], @t[6], @t[6], #12
++	veor	@t[1], @t[1], @t[5]
++	veor	@y[3], @y[3], @t[0]
++	veor	@t[0], @t[0], @y[0]		@ t[0]=y[0]
++	veor	@t[1], @t[1], @t[6]
++	veor	@t[6], @t[6], @t[7]		@ clobber t[6]
++	veor	@y[4], @y[4], @t[1]
++	veor	@y[7], @y[7], @t[4]
++	veor	@y[6], @y[6], @t[3]
++	veor	@y[5], @y[5], @t[2]
++	veor	@t[4], @t[4], @y[4]		@ t[4]=y[4]
++	veor	@t[3], @t[3], @y[3]		@ t[3]=y[3]
++	veor	@t[5], @t[5], @y[5]		@ t[5]=y[5]
++	veor	@t[2], @t[2], @y[2]		@ t[2]=y[2]
++	veor	@t[3], @t[3], @t[7]
++	veor	@XMM[5], @t[5], @t[6]
++	veor	@XMM[6], @t[6], @y[6]		@ t[6]=y[6]
++	veor	@XMM[2], @t[2], @t[6]
++	veor	@XMM[7], @t[7], @y[7]		@ t[7]=y[7]
++
++	vmov	@XMM[0], @t[0]
++	vmov	@XMM[1], @t[1]
++	@ vmov	@XMM[2], @t[2]
++	vmov	@XMM[3], @t[3]
++	vmov	@XMM[4], @t[4]
++	@ vmov	@XMM[5], @t[5]
++	@ vmov	@XMM[6], @t[6]
++	@ vmov	@XMM[7], @t[7]
++___
++}
++
++sub InvMixColumns {
++my @x=@_[0..7];
++my @t=@_[8..15];
++
++# Thanks to Jussi Kivilinna for providing pointer to
++#
++# | 0e 0b 0d 09 |   | 02 03 01 01 |   | 05 00 04 00 |
++# | 09 0e 0b 0d | = | 01 02 03 01 | x | 00 05 00 04 |
++# | 0d 09 0e 0b |   | 01 01 02 03 |   | 04 00 05 00 |
++# | 0b 0d 09 0e |   | 03 01 01 02 |   | 00 04 00 05 |
++
++$code.=<<___;
++	@ multiplication by 0x05-0x00-0x04-0x00
++	vext.8	@t[0], @x[0], @x[0], #8
++	vext.8	@t[6], @x[6], @x[6], #8
++	vext.8	@t[7], @x[7], @x[7], #8
++	veor	@t[0], @t[0], @x[0]
++	vext.8	@t[1], @x[1], @x[1], #8
++	veor	@t[6], @t[6], @x[6]
++	vext.8	@t[2], @x[2], @x[2], #8
++	veor	@t[7], @t[7], @x[7]
++	vext.8	@t[3], @x[3], @x[3], #8
++	veor	@t[1], @t[1], @x[1]
++	vext.8	@t[4], @x[4], @x[4], #8
++	veor	@t[2], @t[2], @x[2]
++	vext.8	@t[5], @x[5], @x[5], #8
++	veor	@t[3], @t[3], @x[3]
++	veor	@t[4], @t[4], @x[4]
++	veor	@t[5], @t[5], @x[5]
++
++	 veor	@x[0], @x[0], @t[6]
++	 veor	@x[1], @x[1], @t[6]
++	 veor	@x[2], @x[2], @t[0]
++	 veor	@x[4], @x[4], @t[2]
++	 veor	@x[3], @x[3], @t[1]
++	 veor	@x[1], @x[1], @t[7]
++	 veor	@x[2], @x[2], @t[7]
++	 veor	@x[4], @x[4], @t[6]
++	 veor	@x[5], @x[5], @t[3]
++	 veor	@x[3], @x[3], @t[6]
++	 veor	@x[6], @x[6], @t[4]
++	 veor	@x[4], @x[4], @t[7]
++	 veor	@x[5], @x[5], @t[7]
++	 veor	@x[7], @x[7], @t[5]
++___
++	&MixColumns	(@x,@t,1);	# flipped 2<->3 and 4<->6
++}
++
++sub swapmove {
++my ($a,$b,$n,$mask,$t)=@_;
++$code.=<<___;
++	vshr.u64	$t, $b, #$n
++	veor		$t, $t, $a
++	vand		$t, $t, $mask
++	veor		$a, $a, $t
++	vshl.u64	$t, $t, #$n
++	veor		$b, $b, $t
++___
++}
++sub swapmove2x {
++my ($a0,$b0,$a1,$b1,$n,$mask,$t0,$t1)=@_;
++$code.=<<___;
++	vshr.u64	$t0, $b0, #$n
++	 vshr.u64	$t1, $b1, #$n
++	veor		$t0, $t0, $a0
++	 veor		$t1, $t1, $a1
++	vand		$t0, $t0, $mask
++	 vand		$t1, $t1, $mask
++	veor		$a0, $a0, $t0
++	vshl.u64	$t0, $t0, #$n
++	 veor		$a1, $a1, $t1
++	 vshl.u64	$t1, $t1, #$n
++	veor		$b0, $b0, $t0
++	 veor		$b1, $b1, $t1
++___
++}
++
++sub bitslice {
++my @x=reverse(@_[0..7]);
++my ($t0,$t1,$t2,$t3)=@_[8..11];
++$code.=<<___;
++	vmov.i8	$t0,#0x55			@ compose .LBS0
++	vmov.i8	$t1,#0x33			@ compose .LBS1
++___
++	&swapmove2x(@x[0,1,2,3],1,$t0,$t2,$t3);
++	&swapmove2x(@x[4,5,6,7],1,$t0,$t2,$t3);
++$code.=<<___;
++	vmov.i8	$t0,#0x0f			@ compose .LBS2
++___
++	&swapmove2x(@x[0,2,1,3],2,$t1,$t2,$t3);
++	&swapmove2x(@x[4,6,5,7],2,$t1,$t2,$t3);
++
++	&swapmove2x(@x[0,4,1,5],4,$t0,$t2,$t3);
++	&swapmove2x(@x[2,6,3,7],4,$t0,$t2,$t3);
++}
++
++$code.=<<___;
++#ifndef __KERNEL__
++# include <openssl/arm_arch.h>
++
++# define VFP_ABI_PUSH	vstmdb	sp!,{d8-d15}
++# define VFP_ABI_POP	vldmia	sp!,{d8-d15}
++# define VFP_ABI_FRAME	0x40
++#else
++# define VFP_ABI_PUSH
++# define VFP_ABI_POP
++# define VFP_ABI_FRAME	0
++# define BSAES_ASM_EXTENDED_KEY
++# define XTS_CHAIN_TWEAK
++# define __ARM_ARCH__ __LINUX_ARM_ARCH__
++# define __ARM_MAX_ARCH__ 7
++#endif
++
++#ifdef __thumb__
++# define adrl adr
++#endif
++
++#if __ARM_MAX_ARCH__>=7
++.arch	armv7-a
++.fpu	neon
++
++.text
++.syntax	unified 	@ ARMv7-capable assembler is expected to handle this
++#if defined(__thumb2__) && !defined(__APPLE__)
++.thumb
++#else
++.code   32
++#endif
++
++.type	_bsaes_decrypt8,%function
++.align	4
++_bsaes_decrypt8:
++	adr	$const,_bsaes_decrypt8
++	vldmia	$key!, {@XMM[9]}		@ round 0 key
++#ifdef	__APPLE__
++	adr	$const,.LM0ISR
++#else
++	add	$const,$const,#.LM0ISR-_bsaes_decrypt8
++#endif
++
++	vldmia	$const!, {@XMM[8]}		@ .LM0ISR
++	veor	@XMM[10], @XMM[0], @XMM[9]	@ xor with round0 key
++	veor	@XMM[11], @XMM[1], @XMM[9]
++	 vtbl.8	`&Dlo(@XMM[0])`, {@XMM[10]}, `&Dlo(@XMM[8])`
++	 vtbl.8	`&Dhi(@XMM[0])`, {@XMM[10]}, `&Dhi(@XMM[8])`
++	veor	@XMM[12], @XMM[2], @XMM[9]
++	 vtbl.8	`&Dlo(@XMM[1])`, {@XMM[11]}, `&Dlo(@XMM[8])`
++	 vtbl.8	`&Dhi(@XMM[1])`, {@XMM[11]}, `&Dhi(@XMM[8])`
++	veor	@XMM[13], @XMM[3], @XMM[9]
++	 vtbl.8	`&Dlo(@XMM[2])`, {@XMM[12]}, `&Dlo(@XMM[8])`
++	 vtbl.8	`&Dhi(@XMM[2])`, {@XMM[12]}, `&Dhi(@XMM[8])`
++	veor	@XMM[14], @XMM[4], @XMM[9]
++	 vtbl.8	`&Dlo(@XMM[3])`, {@XMM[13]}, `&Dlo(@XMM[8])`
++	 vtbl.8	`&Dhi(@XMM[3])`, {@XMM[13]}, `&Dhi(@XMM[8])`
++	veor	@XMM[15], @XMM[5], @XMM[9]
++	 vtbl.8	`&Dlo(@XMM[4])`, {@XMM[14]}, `&Dlo(@XMM[8])`
++	 vtbl.8	`&Dhi(@XMM[4])`, {@XMM[14]}, `&Dhi(@XMM[8])`
++	veor	@XMM[10], @XMM[6], @XMM[9]
++	 vtbl.8	`&Dlo(@XMM[5])`, {@XMM[15]}, `&Dlo(@XMM[8])`
++	 vtbl.8	`&Dhi(@XMM[5])`, {@XMM[15]}, `&Dhi(@XMM[8])`
++	veor	@XMM[11], @XMM[7], @XMM[9]
++	 vtbl.8	`&Dlo(@XMM[6])`, {@XMM[10]}, `&Dlo(@XMM[8])`
++	 vtbl.8	`&Dhi(@XMM[6])`, {@XMM[10]}, `&Dhi(@XMM[8])`
++	 vtbl.8	`&Dlo(@XMM[7])`, {@XMM[11]}, `&Dlo(@XMM[8])`
++	 vtbl.8	`&Dhi(@XMM[7])`, {@XMM[11]}, `&Dhi(@XMM[8])`
++___
++	&bitslice	(@XMM[0..7, 8..11]);
++$code.=<<___;
++	sub	$rounds,$rounds,#1
++	b	.Ldec_sbox
++.align	4
++.Ldec_loop:
++___
++	&ShiftRows	(@XMM[0..7, 8..12]);
++$code.=".Ldec_sbox:\n";
++	&InvSbox	(@XMM[0..7, 8..15]);
++$code.=<<___;
++	subs	$rounds,$rounds,#1
++	bcc	.Ldec_done
++___
++	&InvMixColumns	(@XMM[0,1,6,4,2,7,3,5, 8..15]);
++$code.=<<___;
++	vldmia	$const, {@XMM[12]}		@ .LISR
++	ite	eq				@ Thumb2 thing, sanity check in ARM
++	addeq	$const,$const,#0x10
++	bne	.Ldec_loop
++	vldmia	$const, {@XMM[12]}		@ .LISRM0
++	b	.Ldec_loop
++.align	4
++.Ldec_done:
++___
++	&bitslice	(@XMM[0,1,6,4,2,7,3,5, 8..11]);
++$code.=<<___;
++	vldmia	$key, {@XMM[8]}			@ last round key
++	veor	@XMM[6], @XMM[6], @XMM[8]
++	veor	@XMM[4], @XMM[4], @XMM[8]
++	veor	@XMM[2], @XMM[2], @XMM[8]
++	veor	@XMM[7], @XMM[7], @XMM[8]
++	veor	@XMM[3], @XMM[3], @XMM[8]
++	veor	@XMM[5], @XMM[5], @XMM[8]
++	veor	@XMM[0], @XMM[0], @XMM[8]
++	veor	@XMM[1], @XMM[1], @XMM[8]
++	bx	lr
++.size	_bsaes_decrypt8,.-_bsaes_decrypt8
++
++.type	_bsaes_const,%object
++.align	6
++_bsaes_const:
++.LM0ISR:	@ InvShiftRows constants
++	.quad	0x0a0e0206070b0f03, 0x0004080c0d010509
++.LISR:
++	.quad	0x0504070602010003, 0x0f0e0d0c080b0a09
++.LISRM0:
++	.quad	0x01040b0e0205080f, 0x0306090c00070a0d
++.LM0SR:		@ ShiftRows constants
++	.quad	0x0a0e02060f03070b, 0x0004080c05090d01
++.LSR:
++	.quad	0x0504070600030201, 0x0f0e0d0c0a09080b
++.LSRM0:
++	.quad	0x0304090e00050a0f, 0x01060b0c0207080d
++.LM0:
++	.quad	0x02060a0e03070b0f, 0x0004080c0105090d
++.LREVM0SR:
++	.quad	0x090d01050c000408, 0x03070b0f060a0e02
++.asciz	"Bit-sliced AES for NEON, CRYPTOGAMS by <appro\@openssl.org>"
++.align	6
++.size	_bsaes_const,.-_bsaes_const
++
++.type	_bsaes_encrypt8,%function
++.align	4
++_bsaes_encrypt8:
++	adr	$const,_bsaes_encrypt8
++	vldmia	$key!, {@XMM[9]}		@ round 0 key
++#ifdef	__APPLE__
++	adr	$const,.LM0SR
++#else
++	sub	$const,$const,#_bsaes_encrypt8-.LM0SR
++#endif
++
++	vldmia	$const!, {@XMM[8]}		@ .LM0SR
++_bsaes_encrypt8_alt:
++	veor	@XMM[10], @XMM[0], @XMM[9]	@ xor with round0 key
++	veor	@XMM[11], @XMM[1], @XMM[9]
++	 vtbl.8	`&Dlo(@XMM[0])`, {@XMM[10]}, `&Dlo(@XMM[8])`
++	 vtbl.8	`&Dhi(@XMM[0])`, {@XMM[10]}, `&Dhi(@XMM[8])`
++	veor	@XMM[12], @XMM[2], @XMM[9]
++	 vtbl.8	`&Dlo(@XMM[1])`, {@XMM[11]}, `&Dlo(@XMM[8])`
++	 vtbl.8	`&Dhi(@XMM[1])`, {@XMM[11]}, `&Dhi(@XMM[8])`
++	veor	@XMM[13], @XMM[3], @XMM[9]
++	 vtbl.8	`&Dlo(@XMM[2])`, {@XMM[12]}, `&Dlo(@XMM[8])`
++	 vtbl.8	`&Dhi(@XMM[2])`, {@XMM[12]}, `&Dhi(@XMM[8])`
++	veor	@XMM[14], @XMM[4], @XMM[9]
++	 vtbl.8	`&Dlo(@XMM[3])`, {@XMM[13]}, `&Dlo(@XMM[8])`
++	 vtbl.8	`&Dhi(@XMM[3])`, {@XMM[13]}, `&Dhi(@XMM[8])`
++	veor	@XMM[15], @XMM[5], @XMM[9]
++	 vtbl.8	`&Dlo(@XMM[4])`, {@XMM[14]}, `&Dlo(@XMM[8])`
++	 vtbl.8	`&Dhi(@XMM[4])`, {@XMM[14]}, `&Dhi(@XMM[8])`
++	veor	@XMM[10], @XMM[6], @XMM[9]
++	 vtbl.8	`&Dlo(@XMM[5])`, {@XMM[15]}, `&Dlo(@XMM[8])`
++	 vtbl.8	`&Dhi(@XMM[5])`, {@XMM[15]}, `&Dhi(@XMM[8])`
++	veor	@XMM[11], @XMM[7], @XMM[9]
++	 vtbl.8	`&Dlo(@XMM[6])`, {@XMM[10]}, `&Dlo(@XMM[8])`
++	 vtbl.8	`&Dhi(@XMM[6])`, {@XMM[10]}, `&Dhi(@XMM[8])`
++	 vtbl.8	`&Dlo(@XMM[7])`, {@XMM[11]}, `&Dlo(@XMM[8])`
++	 vtbl.8	`&Dhi(@XMM[7])`, {@XMM[11]}, `&Dhi(@XMM[8])`
++_bsaes_encrypt8_bitslice:
++___
++	&bitslice	(@XMM[0..7, 8..11]);
++$code.=<<___;
++	sub	$rounds,$rounds,#1
++	b	.Lenc_sbox
++.align	4
++.Lenc_loop:
++___
++	&ShiftRows	(@XMM[0..7, 8..12]);
++$code.=".Lenc_sbox:\n";
++	&Sbox		(@XMM[0..7, 8..15]);
++$code.=<<___;
++	subs	$rounds,$rounds,#1
++	bcc	.Lenc_done
++___
++	&MixColumns	(@XMM[0,1,4,6,3,7,2,5, 8..15]);
++$code.=<<___;
++	vldmia	$const, {@XMM[12]}		@ .LSR
++	ite	eq				@ Thumb2 thing, samity check in ARM
++	addeq	$const,$const,#0x10
++	bne	.Lenc_loop
++	vldmia	$const, {@XMM[12]}		@ .LSRM0
++	b	.Lenc_loop
++.align	4
++.Lenc_done:
++___
++	# output in lsb > [t0, t1, t4, t6, t3, t7, t2, t5] < msb
++	&bitslice	(@XMM[0,1,4,6,3,7,2,5, 8..11]);
++$code.=<<___;
++	vldmia	$key, {@XMM[8]}			@ last round key
++	veor	@XMM[4], @XMM[4], @XMM[8]
++	veor	@XMM[6], @XMM[6], @XMM[8]
++	veor	@XMM[3], @XMM[3], @XMM[8]
++	veor	@XMM[7], @XMM[7], @XMM[8]
++	veor	@XMM[2], @XMM[2], @XMM[8]
++	veor	@XMM[5], @XMM[5], @XMM[8]
++	veor	@XMM[0], @XMM[0], @XMM[8]
++	veor	@XMM[1], @XMM[1], @XMM[8]
++	bx	lr
++.size	_bsaes_encrypt8,.-_bsaes_encrypt8
++___
++}
++{
++my ($out,$inp,$rounds,$const)=("r12","r4","r5","r6");
++
++sub bitslice_key {
++my @x=reverse(@_[0..7]);
++my ($bs0,$bs1,$bs2,$t2,$t3)=@_[8..12];
++
++	&swapmove	(@x[0,1],1,$bs0,$t2,$t3);
++$code.=<<___;
++	@ &swapmove(@x[2,3],1,$t0,$t2,$t3);
++	vmov	@x[2], @x[0]
++	vmov	@x[3], @x[1]
++___
++	#&swapmove2x(@x[4,5,6,7],1,$t0,$t2,$t3);
++
++	&swapmove2x	(@x[0,2,1,3],2,$bs1,$t2,$t3);
++$code.=<<___;
++	@ &swapmove2x(@x[4,6,5,7],2,$t1,$t2,$t3);
++	vmov	@x[4], @x[0]
++	vmov	@x[6], @x[2]
++	vmov	@x[5], @x[1]
++	vmov	@x[7], @x[3]
++___
++	&swapmove2x	(@x[0,4,1,5],4,$bs2,$t2,$t3);
++	&swapmove2x	(@x[2,6,3,7],4,$bs2,$t2,$t3);
++}
++
++$code.=<<___;
++.type	_bsaes_key_convert,%function
++.align	4
++_bsaes_key_convert:
++	adr	$const,_bsaes_key_convert
++	vld1.8	{@XMM[7]},  [$inp]!		@ load round 0 key
++#ifdef	__APPLE__
++	adr	$const,.LM0
++#else
++	sub	$const,$const,#_bsaes_key_convert-.LM0
++#endif
++	vld1.8	{@XMM[15]}, [$inp]!		@ load round 1 key
++
++	vmov.i8	@XMM[8],  #0x01			@ bit masks
++	vmov.i8	@XMM[9],  #0x02
++	vmov.i8	@XMM[10], #0x04
++	vmov.i8	@XMM[11], #0x08
++	vmov.i8	@XMM[12], #0x10
++	vmov.i8	@XMM[13], #0x20
++	vldmia	$const, {@XMM[14]}		@ .LM0
++
++#ifdef __ARMEL__
++	vrev32.8	@XMM[7],  @XMM[7]
++	vrev32.8	@XMM[15], @XMM[15]
++#endif
++	sub	$rounds,$rounds,#1
++	vstmia	$out!, {@XMM[7]}		@ save round 0 key
++	b	.Lkey_loop
++
++.align	4
++.Lkey_loop:
++	vtbl.8	`&Dlo(@XMM[7])`,{@XMM[15]},`&Dlo(@XMM[14])`
++	vtbl.8	`&Dhi(@XMM[7])`,{@XMM[15]},`&Dhi(@XMM[14])`
++	vmov.i8	@XMM[6],  #0x40
++	vmov.i8	@XMM[15], #0x80
++
++	vtst.8	@XMM[0], @XMM[7], @XMM[8]
++	vtst.8	@XMM[1], @XMM[7], @XMM[9]
++	vtst.8	@XMM[2], @XMM[7], @XMM[10]
++	vtst.8	@XMM[3], @XMM[7], @XMM[11]
++	vtst.8	@XMM[4], @XMM[7], @XMM[12]
++	vtst.8	@XMM[5], @XMM[7], @XMM[13]
++	vtst.8	@XMM[6], @XMM[7], @XMM[6]
++	vtst.8	@XMM[7], @XMM[7], @XMM[15]
++	vld1.8	{@XMM[15]}, [$inp]!		@ load next round key
++	vmvn	@XMM[0], @XMM[0]		@ "pnot"
++	vmvn	@XMM[1], @XMM[1]
++	vmvn	@XMM[5], @XMM[5]
++	vmvn	@XMM[6], @XMM[6]
++#ifdef __ARMEL__
++	vrev32.8	@XMM[15], @XMM[15]
++#endif
++	subs	$rounds,$rounds,#1
++	vstmia	$out!,{@XMM[0]-@XMM[7]}		@ write bit-sliced round key
++	bne	.Lkey_loop
++
++	vmov.i8	@XMM[7],#0x63			@ compose .L63
++	@ don't save last round key
++	bx	lr
++.size	_bsaes_key_convert,.-_bsaes_key_convert
++___
++}
++
++if (0) {		# following four functions are unsupported interface
++			# used for benchmarking...
++$code.=<<___;
++.globl	bsaes_enc_key_convert
++.type	bsaes_enc_key_convert,%function
++.align	4
++bsaes_enc_key_convert:
++	stmdb	sp!,{r4-r6,lr}
++	vstmdb	sp!,{d8-d15}		@ ABI specification says so
++
++	ldr	r5,[$inp,#240]			@ pass rounds
++	mov	r4,$inp				@ pass key
++	mov	r12,$out			@ pass key schedule
++	bl	_bsaes_key_convert
++	veor	@XMM[7],@XMM[7],@XMM[15]	@ fix up last round key
++	vstmia	r12, {@XMM[7]}			@ save last round key
++
++	vldmia	sp!,{d8-d15}
++	ldmia	sp!,{r4-r6,pc}
++.size	bsaes_enc_key_convert,.-bsaes_enc_key_convert
++
++.globl	bsaes_encrypt_128
++.type	bsaes_encrypt_128,%function
++.align	4
++bsaes_encrypt_128:
++	stmdb	sp!,{r4-r6,lr}
++	vstmdb	sp!,{d8-d15}		@ ABI specification says so
++.Lenc128_loop:
++	vld1.8	{@XMM[0]-@XMM[1]}, [$inp]!	@ load input
++	vld1.8	{@XMM[2]-@XMM[3]}, [$inp]!
++	mov	r4,$key				@ pass the key
++	vld1.8	{@XMM[4]-@XMM[5]}, [$inp]!
++	mov	r5,#10				@ pass rounds
++	vld1.8	{@XMM[6]-@XMM[7]}, [$inp]!
++
++	bl	_bsaes_encrypt8
++
++	vst1.8	{@XMM[0]-@XMM[1]}, [$out]!	@ write output
++	vst1.8	{@XMM[4]}, [$out]!
++	vst1.8	{@XMM[6]}, [$out]!
++	vst1.8	{@XMM[3]}, [$out]!
++	vst1.8	{@XMM[7]}, [$out]!
++	vst1.8	{@XMM[2]}, [$out]!
++	subs	$len,$len,#0x80
++	vst1.8	{@XMM[5]}, [$out]!
++	bhi	.Lenc128_loop
++
++	vldmia	sp!,{d8-d15}
++	ldmia	sp!,{r4-r6,pc}
++.size	bsaes_encrypt_128,.-bsaes_encrypt_128
++
++.globl	bsaes_dec_key_convert
++.type	bsaes_dec_key_convert,%function
++.align	4
++bsaes_dec_key_convert:
++	stmdb	sp!,{r4-r6,lr}
++	vstmdb	sp!,{d8-d15}		@ ABI specification says so
++
++	ldr	r5,[$inp,#240]			@ pass rounds
++	mov	r4,$inp				@ pass key
++	mov	r12,$out			@ pass key schedule
++	bl	_bsaes_key_convert
++	vldmia	$out, {@XMM[6]}
++	vstmia	r12,  {@XMM[15]}		@ save last round key
++	veor	@XMM[7], @XMM[7], @XMM[6]	@ fix up round 0 key
++	vstmia	$out, {@XMM[7]}
++
++	vldmia	sp!,{d8-d15}
++	ldmia	sp!,{r4-r6,pc}
++.size	bsaes_dec_key_convert,.-bsaes_dec_key_convert
++
++.globl	bsaes_decrypt_128
++.type	bsaes_decrypt_128,%function
++.align	4
++bsaes_decrypt_128:
++	stmdb	sp!,{r4-r6,lr}
++	vstmdb	sp!,{d8-d15}		@ ABI specification says so
++.Ldec128_loop:
++	vld1.8	{@XMM[0]-@XMM[1]}, [$inp]!	@ load input
++	vld1.8	{@XMM[2]-@XMM[3]}, [$inp]!
++	mov	r4,$key				@ pass the key
++	vld1.8	{@XMM[4]-@XMM[5]}, [$inp]!
++	mov	r5,#10				@ pass rounds
++	vld1.8	{@XMM[6]-@XMM[7]}, [$inp]!
++
++	bl	_bsaes_decrypt8
++
++	vst1.8	{@XMM[0]-@XMM[1]}, [$out]!	@ write output
++	vst1.8	{@XMM[6]}, [$out]!
++	vst1.8	{@XMM[4]}, [$out]!
++	vst1.8	{@XMM[2]}, [$out]!
++	vst1.8	{@XMM[7]}, [$out]!
++	vst1.8	{@XMM[3]}, [$out]!
++	subs	$len,$len,#0x80
++	vst1.8	{@XMM[5]}, [$out]!
++	bhi	.Ldec128_loop
++
++	vldmia	sp!,{d8-d15}
++	ldmia	sp!,{r4-r6,pc}
++.size	bsaes_decrypt_128,.-bsaes_decrypt_128
++___
++}
++{
++my ($inp,$out,$len,$key, $ivp,$fp,$rounds)=map("r$_",(0..3,8..10));
++my ($keysched)=("sp");
++
++$code.=<<___;
++.extern AES_cbc_encrypt
++.extern AES_decrypt
++
++.global	bsaes_cbc_encrypt
++.type	bsaes_cbc_encrypt,%function
++.align	5
++bsaes_cbc_encrypt:
++#ifndef	__KERNEL__
++	cmp	$len, #128
++#ifndef	__thumb__
++	blo	AES_cbc_encrypt
++#else
++	bhs	1f
++	b	AES_cbc_encrypt
++1:
++#endif
++#endif
++
++	@ it is up to the caller to make sure we are called with enc == 0
++
++	mov	ip, sp
++	stmdb	sp!, {r4-r10, lr}
++	VFP_ABI_PUSH
++	ldr	$ivp, [ip]			@ IV is 1st arg on the stack
++	mov	$len, $len, lsr#4		@ len in 16 byte blocks
++	sub	sp, #0x10			@ scratch space to carry over the IV
++	mov	$fp, sp				@ save sp
++
++	ldr	$rounds, [$key, #240]		@ get # of rounds
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	@ allocate the key schedule on the stack
++	sub	r12, sp, $rounds, lsl#7		@ 128 bytes per inner round key
++	add	r12, #`128-32`			@ sifze of bit-slices key schedule
++
++	@ populate the key schedule
++	mov	r4, $key			@ pass key
++	mov	r5, $rounds			@ pass # of rounds
++	mov	sp, r12				@ sp is $keysched
++	bl	_bsaes_key_convert
++	vldmia	$keysched, {@XMM[6]}
++	vstmia	r12,  {@XMM[15]}		@ save last round key
++	veor	@XMM[7], @XMM[7], @XMM[6]	@ fix up round 0 key
++	vstmia	$keysched, {@XMM[7]}
++#else
++	ldr	r12, [$key, #244]
++	eors	r12, #1
++	beq	0f
++
++	@ populate the key schedule
++	str	r12, [$key, #244]
++	mov	r4, $key			@ pass key
++	mov	r5, $rounds			@ pass # of rounds
++	add	r12, $key, #248			@ pass key schedule
++	bl	_bsaes_key_convert
++	add	r4, $key, #248
++	vldmia	r4, {@XMM[6]}
++	vstmia	r12, {@XMM[15]}			@ save last round key
++	veor	@XMM[7], @XMM[7], @XMM[6]	@ fix up round 0 key
++	vstmia	r4, {@XMM[7]}
++
++.align	2
++0:
++#endif
++
++	vld1.8	{@XMM[15]}, [$ivp]		@ load IV
++	b	.Lcbc_dec_loop
++
++.align	4
++.Lcbc_dec_loop:
++	subs	$len, $len, #0x8
++	bmi	.Lcbc_dec_loop_finish
++
++	vld1.8	{@XMM[0]-@XMM[1]}, [$inp]!	@ load input
++	vld1.8	{@XMM[2]-@XMM[3]}, [$inp]!
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	mov	r4, $keysched			@ pass the key
++#else
++	add	r4, $key, #248
++#endif
++	vld1.8	{@XMM[4]-@XMM[5]}, [$inp]!
++	mov	r5, $rounds
++	vld1.8	{@XMM[6]-@XMM[7]}, [$inp]
++	sub	$inp, $inp, #0x60
++	vstmia	$fp, {@XMM[15]}			@ put aside IV
++
++	bl	_bsaes_decrypt8
++
++	vldmia	$fp, {@XMM[14]}			@ reload IV
++	vld1.8	{@XMM[8]-@XMM[9]}, [$inp]!	@ reload input
++	veor	@XMM[0], @XMM[0], @XMM[14]	@ ^= IV
++	vld1.8	{@XMM[10]-@XMM[11]}, [$inp]!
++	veor	@XMM[1], @XMM[1], @XMM[8]
++	veor	@XMM[6], @XMM[6], @XMM[9]
++	vld1.8	{@XMM[12]-@XMM[13]}, [$inp]!
++	veor	@XMM[4], @XMM[4], @XMM[10]
++	veor	@XMM[2], @XMM[2], @XMM[11]
++	vld1.8	{@XMM[14]-@XMM[15]}, [$inp]!
++	veor	@XMM[7], @XMM[7], @XMM[12]
++	vst1.8	{@XMM[0]-@XMM[1]}, [$out]!	@ write output
++	veor	@XMM[3], @XMM[3], @XMM[13]
++	vst1.8	{@XMM[6]}, [$out]!
++	veor	@XMM[5], @XMM[5], @XMM[14]
++	vst1.8	{@XMM[4]}, [$out]!
++	vst1.8	{@XMM[2]}, [$out]!
++	vst1.8	{@XMM[7]}, [$out]!
++	vst1.8	{@XMM[3]}, [$out]!
++	vst1.8	{@XMM[5]}, [$out]!
++
++	b	.Lcbc_dec_loop
++
++.Lcbc_dec_loop_finish:
++	adds	$len, $len, #8
++	beq	.Lcbc_dec_done
++
++	vld1.8	{@XMM[0]}, [$inp]!		@ load input
++	cmp	$len, #2
++	blo	.Lcbc_dec_one
++	vld1.8	{@XMM[1]}, [$inp]!
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	mov	r4, $keysched			@ pass the key
++#else
++	add	r4, $key, #248
++#endif
++	mov	r5, $rounds
++	vstmia	$fp, {@XMM[15]}			@ put aside IV
++	beq	.Lcbc_dec_two
++	vld1.8	{@XMM[2]}, [$inp]!
++	cmp	$len, #4
++	blo	.Lcbc_dec_three
++	vld1.8	{@XMM[3]}, [$inp]!
++	beq	.Lcbc_dec_four
++	vld1.8	{@XMM[4]}, [$inp]!
++	cmp	$len, #6
++	blo	.Lcbc_dec_five
++	vld1.8	{@XMM[5]}, [$inp]!
++	beq	.Lcbc_dec_six
++	vld1.8	{@XMM[6]}, [$inp]!
++	sub	$inp, $inp, #0x70
++
++	bl	_bsaes_decrypt8
++
++	vldmia	$fp, {@XMM[14]}			@ reload IV
++	vld1.8	{@XMM[8]-@XMM[9]}, [$inp]!	@ reload input
++	veor	@XMM[0], @XMM[0], @XMM[14]	@ ^= IV
++	vld1.8	{@XMM[10]-@XMM[11]}, [$inp]!
++	veor	@XMM[1], @XMM[1], @XMM[8]
++	veor	@XMM[6], @XMM[6], @XMM[9]
++	vld1.8	{@XMM[12]-@XMM[13]}, [$inp]!
++	veor	@XMM[4], @XMM[4], @XMM[10]
++	veor	@XMM[2], @XMM[2], @XMM[11]
++	vld1.8	{@XMM[15]}, [$inp]!
++	veor	@XMM[7], @XMM[7], @XMM[12]
++	vst1.8	{@XMM[0]-@XMM[1]}, [$out]!	@ write output
++	veor	@XMM[3], @XMM[3], @XMM[13]
++	vst1.8	{@XMM[6]}, [$out]!
++	vst1.8	{@XMM[4]}, [$out]!
++	vst1.8	{@XMM[2]}, [$out]!
++	vst1.8	{@XMM[7]}, [$out]!
++	vst1.8	{@XMM[3]}, [$out]!
++	b	.Lcbc_dec_done
++.align	4
++.Lcbc_dec_six:
++	sub	$inp, $inp, #0x60
++	bl	_bsaes_decrypt8
++	vldmia	$fp,{@XMM[14]}			@ reload IV
++	vld1.8	{@XMM[8]-@XMM[9]}, [$inp]!	@ reload input
++	veor	@XMM[0], @XMM[0], @XMM[14]	@ ^= IV
++	vld1.8	{@XMM[10]-@XMM[11]}, [$inp]!
++	veor	@XMM[1], @XMM[1], @XMM[8]
++	veor	@XMM[6], @XMM[6], @XMM[9]
++	vld1.8	{@XMM[12]}, [$inp]!
++	veor	@XMM[4], @XMM[4], @XMM[10]
++	veor	@XMM[2], @XMM[2], @XMM[11]
++	vld1.8	{@XMM[15]}, [$inp]!
++	veor	@XMM[7], @XMM[7], @XMM[12]
++	vst1.8	{@XMM[0]-@XMM[1]}, [$out]!	@ write output
++	vst1.8	{@XMM[6]}, [$out]!
++	vst1.8	{@XMM[4]}, [$out]!
++	vst1.8	{@XMM[2]}, [$out]!
++	vst1.8	{@XMM[7]}, [$out]!
++	b	.Lcbc_dec_done
++.align	4
++.Lcbc_dec_five:
++	sub	$inp, $inp, #0x50
++	bl	_bsaes_decrypt8
++	vldmia	$fp, {@XMM[14]}			@ reload IV
++	vld1.8	{@XMM[8]-@XMM[9]}, [$inp]!	@ reload input
++	veor	@XMM[0], @XMM[0], @XMM[14]	@ ^= IV
++	vld1.8	{@XMM[10]-@XMM[11]}, [$inp]!
++	veor	@XMM[1], @XMM[1], @XMM[8]
++	veor	@XMM[6], @XMM[6], @XMM[9]
++	vld1.8	{@XMM[15]}, [$inp]!
++	veor	@XMM[4], @XMM[4], @XMM[10]
++	vst1.8	{@XMM[0]-@XMM[1]}, [$out]!	@ write output
++	veor	@XMM[2], @XMM[2], @XMM[11]
++	vst1.8	{@XMM[6]}, [$out]!
++	vst1.8	{@XMM[4]}, [$out]!
++	vst1.8	{@XMM[2]}, [$out]!
++	b	.Lcbc_dec_done
++.align	4
++.Lcbc_dec_four:
++	sub	$inp, $inp, #0x40
++	bl	_bsaes_decrypt8
++	vldmia	$fp, {@XMM[14]}			@ reload IV
++	vld1.8	{@XMM[8]-@XMM[9]}, [$inp]!	@ reload input
++	veor	@XMM[0], @XMM[0], @XMM[14]	@ ^= IV
++	vld1.8	{@XMM[10]}, [$inp]!
++	veor	@XMM[1], @XMM[1], @XMM[8]
++	veor	@XMM[6], @XMM[6], @XMM[9]
++	vld1.8	{@XMM[15]}, [$inp]!
++	veor	@XMM[4], @XMM[4], @XMM[10]
++	vst1.8	{@XMM[0]-@XMM[1]}, [$out]!	@ write output
++	vst1.8	{@XMM[6]}, [$out]!
++	vst1.8	{@XMM[4]}, [$out]!
++	b	.Lcbc_dec_done
++.align	4
++.Lcbc_dec_three:
++	sub	$inp, $inp, #0x30
++	bl	_bsaes_decrypt8
++	vldmia	$fp, {@XMM[14]}			@ reload IV
++	vld1.8	{@XMM[8]-@XMM[9]}, [$inp]!	@ reload input
++	veor	@XMM[0], @XMM[0], @XMM[14]	@ ^= IV
++	vld1.8	{@XMM[15]}, [$inp]!
++	veor	@XMM[1], @XMM[1], @XMM[8]
++	veor	@XMM[6], @XMM[6], @XMM[9]
++	vst1.8	{@XMM[0]-@XMM[1]}, [$out]!	@ write output
++	vst1.8	{@XMM[6]}, [$out]!
++	b	.Lcbc_dec_done
++.align	4
++.Lcbc_dec_two:
++	sub	$inp, $inp, #0x20
++	bl	_bsaes_decrypt8
++	vldmia	$fp, {@XMM[14]}			@ reload IV
++	vld1.8	{@XMM[8]}, [$inp]!		@ reload input
++	veor	@XMM[0], @XMM[0], @XMM[14]	@ ^= IV
++	vld1.8	{@XMM[15]}, [$inp]!		@ reload input
++	veor	@XMM[1], @XMM[1], @XMM[8]
++	vst1.8	{@XMM[0]-@XMM[1]}, [$out]!	@ write output
++	b	.Lcbc_dec_done
++.align	4
++.Lcbc_dec_one:
++	sub	$inp, $inp, #0x10
++	mov	$rounds, $out			@ save original out pointer
++	mov	$out, $fp			@ use the iv scratch space as out buffer
++	mov	r2, $key
++	vmov	@XMM[4],@XMM[15]		@ just in case ensure that IV
++	vmov	@XMM[5],@XMM[0]			@ and input are preserved
++	bl	AES_decrypt
++	vld1.8	{@XMM[0]}, [$fp,:64]		@ load result
++	veor	@XMM[0], @XMM[0], @XMM[4]	@ ^= IV
++	vmov	@XMM[15], @XMM[5]		@ @XMM[5] holds input
++	vst1.8	{@XMM[0]}, [$rounds]		@ write output
++
++.Lcbc_dec_done:
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	vmov.i32	q0, #0
++	vmov.i32	q1, #0
++.Lcbc_dec_bzero:				@ wipe key schedule [if any]
++	vstmia		$keysched!, {q0-q1}
++	cmp		$keysched, $fp
++	bne		.Lcbc_dec_bzero
++#endif
++
++	mov	sp, $fp
++	add	sp, #0x10			@ add sp,$fp,#0x10 is no good for thumb
++	vst1.8	{@XMM[15]}, [$ivp]		@ return IV
++	VFP_ABI_POP
++	ldmia	sp!, {r4-r10, pc}
++.size	bsaes_cbc_encrypt,.-bsaes_cbc_encrypt
++___
++}
++{
++my ($inp,$out,$len,$key, $ctr,$fp,$rounds)=(map("r$_",(0..3,8..10)));
++my $const = "r6";	# shared with _bsaes_encrypt8_alt
++my $keysched = "sp";
++
++$code.=<<___;
++.extern	AES_encrypt
++.global	bsaes_ctr32_encrypt_blocks
++.type	bsaes_ctr32_encrypt_blocks,%function
++.align	5
++bsaes_ctr32_encrypt_blocks:
++	cmp	$len, #8			@ use plain AES for
++	blo	.Lctr_enc_short			@ small sizes
++
++	mov	ip, sp
++	stmdb	sp!, {r4-r10, lr}
++	VFP_ABI_PUSH
++	ldr	$ctr, [ip]			@ ctr is 1st arg on the stack
++	sub	sp, sp, #0x10			@ scratch space to carry over the ctr
++	mov	$fp, sp				@ save sp
++
++	ldr	$rounds, [$key, #240]		@ get # of rounds
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	@ allocate the key schedule on the stack
++	sub	r12, sp, $rounds, lsl#7		@ 128 bytes per inner round key
++	add	r12, #`128-32`			@ size of bit-sliced key schedule
++
++	@ populate the key schedule
++	mov	r4, $key			@ pass key
++	mov	r5, $rounds			@ pass # of rounds
++	mov	sp, r12				@ sp is $keysched
++	bl	_bsaes_key_convert
++	veor	@XMM[7],@XMM[7],@XMM[15]	@ fix up last round key
++	vstmia	r12, {@XMM[7]}			@ save last round key
++
++	vld1.8	{@XMM[0]}, [$ctr]		@ load counter
++#ifdef	__APPLE__
++	mov	$ctr, #:lower16:(.LREVM0SR-.LM0)
++	add	$ctr, $const, $ctr
++#else
++	add	$ctr, $const, #.LREVM0SR-.LM0	@ borrow $ctr
++#endif
++	vldmia	$keysched, {@XMM[4]}		@ load round0 key
++#else
++	ldr	r12, [$key, #244]
++	eors	r12, #1
++	beq	0f
++
++	@ populate the key schedule
++	str	r12, [$key, #244]
++	mov	r4, $key			@ pass key
++	mov	r5, $rounds			@ pass # of rounds
++	add	r12, $key, #248			@ pass key schedule
++	bl	_bsaes_key_convert
++	veor	@XMM[7],@XMM[7],@XMM[15]	@ fix up last round key
++	vstmia	r12, {@XMM[7]}			@ save last round key
++
++.align	2
++0:	add	r12, $key, #248
++	vld1.8	{@XMM[0]}, [$ctr]		@ load counter
++	adrl	$ctr, .LREVM0SR			@ borrow $ctr
++	vldmia	r12, {@XMM[4]}			@ load round0 key
++	sub	sp, #0x10			@ place for adjusted round0 key
++#endif
++
++	vmov.i32	@XMM[8],#1		@ compose 1<<96
++	veor		@XMM[9],@XMM[9],@XMM[9]
++	vrev32.8	@XMM[0],@XMM[0]
++	vext.8		@XMM[8],@XMM[9],@XMM[8],#4
++	vrev32.8	@XMM[4],@XMM[4]
++	vadd.u32	@XMM[9],@XMM[8],@XMM[8]	@ compose 2<<96
++	vstmia	$keysched, {@XMM[4]}		@ save adjusted round0 key
++	b	.Lctr_enc_loop
++
++.align	4
++.Lctr_enc_loop:
++	vadd.u32	@XMM[10], @XMM[8], @XMM[9]	@ compose 3<<96
++	vadd.u32	@XMM[1], @XMM[0], @XMM[8]	@ +1
++	vadd.u32	@XMM[2], @XMM[0], @XMM[9]	@ +2
++	vadd.u32	@XMM[3], @XMM[0], @XMM[10]	@ +3
++	vadd.u32	@XMM[4], @XMM[1], @XMM[10]
++	vadd.u32	@XMM[5], @XMM[2], @XMM[10]
++	vadd.u32	@XMM[6], @XMM[3], @XMM[10]
++	vadd.u32	@XMM[7], @XMM[4], @XMM[10]
++	vadd.u32	@XMM[10], @XMM[5], @XMM[10]	@ next counter
++
++	@ Borrow prologue from _bsaes_encrypt8 to use the opportunity
++	@ to flip byte order in 32-bit counter
++
++	vldmia		$keysched, {@XMM[9]}		@ load round0 key
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	add		r4, $keysched, #0x10		@ pass next round key
++#else
++	add		r4, $key, #`248+16`
++#endif
++	vldmia		$ctr, {@XMM[8]}			@ .LREVM0SR
++	mov		r5, $rounds			@ pass rounds
++	vstmia		$fp, {@XMM[10]}			@ save next counter
++#ifdef	__APPLE__
++	mov		$const, #:lower16:(.LREVM0SR-.LSR)
++	sub		$const, $ctr, $const
++#else
++	sub		$const, $ctr, #.LREVM0SR-.LSR	@ pass constants
++#endif
++
++	bl		_bsaes_encrypt8_alt
++
++	subs		$len, $len, #8
++	blo		.Lctr_enc_loop_done
++
++	vld1.8		{@XMM[8]-@XMM[9]}, [$inp]!	@ load input
++	vld1.8		{@XMM[10]-@XMM[11]}, [$inp]!
++	veor		@XMM[0], @XMM[8]
++	veor		@XMM[1], @XMM[9]
++	vld1.8		{@XMM[12]-@XMM[13]}, [$inp]!
++	veor		@XMM[4], @XMM[10]
++	veor		@XMM[6], @XMM[11]
++	vld1.8		{@XMM[14]-@XMM[15]}, [$inp]!
++	veor		@XMM[3], @XMM[12]
++	vst1.8		{@XMM[0]-@XMM[1]}, [$out]!	@ write output
++	veor		@XMM[7], @XMM[13]
++	veor		@XMM[2], @XMM[14]
++	vst1.8		{@XMM[4]}, [$out]!
++	veor		@XMM[5], @XMM[15]
++	vst1.8		{@XMM[6]}, [$out]!
++	vmov.i32	@XMM[8], #1			@ compose 1<<96
++	vst1.8		{@XMM[3]}, [$out]!
++	veor		@XMM[9], @XMM[9], @XMM[9]
++	vst1.8		{@XMM[7]}, [$out]!
++	vext.8		@XMM[8], @XMM[9], @XMM[8], #4
++	vst1.8		{@XMM[2]}, [$out]!
++	vadd.u32	@XMM[9],@XMM[8],@XMM[8]		@ compose 2<<96
++	vst1.8		{@XMM[5]}, [$out]!
++	vldmia		$fp, {@XMM[0]}			@ load counter
++
++	bne		.Lctr_enc_loop
++	b		.Lctr_enc_done
++
++.align	4
++.Lctr_enc_loop_done:
++	add		$len, $len, #8
++	vld1.8		{@XMM[8]}, [$inp]!	@ load input
++	veor		@XMM[0], @XMM[8]
++	vst1.8		{@XMM[0]}, [$out]!	@ write output
++	cmp		$len, #2
++	blo		.Lctr_enc_done
++	vld1.8		{@XMM[9]}, [$inp]!
++	veor		@XMM[1], @XMM[9]
++	vst1.8		{@XMM[1]}, [$out]!
++	beq		.Lctr_enc_done
++	vld1.8		{@XMM[10]}, [$inp]!
++	veor		@XMM[4], @XMM[10]
++	vst1.8		{@XMM[4]}, [$out]!
++	cmp		$len, #4
++	blo		.Lctr_enc_done
++	vld1.8		{@XMM[11]}, [$inp]!
++	veor		@XMM[6], @XMM[11]
++	vst1.8		{@XMM[6]}, [$out]!
++	beq		.Lctr_enc_done
++	vld1.8		{@XMM[12]}, [$inp]!
++	veor		@XMM[3], @XMM[12]
++	vst1.8		{@XMM[3]}, [$out]!
++	cmp		$len, #6
++	blo		.Lctr_enc_done
++	vld1.8		{@XMM[13]}, [$inp]!
++	veor		@XMM[7], @XMM[13]
++	vst1.8		{@XMM[7]}, [$out]!
++	beq		.Lctr_enc_done
++	vld1.8		{@XMM[14]}, [$inp]
++	veor		@XMM[2], @XMM[14]
++	vst1.8		{@XMM[2]}, [$out]!
++
++.Lctr_enc_done:
++	vmov.i32	q0, #0
++	vmov.i32	q1, #0
++#ifndef	BSAES_ASM_EXTENDED_KEY
++.Lctr_enc_bzero:			@ wipe key schedule [if any]
++	vstmia		$keysched!, {q0-q1}
++	cmp		$keysched, $fp
++	bne		.Lctr_enc_bzero
++#else
++	vstmia		$keysched, {q0-q1}
++#endif
++
++	mov	sp, $fp
++	add	sp, #0x10		@ add sp,$fp,#0x10 is no good for thumb
++	VFP_ABI_POP
++	ldmia	sp!, {r4-r10, pc}	@ return
++
++.align	4
++.Lctr_enc_short:
++	ldr	ip, [sp]		@ ctr pointer is passed on stack
++	stmdb	sp!, {r4-r8, lr}
++
++	mov	r4, $inp		@ copy arguments
++	mov	r5, $out
++	mov	r6, $len
++	mov	r7, $key
++	ldr	r8, [ip, #12]		@ load counter LSW
++	vld1.8	{@XMM[1]}, [ip]		@ load whole counter value
++#ifdef __ARMEL__
++	rev	r8, r8
++#endif
++	sub	sp, sp, #0x10
++	vst1.8	{@XMM[1]}, [sp]		@ copy counter value
++	sub	sp, sp, #0x10
++
++.Lctr_enc_short_loop:
++	add	r0, sp, #0x10		@ input counter value
++	mov	r1, sp			@ output on the stack
++	mov	r2, r7			@ key
++
++	bl	AES_encrypt
++
++	vld1.8	{@XMM[0]}, [r4]!	@ load input
++	vld1.8	{@XMM[1]}, [sp]		@ load encrypted counter
++	add	r8, r8, #1
++#ifdef __ARMEL__
++	rev	r0, r8
++	str	r0, [sp, #0x1c]		@ next counter value
++#else
++	str	r8, [sp, #0x1c]		@ next counter value
++#endif
++	veor	@XMM[0],@XMM[0],@XMM[1]
++	vst1.8	{@XMM[0]}, [r5]!	@ store output
++	subs	r6, r6, #1
++	bne	.Lctr_enc_short_loop
++
++	vmov.i32	q0, #0
++	vmov.i32	q1, #0
++	vstmia		sp!, {q0-q1}
++
++	ldmia	sp!, {r4-r8, pc}
++.size	bsaes_ctr32_encrypt_blocks,.-bsaes_ctr32_encrypt_blocks
++___
++}
++{
++######################################################################
++# void bsaes_xts_[en|de]crypt(const char *inp,char *out,size_t len,
++#	const AES_KEY *key1, const AES_KEY *key2,
++#	const unsigned char iv[16]);
++#
++my ($inp,$out,$len,$key,$rounds,$magic,$fp)=(map("r$_",(7..10,1..3)));
++my $const="r6";		# returned by _bsaes_key_convert
++my $twmask=@XMM[5];
++my @T=@XMM[6..7];
++
++$code.=<<___;
++.globl	bsaes_xts_encrypt
++.type	bsaes_xts_encrypt,%function
++.align	4
++bsaes_xts_encrypt:
++	mov	ip, sp
++	stmdb	sp!, {r4-r10, lr}		@ 0x20
++	VFP_ABI_PUSH
++	mov	r6, sp				@ future $fp
++
++	mov	$inp, r0
++	mov	$out, r1
++	mov	$len, r2
++	mov	$key, r3
++
++	sub	r0, sp, #0x10			@ 0x10
++	bic	r0, #0xf			@ align at 16 bytes
++	mov	sp, r0
++
++#ifdef	XTS_CHAIN_TWEAK
++	ldr	r0, [ip]			@ pointer to input tweak
++#else
++	@ generate initial tweak
++	ldr	r0, [ip, #4]			@ iv[]
++	mov	r1, sp
++	ldr	r2, [ip, #0]			@ key2
++	bl	AES_encrypt
++	mov	r0,sp				@ pointer to initial tweak
++#endif
++
++	ldr	$rounds, [$key, #240]		@ get # of rounds
++	mov	$fp, r6
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	@ allocate the key schedule on the stack
++	sub	r12, sp, $rounds, lsl#7		@ 128 bytes per inner round key
++	@ add	r12, #`128-32`			@ size of bit-sliced key schedule
++	sub	r12, #`32+16`			@ place for tweak[9]
++
++	@ populate the key schedule
++	mov	r4, $key			@ pass key
++	mov	r5, $rounds			@ pass # of rounds
++	mov	sp, r12
++	add	r12, #0x90			@ pass key schedule
++	bl	_bsaes_key_convert
++	veor	@XMM[7], @XMM[7], @XMM[15]	@ fix up last round key
++	vstmia	r12, {@XMM[7]}			@ save last round key
++#else
++	ldr	r12, [$key, #244]
++	eors	r12, #1
++	beq	0f
++
++	str	r12, [$key, #244]
++	mov	r4, $key			@ pass key
++	mov	r5, $rounds			@ pass # of rounds
++	add	r12, $key, #248			@ pass key schedule
++	bl	_bsaes_key_convert
++	veor	@XMM[7], @XMM[7], @XMM[15]	@ fix up last round key
++	vstmia	r12, {@XMM[7]}
++
++.align	2
++0:	sub	sp, #0x90			@ place for tweak[9]
++#endif
++
++	vld1.8	{@XMM[8]}, [r0]			@ initial tweak
++	adr	$magic, .Lxts_magic
++
++	subs	$len, #0x80
++	blo	.Lxts_enc_short
++	b	.Lxts_enc_loop
++
++.align	4
++.Lxts_enc_loop:
++	vldmia		$magic, {$twmask}	@ load XTS magic
++	vshr.s64	@T[0], @XMM[8], #63
++	mov		r0, sp
++	vand		@T[0], @T[0], $twmask
++___
++for($i=9;$i<16;$i++) {
++$code.=<<___;
++	vadd.u64	@XMM[$i], @XMM[$i-1], @XMM[$i-1]
++	vst1.64		{@XMM[$i-1]}, [r0,:128]!
++	vswp		`&Dhi("@T[0]")`,`&Dlo("@T[0]")`
++	vshr.s64	@T[1], @XMM[$i], #63
++	veor		@XMM[$i], @XMM[$i], @T[0]
++	vand		@T[1], @T[1], $twmask
++___
++	@T=reverse(@T);
++
++$code.=<<___ if ($i>=10);
++	vld1.8		{@XMM[$i-10]}, [$inp]!
++___
++$code.=<<___ if ($i>=11);
++	veor		@XMM[$i-11], @XMM[$i-11], @XMM[$i-3]
++___
++}
++$code.=<<___;
++	vadd.u64	@XMM[8], @XMM[15], @XMM[15]
++	vst1.64		{@XMM[15]}, [r0,:128]!
++	vswp		`&Dhi("@T[0]")`,`&Dlo("@T[0]")`
++	veor		@XMM[8], @XMM[8], @T[0]
++	vst1.64		{@XMM[8]}, [r0,:128]		@ next round tweak
++
++	vld1.8		{@XMM[6]-@XMM[7]}, [$inp]!
++	veor		@XMM[5], @XMM[5], @XMM[13]
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	add		r4, sp, #0x90			@ pass key schedule
++#else
++	add		r4, $key, #248			@ pass key schedule
++#endif
++	veor		@XMM[6], @XMM[6], @XMM[14]
++	mov		r5, $rounds			@ pass rounds
++	veor		@XMM[7], @XMM[7], @XMM[15]
++	mov		r0, sp
++
++	bl		_bsaes_encrypt8
++
++	vld1.64		{@XMM[ 8]-@XMM[ 9]}, [r0,:128]!
++	vld1.64		{@XMM[10]-@XMM[11]}, [r0,:128]!
++	veor		@XMM[0], @XMM[0], @XMM[ 8]
++	vld1.64		{@XMM[12]-@XMM[13]}, [r0,:128]!
++	veor		@XMM[1], @XMM[1], @XMM[ 9]
++	veor		@XMM[8], @XMM[4], @XMM[10]
++	vst1.8		{@XMM[0]-@XMM[1]}, [$out]!
++	veor		@XMM[9], @XMM[6], @XMM[11]
++	vld1.64		{@XMM[14]-@XMM[15]}, [r0,:128]!
++	veor		@XMM[10], @XMM[3], @XMM[12]
++	vst1.8		{@XMM[8]-@XMM[9]}, [$out]!
++	veor		@XMM[11], @XMM[7], @XMM[13]
++	veor		@XMM[12], @XMM[2], @XMM[14]
++	vst1.8		{@XMM[10]-@XMM[11]}, [$out]!
++	veor		@XMM[13], @XMM[5], @XMM[15]
++	vst1.8		{@XMM[12]-@XMM[13]}, [$out]!
++
++	vld1.64		{@XMM[8]}, [r0,:128]		@ next round tweak
++
++	subs		$len, #0x80
++	bpl		.Lxts_enc_loop
++
++.Lxts_enc_short:
++	adds		$len, #0x70
++	bmi		.Lxts_enc_done
++
++	vldmia		$magic, {$twmask}	@ load XTS magic
++	vshr.s64	@T[0], @XMM[8], #63
++	mov		r0, sp
++	vand		@T[0], @T[0], $twmask
++___
++for($i=9;$i<16;$i++) {
++$code.=<<___;
++	vadd.u64	@XMM[$i], @XMM[$i-1], @XMM[$i-1]
++	vst1.64		{@XMM[$i-1]}, [r0,:128]!
++	vswp		`&Dhi("@T[0]")`,`&Dlo("@T[0]")`
++	vshr.s64	@T[1], @XMM[$i], #63
++	veor		@XMM[$i], @XMM[$i], @T[0]
++	vand		@T[1], @T[1], $twmask
++___
++	@T=reverse(@T);
++
++$code.=<<___ if ($i>=10);
++	vld1.8		{@XMM[$i-10]}, [$inp]!
++	subs		$len, #0x10
++	bmi		.Lxts_enc_`$i-9`
++___
++$code.=<<___ if ($i>=11);
++	veor		@XMM[$i-11], @XMM[$i-11], @XMM[$i-3]
++___
++}
++$code.=<<___;
++	sub		$len, #0x10
++	vst1.64		{@XMM[15]}, [r0,:128]		@ next round tweak
++
++	vld1.8		{@XMM[6]}, [$inp]!
++	veor		@XMM[5], @XMM[5], @XMM[13]
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	add		r4, sp, #0x90			@ pass key schedule
++#else
++	add		r4, $key, #248			@ pass key schedule
++#endif
++	veor		@XMM[6], @XMM[6], @XMM[14]
++	mov		r5, $rounds			@ pass rounds
++	mov		r0, sp
++
++	bl		_bsaes_encrypt8
++
++	vld1.64		{@XMM[ 8]-@XMM[ 9]}, [r0,:128]!
++	vld1.64		{@XMM[10]-@XMM[11]}, [r0,:128]!
++	veor		@XMM[0], @XMM[0], @XMM[ 8]
++	vld1.64		{@XMM[12]-@XMM[13]}, [r0,:128]!
++	veor		@XMM[1], @XMM[1], @XMM[ 9]
++	veor		@XMM[8], @XMM[4], @XMM[10]
++	vst1.8		{@XMM[0]-@XMM[1]}, [$out]!
++	veor		@XMM[9], @XMM[6], @XMM[11]
++	vld1.64		{@XMM[14]}, [r0,:128]!
++	veor		@XMM[10], @XMM[3], @XMM[12]
++	vst1.8		{@XMM[8]-@XMM[9]}, [$out]!
++	veor		@XMM[11], @XMM[7], @XMM[13]
++	veor		@XMM[12], @XMM[2], @XMM[14]
++	vst1.8		{@XMM[10]-@XMM[11]}, [$out]!
++	vst1.8		{@XMM[12]}, [$out]!
++
++	vld1.64		{@XMM[8]}, [r0,:128]		@ next round tweak
++	b		.Lxts_enc_done
++.align	4
++.Lxts_enc_6:
++	veor		@XMM[4], @XMM[4], @XMM[12]
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	add		r4, sp, #0x90			@ pass key schedule
++#else
++	add		r4, $key, #248			@ pass key schedule
++#endif
++	veor		@XMM[5], @XMM[5], @XMM[13]
++	mov		r5, $rounds			@ pass rounds
++	mov		r0, sp
++
++	bl		_bsaes_encrypt8
++
++	vld1.64		{@XMM[ 8]-@XMM[ 9]}, [r0,:128]!
++	vld1.64		{@XMM[10]-@XMM[11]}, [r0,:128]!
++	veor		@XMM[0], @XMM[0], @XMM[ 8]
++	vld1.64		{@XMM[12]-@XMM[13]}, [r0,:128]!
++	veor		@XMM[1], @XMM[1], @XMM[ 9]
++	veor		@XMM[8], @XMM[4], @XMM[10]
++	vst1.8		{@XMM[0]-@XMM[1]}, [$out]!
++	veor		@XMM[9], @XMM[6], @XMM[11]
++	veor		@XMM[10], @XMM[3], @XMM[12]
++	vst1.8		{@XMM[8]-@XMM[9]}, [$out]!
++	veor		@XMM[11], @XMM[7], @XMM[13]
++	vst1.8		{@XMM[10]-@XMM[11]}, [$out]!
++
++	vld1.64		{@XMM[8]}, [r0,:128]		@ next round tweak
++	b		.Lxts_enc_done
++
++@ put this in range for both ARM and Thumb mode adr instructions
++.align	5
++.Lxts_magic:
++	.quad	1, 0x87
++
++.align	5
++.Lxts_enc_5:
++	veor		@XMM[3], @XMM[3], @XMM[11]
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	add		r4, sp, #0x90			@ pass key schedule
++#else
++	add		r4, $key, #248			@ pass key schedule
++#endif
++	veor		@XMM[4], @XMM[4], @XMM[12]
++	mov		r5, $rounds			@ pass rounds
++	mov		r0, sp
++
++	bl		_bsaes_encrypt8
++
++	vld1.64		{@XMM[ 8]-@XMM[ 9]}, [r0,:128]!
++	vld1.64		{@XMM[10]-@XMM[11]}, [r0,:128]!
++	veor		@XMM[0], @XMM[0], @XMM[ 8]
++	vld1.64		{@XMM[12]}, [r0,:128]!
++	veor		@XMM[1], @XMM[1], @XMM[ 9]
++	veor		@XMM[8], @XMM[4], @XMM[10]
++	vst1.8		{@XMM[0]-@XMM[1]}, [$out]!
++	veor		@XMM[9], @XMM[6], @XMM[11]
++	veor		@XMM[10], @XMM[3], @XMM[12]
++	vst1.8		{@XMM[8]-@XMM[9]}, [$out]!
++	vst1.8		{@XMM[10]}, [$out]!
++
++	vld1.64		{@XMM[8]}, [r0,:128]		@ next round tweak
++	b		.Lxts_enc_done
++.align	4
++.Lxts_enc_4:
++	veor		@XMM[2], @XMM[2], @XMM[10]
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	add		r4, sp, #0x90			@ pass key schedule
++#else
++	add		r4, $key, #248			@ pass key schedule
++#endif
++	veor		@XMM[3], @XMM[3], @XMM[11]
++	mov		r5, $rounds			@ pass rounds
++	mov		r0, sp
++
++	bl		_bsaes_encrypt8
++
++	vld1.64		{@XMM[ 8]-@XMM[ 9]}, [r0,:128]!
++	vld1.64		{@XMM[10]-@XMM[11]}, [r0,:128]!
++	veor		@XMM[0], @XMM[0], @XMM[ 8]
++	veor		@XMM[1], @XMM[1], @XMM[ 9]
++	veor		@XMM[8], @XMM[4], @XMM[10]
++	vst1.8		{@XMM[0]-@XMM[1]}, [$out]!
++	veor		@XMM[9], @XMM[6], @XMM[11]
++	vst1.8		{@XMM[8]-@XMM[9]}, [$out]!
++
++	vld1.64		{@XMM[8]}, [r0,:128]		@ next round tweak
++	b		.Lxts_enc_done
++.align	4
++.Lxts_enc_3:
++	veor		@XMM[1], @XMM[1], @XMM[9]
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	add		r4, sp, #0x90			@ pass key schedule
++#else
++	add		r4, $key, #248			@ pass key schedule
++#endif
++	veor		@XMM[2], @XMM[2], @XMM[10]
++	mov		r5, $rounds			@ pass rounds
++	mov		r0, sp
++
++	bl		_bsaes_encrypt8
++
++	vld1.64		{@XMM[8]-@XMM[9]}, [r0,:128]!
++	vld1.64		{@XMM[10]}, [r0,:128]!
++	veor		@XMM[0], @XMM[0], @XMM[ 8]
++	veor		@XMM[1], @XMM[1], @XMM[ 9]
++	veor		@XMM[8], @XMM[4], @XMM[10]
++	vst1.8		{@XMM[0]-@XMM[1]}, [$out]!
++	vst1.8		{@XMM[8]}, [$out]!
++
++	vld1.64		{@XMM[8]}, [r0,:128]		@ next round tweak
++	b		.Lxts_enc_done
++.align	4
++.Lxts_enc_2:
++	veor		@XMM[0], @XMM[0], @XMM[8]
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	add		r4, sp, #0x90			@ pass key schedule
++#else
++	add		r4, $key, #248			@ pass key schedule
++#endif
++	veor		@XMM[1], @XMM[1], @XMM[9]
++	mov		r5, $rounds			@ pass rounds
++	mov		r0, sp
++
++	bl		_bsaes_encrypt8
++
++	vld1.64		{@XMM[8]-@XMM[9]}, [r0,:128]!
++	veor		@XMM[0], @XMM[0], @XMM[ 8]
++	veor		@XMM[1], @XMM[1], @XMM[ 9]
++	vst1.8		{@XMM[0]-@XMM[1]}, [$out]!
++
++	vld1.64		{@XMM[8]}, [r0,:128]		@ next round tweak
++	b		.Lxts_enc_done
++.align	4
++.Lxts_enc_1:
++	mov		r0, sp
++	veor		@XMM[0], @XMM[0], @XMM[8]
++	mov		r1, sp
++	vst1.8		{@XMM[0]}, [sp,:128]
++	mov		r2, $key
++	mov		r4, $fp				@ preserve fp
++
++	bl		AES_encrypt
++
++	vld1.8		{@XMM[0]}, [sp,:128]
++	veor		@XMM[0], @XMM[0], @XMM[8]
++	vst1.8		{@XMM[0]}, [$out]!
++	mov		$fp, r4
++
++	vmov		@XMM[8], @XMM[9]		@ next round tweak
++
++.Lxts_enc_done:
++#ifndef	XTS_CHAIN_TWEAK
++	adds		$len, #0x10
++	beq		.Lxts_enc_ret
++	sub		r6, $out, #0x10
++
++.Lxts_enc_steal:
++	ldrb		r0, [$inp], #1
++	ldrb		r1, [$out, #-0x10]
++	strb		r0, [$out, #-0x10]
++	strb		r1, [$out], #1
++
++	subs		$len, #1
++	bhi		.Lxts_enc_steal
++
++	vld1.8		{@XMM[0]}, [r6]
++	mov		r0, sp
++	veor		@XMM[0], @XMM[0], @XMM[8]
++	mov		r1, sp
++	vst1.8		{@XMM[0]}, [sp,:128]
++	mov		r2, $key
++	mov		r4, $fp			@ preserve fp
++
++	bl		AES_encrypt
++
++	vld1.8		{@XMM[0]}, [sp,:128]
++	veor		@XMM[0], @XMM[0], @XMM[8]
++	vst1.8		{@XMM[0]}, [r6]
++	mov		$fp, r4
++#endif
++
++.Lxts_enc_ret:
++	bic		r0, $fp, #0xf
++	vmov.i32	q0, #0
++	vmov.i32	q1, #0
++#ifdef	XTS_CHAIN_TWEAK
++	ldr		r1, [$fp, #0x20+VFP_ABI_FRAME]	@ chain tweak
++#endif
++.Lxts_enc_bzero:				@ wipe key schedule [if any]
++	vstmia		sp!, {q0-q1}
++	cmp		sp, r0
++	bne		.Lxts_enc_bzero
++
++	mov		sp, $fp
++#ifdef	XTS_CHAIN_TWEAK
++	vst1.8		{@XMM[8]}, [r1]
++#endif
++	VFP_ABI_POP
++	ldmia		sp!, {r4-r10, pc}	@ return
++
++.size	bsaes_xts_encrypt,.-bsaes_xts_encrypt
++
++.globl	bsaes_xts_decrypt
++.type	bsaes_xts_decrypt,%function
++.align	4
++bsaes_xts_decrypt:
++	mov	ip, sp
++	stmdb	sp!, {r4-r10, lr}		@ 0x20
++	VFP_ABI_PUSH
++	mov	r6, sp				@ future $fp
++
++	mov	$inp, r0
++	mov	$out, r1
++	mov	$len, r2
++	mov	$key, r3
++
++	sub	r0, sp, #0x10			@ 0x10
++	bic	r0, #0xf			@ align at 16 bytes
++	mov	sp, r0
++
++#ifdef	XTS_CHAIN_TWEAK
++	ldr	r0, [ip]			@ pointer to input tweak
++#else
++	@ generate initial tweak
++	ldr	r0, [ip, #4]			@ iv[]
++	mov	r1, sp
++	ldr	r2, [ip, #0]			@ key2
++	bl	AES_encrypt
++	mov	r0, sp				@ pointer to initial tweak
++#endif
++
++	ldr	$rounds, [$key, #240]		@ get # of rounds
++	mov	$fp, r6
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	@ allocate the key schedule on the stack
++	sub	r12, sp, $rounds, lsl#7		@ 128 bytes per inner round key
++	@ add	r12, #`128-32`			@ size of bit-sliced key schedule
++	sub	r12, #`32+16`			@ place for tweak[9]
++
++	@ populate the key schedule
++	mov	r4, $key			@ pass key
++	mov	r5, $rounds			@ pass # of rounds
++	mov	sp, r12
++	add	r12, #0x90			@ pass key schedule
++	bl	_bsaes_key_convert
++	add	r4, sp, #0x90
++	vldmia	r4, {@XMM[6]}
++	vstmia	r12,  {@XMM[15]}		@ save last round key
++	veor	@XMM[7], @XMM[7], @XMM[6]	@ fix up round 0 key
++	vstmia	r4, {@XMM[7]}
++#else
++	ldr	r12, [$key, #244]
++	eors	r12, #1
++	beq	0f
++
++	str	r12, [$key, #244]
++	mov	r4, $key			@ pass key
++	mov	r5, $rounds			@ pass # of rounds
++	add	r12, $key, #248			@ pass key schedule
++	bl	_bsaes_key_convert
++	add	r4, $key, #248
++	vldmia	r4, {@XMM[6]}
++	vstmia	r12,  {@XMM[15]}		@ save last round key
++	veor	@XMM[7], @XMM[7], @XMM[6]	@ fix up round 0 key
++	vstmia	r4, {@XMM[7]}
++
++.align	2
++0:	sub	sp, #0x90			@ place for tweak[9]
++#endif
++	vld1.8	{@XMM[8]}, [r0]			@ initial tweak
++	adr	$magic, .Lxts_magic
++
++#ifndef	XTS_CHAIN_TWEAK
++	tst	$len, #0xf			@ if not multiple of 16
++	it	ne				@ Thumb2 thing, sanity check in ARM
++	subne	$len, #0x10			@ subtract another 16 bytes
++#endif
++	subs	$len, #0x80
++
++	blo	.Lxts_dec_short
++	b	.Lxts_dec_loop
++
++.align	4
++.Lxts_dec_loop:
++	vldmia		$magic, {$twmask}	@ load XTS magic
++	vshr.s64	@T[0], @XMM[8], #63
++	mov		r0, sp
++	vand		@T[0], @T[0], $twmask
++___
++for($i=9;$i<16;$i++) {
++$code.=<<___;
++	vadd.u64	@XMM[$i], @XMM[$i-1], @XMM[$i-1]
++	vst1.64		{@XMM[$i-1]}, [r0,:128]!
++	vswp		`&Dhi("@T[0]")`,`&Dlo("@T[0]")`
++	vshr.s64	@T[1], @XMM[$i], #63
++	veor		@XMM[$i], @XMM[$i], @T[0]
++	vand		@T[1], @T[1], $twmask
++___
++	@T=reverse(@T);
++
++$code.=<<___ if ($i>=10);
++	vld1.8		{@XMM[$i-10]}, [$inp]!
++___
++$code.=<<___ if ($i>=11);
++	veor		@XMM[$i-11], @XMM[$i-11], @XMM[$i-3]
++___
++}
++$code.=<<___;
++	vadd.u64	@XMM[8], @XMM[15], @XMM[15]
++	vst1.64		{@XMM[15]}, [r0,:128]!
++	vswp		`&Dhi("@T[0]")`,`&Dlo("@T[0]")`
++	veor		@XMM[8], @XMM[8], @T[0]
++	vst1.64		{@XMM[8]}, [r0,:128]		@ next round tweak
++
++	vld1.8		{@XMM[6]-@XMM[7]}, [$inp]!
++	veor		@XMM[5], @XMM[5], @XMM[13]
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	add		r4, sp, #0x90			@ pass key schedule
++#else
++	add		r4, $key, #248			@ pass key schedule
++#endif
++	veor		@XMM[6], @XMM[6], @XMM[14]
++	mov		r5, $rounds			@ pass rounds
++	veor		@XMM[7], @XMM[7], @XMM[15]
++	mov		r0, sp
++
++	bl		_bsaes_decrypt8
++
++	vld1.64		{@XMM[ 8]-@XMM[ 9]}, [r0,:128]!
++	vld1.64		{@XMM[10]-@XMM[11]}, [r0,:128]!
++	veor		@XMM[0], @XMM[0], @XMM[ 8]
++	vld1.64		{@XMM[12]-@XMM[13]}, [r0,:128]!
++	veor		@XMM[1], @XMM[1], @XMM[ 9]
++	veor		@XMM[8], @XMM[6], @XMM[10]
++	vst1.8		{@XMM[0]-@XMM[1]}, [$out]!
++	veor		@XMM[9], @XMM[4], @XMM[11]
++	vld1.64		{@XMM[14]-@XMM[15]}, [r0,:128]!
++	veor		@XMM[10], @XMM[2], @XMM[12]
++	vst1.8		{@XMM[8]-@XMM[9]}, [$out]!
++	veor		@XMM[11], @XMM[7], @XMM[13]
++	veor		@XMM[12], @XMM[3], @XMM[14]
++	vst1.8		{@XMM[10]-@XMM[11]}, [$out]!
++	veor		@XMM[13], @XMM[5], @XMM[15]
++	vst1.8		{@XMM[12]-@XMM[13]}, [$out]!
++
++	vld1.64		{@XMM[8]}, [r0,:128]		@ next round tweak
++
++	subs		$len, #0x80
++	bpl		.Lxts_dec_loop
++
++.Lxts_dec_short:
++	adds		$len, #0x70
++	bmi		.Lxts_dec_done
++
++	vldmia		$magic, {$twmask}	@ load XTS magic
++	vshr.s64	@T[0], @XMM[8], #63
++	mov		r0, sp
++	vand		@T[0], @T[0], $twmask
++___
++for($i=9;$i<16;$i++) {
++$code.=<<___;
++	vadd.u64	@XMM[$i], @XMM[$i-1], @XMM[$i-1]
++	vst1.64		{@XMM[$i-1]}, [r0,:128]!
++	vswp		`&Dhi("@T[0]")`,`&Dlo("@T[0]")`
++	vshr.s64	@T[1], @XMM[$i], #63
++	veor		@XMM[$i], @XMM[$i], @T[0]
++	vand		@T[1], @T[1], $twmask
++___
++	@T=reverse(@T);
++
++$code.=<<___ if ($i>=10);
++	vld1.8		{@XMM[$i-10]}, [$inp]!
++	subs		$len, #0x10
++	bmi		.Lxts_dec_`$i-9`
++___
++$code.=<<___ if ($i>=11);
++	veor		@XMM[$i-11], @XMM[$i-11], @XMM[$i-3]
++___
++}
++$code.=<<___;
++	sub		$len, #0x10
++	vst1.64		{@XMM[15]}, [r0,:128]		@ next round tweak
++
++	vld1.8		{@XMM[6]}, [$inp]!
++	veor		@XMM[5], @XMM[5], @XMM[13]
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	add		r4, sp, #0x90			@ pass key schedule
++#else
++	add		r4, $key, #248			@ pass key schedule
++#endif
++	veor		@XMM[6], @XMM[6], @XMM[14]
++	mov		r5, $rounds			@ pass rounds
++	mov		r0, sp
++
++	bl		_bsaes_decrypt8
++
++	vld1.64		{@XMM[ 8]-@XMM[ 9]}, [r0,:128]!
++	vld1.64		{@XMM[10]-@XMM[11]}, [r0,:128]!
++	veor		@XMM[0], @XMM[0], @XMM[ 8]
++	vld1.64		{@XMM[12]-@XMM[13]}, [r0,:128]!
++	veor		@XMM[1], @XMM[1], @XMM[ 9]
++	veor		@XMM[8], @XMM[6], @XMM[10]
++	vst1.8		{@XMM[0]-@XMM[1]}, [$out]!
++	veor		@XMM[9], @XMM[4], @XMM[11]
++	vld1.64		{@XMM[14]}, [r0,:128]!
++	veor		@XMM[10], @XMM[2], @XMM[12]
++	vst1.8		{@XMM[8]-@XMM[9]}, [$out]!
++	veor		@XMM[11], @XMM[7], @XMM[13]
++	veor		@XMM[12], @XMM[3], @XMM[14]
++	vst1.8		{@XMM[10]-@XMM[11]}, [$out]!
++	vst1.8		{@XMM[12]}, [$out]!
++
++	vld1.64		{@XMM[8]}, [r0,:128]		@ next round tweak
++	b		.Lxts_dec_done
++.align	4
++.Lxts_dec_6:
++	vst1.64		{@XMM[14]}, [r0,:128]		@ next round tweak
++
++	veor		@XMM[4], @XMM[4], @XMM[12]
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	add		r4, sp, #0x90			@ pass key schedule
++#else
++	add		r4, $key, #248			@ pass key schedule
++#endif
++	veor		@XMM[5], @XMM[5], @XMM[13]
++	mov		r5, $rounds			@ pass rounds
++	mov		r0, sp
++
++	bl		_bsaes_decrypt8
++
++	vld1.64		{@XMM[ 8]-@XMM[ 9]}, [r0,:128]!
++	vld1.64		{@XMM[10]-@XMM[11]}, [r0,:128]!
++	veor		@XMM[0], @XMM[0], @XMM[ 8]
++	vld1.64		{@XMM[12]-@XMM[13]}, [r0,:128]!
++	veor		@XMM[1], @XMM[1], @XMM[ 9]
++	veor		@XMM[8], @XMM[6], @XMM[10]
++	vst1.8		{@XMM[0]-@XMM[1]}, [$out]!
++	veor		@XMM[9], @XMM[4], @XMM[11]
++	veor		@XMM[10], @XMM[2], @XMM[12]
++	vst1.8		{@XMM[8]-@XMM[9]}, [$out]!
++	veor		@XMM[11], @XMM[7], @XMM[13]
++	vst1.8		{@XMM[10]-@XMM[11]}, [$out]!
++
++	vld1.64		{@XMM[8]}, [r0,:128]		@ next round tweak
++	b		.Lxts_dec_done
++.align	4
++.Lxts_dec_5:
++	veor		@XMM[3], @XMM[3], @XMM[11]
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	add		r4, sp, #0x90			@ pass key schedule
++#else
++	add		r4, $key, #248			@ pass key schedule
++#endif
++	veor		@XMM[4], @XMM[4], @XMM[12]
++	mov		r5, $rounds			@ pass rounds
++	mov		r0, sp
++
++	bl		_bsaes_decrypt8
++
++	vld1.64		{@XMM[ 8]-@XMM[ 9]}, [r0,:128]!
++	vld1.64		{@XMM[10]-@XMM[11]}, [r0,:128]!
++	veor		@XMM[0], @XMM[0], @XMM[ 8]
++	vld1.64		{@XMM[12]}, [r0,:128]!
++	veor		@XMM[1], @XMM[1], @XMM[ 9]
++	veor		@XMM[8], @XMM[6], @XMM[10]
++	vst1.8		{@XMM[0]-@XMM[1]}, [$out]!
++	veor		@XMM[9], @XMM[4], @XMM[11]
++	veor		@XMM[10], @XMM[2], @XMM[12]
++	vst1.8		{@XMM[8]-@XMM[9]}, [$out]!
++	vst1.8		{@XMM[10]}, [$out]!
++
++	vld1.64		{@XMM[8]}, [r0,:128]		@ next round tweak
++	b		.Lxts_dec_done
++.align	4
++.Lxts_dec_4:
++	veor		@XMM[2], @XMM[2], @XMM[10]
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	add		r4, sp, #0x90			@ pass key schedule
++#else
++	add		r4, $key, #248			@ pass key schedule
++#endif
++	veor		@XMM[3], @XMM[3], @XMM[11]
++	mov		r5, $rounds			@ pass rounds
++	mov		r0, sp
++
++	bl		_bsaes_decrypt8
++
++	vld1.64		{@XMM[ 8]-@XMM[ 9]}, [r0,:128]!
++	vld1.64		{@XMM[10]-@XMM[11]}, [r0,:128]!
++	veor		@XMM[0], @XMM[0], @XMM[ 8]
++	veor		@XMM[1], @XMM[1], @XMM[ 9]
++	veor		@XMM[8], @XMM[6], @XMM[10]
++	vst1.8		{@XMM[0]-@XMM[1]}, [$out]!
++	veor		@XMM[9], @XMM[4], @XMM[11]
++	vst1.8		{@XMM[8]-@XMM[9]}, [$out]!
++
++	vld1.64		{@XMM[8]}, [r0,:128]		@ next round tweak
++	b		.Lxts_dec_done
++.align	4
++.Lxts_dec_3:
++	veor		@XMM[1], @XMM[1], @XMM[9]
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	add		r4, sp, #0x90			@ pass key schedule
++#else
++	add		r4, $key, #248			@ pass key schedule
++#endif
++	veor		@XMM[2], @XMM[2], @XMM[10]
++	mov		r5, $rounds			@ pass rounds
++	mov		r0, sp
++
++	bl		_bsaes_decrypt8
++
++	vld1.64		{@XMM[8]-@XMM[9]}, [r0,:128]!
++	vld1.64		{@XMM[10]}, [r0,:128]!
++	veor		@XMM[0], @XMM[0], @XMM[ 8]
++	veor		@XMM[1], @XMM[1], @XMM[ 9]
++	veor		@XMM[8], @XMM[6], @XMM[10]
++	vst1.8		{@XMM[0]-@XMM[1]}, [$out]!
++	vst1.8		{@XMM[8]}, [$out]!
++
++	vld1.64		{@XMM[8]}, [r0,:128]		@ next round tweak
++	b		.Lxts_dec_done
++.align	4
++.Lxts_dec_2:
++	veor		@XMM[0], @XMM[0], @XMM[8]
++#ifndef	BSAES_ASM_EXTENDED_KEY
++	add		r4, sp, #0x90			@ pass key schedule
++#else
++	add		r4, $key, #248			@ pass key schedule
++#endif
++	veor		@XMM[1], @XMM[1], @XMM[9]
++	mov		r5, $rounds			@ pass rounds
++	mov		r0, sp
++
++	bl		_bsaes_decrypt8
++
++	vld1.64		{@XMM[8]-@XMM[9]}, [r0,:128]!
++	veor		@XMM[0], @XMM[0], @XMM[ 8]
++	veor		@XMM[1], @XMM[1], @XMM[ 9]
++	vst1.8		{@XMM[0]-@XMM[1]}, [$out]!
++
++	vld1.64		{@XMM[8]}, [r0,:128]		@ next round tweak
++	b		.Lxts_dec_done
++.align	4
++.Lxts_dec_1:
++	mov		r0, sp
++	veor		@XMM[0], @XMM[0], @XMM[8]
++	mov		r1, sp
++	vst1.8		{@XMM[0]}, [sp,:128]
++	mov		r5, $magic			@ preserve magic
++	mov		r2, $key
++	mov		r4, $fp				@ preserve fp
++
++	bl		AES_decrypt
++
++	vld1.8		{@XMM[0]}, [sp,:128]
++	veor		@XMM[0], @XMM[0], @XMM[8]
++	vst1.8		{@XMM[0]}, [$out]!
++	mov		$fp, r4
++	mov		$magic, r5
++
++	vmov		@XMM[8], @XMM[9]		@ next round tweak
++
++.Lxts_dec_done:
++#ifndef	XTS_CHAIN_TWEAK
++	adds		$len, #0x10
++	beq		.Lxts_dec_ret
++
++	@ calculate one round of extra tweak for the stolen ciphertext
++	vldmia		$magic, {$twmask}
++	vshr.s64	@XMM[6], @XMM[8], #63
++	vand		@XMM[6], @XMM[6], $twmask
++	vadd.u64	@XMM[9], @XMM[8], @XMM[8]
++	vswp		`&Dhi("@XMM[6]")`,`&Dlo("@XMM[6]")`
++	veor		@XMM[9], @XMM[9], @XMM[6]
++
++	@ perform the final decryption with the last tweak value
++	vld1.8		{@XMM[0]}, [$inp]!
++	mov		r0, sp
++	veor		@XMM[0], @XMM[0], @XMM[9]
++	mov		r1, sp
++	vst1.8		{@XMM[0]}, [sp,:128]
++	mov		r2, $key
++	mov		r4, $fp			@ preserve fp
++
++	bl		AES_decrypt
++
++	vld1.8		{@XMM[0]}, [sp,:128]
++	veor		@XMM[0], @XMM[0], @XMM[9]
++	vst1.8		{@XMM[0]}, [$out]
++
++	mov		r6, $out
++.Lxts_dec_steal:
++	ldrb		r1, [$out]
++	ldrb		r0, [$inp], #1
++	strb		r1, [$out, #0x10]
++	strb		r0, [$out], #1
++
++	subs		$len, #1
++	bhi		.Lxts_dec_steal
++
++	vld1.8		{@XMM[0]}, [r6]
++	mov		r0, sp
++	veor		@XMM[0], @XMM[8]
++	mov		r1, sp
++	vst1.8		{@XMM[0]}, [sp,:128]
++	mov		r2, $key
++
++	bl		AES_decrypt
++
++	vld1.8		{@XMM[0]}, [sp,:128]
++	veor		@XMM[0], @XMM[0], @XMM[8]
++	vst1.8		{@XMM[0]}, [r6]
++	mov		$fp, r4
++#endif
++
++.Lxts_dec_ret:
++	bic		r0, $fp, #0xf
++	vmov.i32	q0, #0
++	vmov.i32	q1, #0
++#ifdef	XTS_CHAIN_TWEAK
++	ldr		r1, [$fp, #0x20+VFP_ABI_FRAME]	@ chain tweak
++#endif
++.Lxts_dec_bzero:				@ wipe key schedule [if any]
++	vstmia		sp!, {q0-q1}
++	cmp		sp, r0
++	bne		.Lxts_dec_bzero
++
++	mov		sp, $fp
++#ifdef	XTS_CHAIN_TWEAK
++	vst1.8		{@XMM[8]}, [r1]
++#endif
++	VFP_ABI_POP
++	ldmia		sp!, {r4-r10, pc}	@ return
++
++.size	bsaes_xts_decrypt,.-bsaes_xts_decrypt
++___
++}
++$code.=<<___;
++#endif
++___
++
++$code =~ s/\`([^\`]*)\`/eval($1)/gem;
++
++open SELF,$0;
++while(<SELF>) {
++	next if (/^#!/);
++        last if (!s/^#/@/ and !/^$/);
++        print;
++}
++close SELF;
++
++print $code;
++
++close STDOUT;
+--- /dev/null
++++ b/crypto/boringssl/bn/asm/armv4-mont.pl
+@@ -0,0 +1,693 @@
++#!/usr/bin/env perl
++
++# ====================================================================
++# Written by Andy Polyakov <appro@openssl.org> for the OpenSSL
++# project. The module is, however, dual licensed under OpenSSL and
++# CRYPTOGAMS licenses depending on where you obtain it. For further
++# details see http://www.openssl.org/~appro/cryptogams/.
++# ====================================================================
++
++# January 2007.
++
++# Montgomery multiplication for ARMv4.
++#
++# Performance improvement naturally varies among CPU implementations
++# and compilers. The code was observed to provide +65-35% improvement
++# [depending on key length, less for longer keys] on ARM920T, and
++# +115-80% on Intel IXP425. This is compared to pre-bn_mul_mont code
++# base and compiler generated code with in-lined umull and even umlal
++# instructions. The latter means that this code didn't really have an 
++# "advantage" of utilizing some "secret" instruction.
++#
++# The code is interoperable with Thumb ISA and is rather compact, less
++# than 1/2KB. Windows CE port would be trivial, as it's exclusively
++# about decorations, ABI and instruction syntax are identical.
++
++# November 2013
++#
++# Add NEON code path, which handles lengths divisible by 8. RSA/DSA
++# performance improvement on Cortex-A8 is ~45-100% depending on key
++# length, more for longer keys. On Cortex-A15 the span is ~10-105%.
++# On Snapdragon S4 improvement was measured to vary from ~70% to
++# incredible ~380%, yes, 4.8x faster, for RSA4096 sign. But this is
++# rather because original integer-only code seems to perform
++# suboptimally on S4. Situation on Cortex-A9 is unfortunately
++# different. It's being looked into, but the trouble is that
++# performance for vectors longer than 256 bits is actually couple
++# of percent worse than for integer-only code. The code is chosen
++# for execution on all NEON-capable processors, because gain on
++# others outweighs the marginal loss on Cortex-A9.
++
++$flavour = shift;
++if ($flavour=~/\w[\w\-]*\.\w+$/) { $output=$flavour; undef $flavour; }
++else { while (($output=shift) && ($output!~/\w[\w\-]*\.\w+$/)) {} }
++
++if ($flavour && $flavour ne "void") {
++    $0 =~ m/(.*[\/\\])[^\/\\]+$/; $dir=$1;
++    ( $xlate="${dir}arm-xlate.pl" and -f $xlate ) or
++    ( $xlate="${dir}../../perlasm/arm-xlate.pl" and -f $xlate) or
++    die "can't locate arm-xlate.pl";
++
++    open STDOUT,"| \"$^X\" $xlate $flavour $output";
++} else {
++    open STDOUT,">$output";
++}
++
++$num="r0";	# starts as num argument, but holds &tp[num-1]
++$ap="r1";
++$bp="r2"; $bi="r2"; $rp="r2";
++$np="r3";
++$tp="r4";
++$aj="r5";
++$nj="r6";
++$tj="r7";
++$n0="r8";
++###########	# r9 is reserved by ELF as platform specific, e.g. TLS pointer
++$alo="r10";	# sl, gcc uses it to keep @GOT
++$ahi="r11";	# fp
++$nlo="r12";	# ip
++###########	# r13 is stack pointer
++$nhi="r14";	# lr
++###########	# r15 is program counter
++
++#### argument block layout relative to &tp[num-1], a.k.a. $num
++$_rp="$num,#12*4";
++# ap permanently resides in r1
++$_bp="$num,#13*4";
++# np permanently resides in r3
++$_n0="$num,#14*4";
++$_num="$num,#15*4";	$_bpend=$_num;
++
++$code=<<___;
++#include <openssl/arm_arch.h>
++
++.text
++.code	32
++
++#if __ARM_MAX_ARCH__>=7
++.align	5
++.LOPENSSL_armcap:
++.word	OPENSSL_armcap_P-.Lbn_mul_mont
++#endif
++
++.global	bn_mul_mont
++.type	bn_mul_mont,%function
++
++.align	5
++bn_mul_mont:
++.Lbn_mul_mont:
++	ldr	ip,[sp,#4]		@ load num
++	stmdb	sp!,{r0,r2}		@ sp points at argument block
++#if __ARM_MAX_ARCH__>=7
++	tst	ip,#7
++	bne	.Lialu
++	adr	r0,bn_mul_mont
++	ldr	r2,.LOPENSSL_armcap
++	ldr	r0,[r0,r2]
++#ifdef	__APPLE__
++	ldr	r0,[r0]
++#endif
++	tst	r0,#ARMV7_NEON		@ NEON available?
++	ldmia	sp, {r0,r2}
++	beq	.Lialu
++	add	sp,sp,#8
++	b	bn_mul8x_mont_neon
++.align	4
++.Lialu:
++#endif
++	cmp	ip,#2
++	mov	$num,ip			@ load num
++	movlt	r0,#0
++	addlt	sp,sp,#2*4
++	blt	.Labrt
++
++	stmdb	sp!,{r4-r12,lr}		@ save 10 registers
++
++	mov	$num,$num,lsl#2		@ rescale $num for byte count
++	sub	sp,sp,$num		@ alloca(4*num)
++	sub	sp,sp,#4		@ +extra dword
++	sub	$num,$num,#4		@ "num=num-1"
++	add	$tp,$bp,$num		@ &bp[num-1]
++
++	add	$num,sp,$num		@ $num to point at &tp[num-1]
++	ldr	$n0,[$_n0]		@ &n0
++	ldr	$bi,[$bp]		@ bp[0]
++	ldr	$aj,[$ap],#4		@ ap[0],ap++
++	ldr	$nj,[$np],#4		@ np[0],np++
++	ldr	$n0,[$n0]		@ *n0
++	str	$tp,[$_bpend]		@ save &bp[num]
++
++	umull	$alo,$ahi,$aj,$bi	@ ap[0]*bp[0]
++	str	$n0,[$_n0]		@ save n0 value
++	mul	$n0,$alo,$n0		@ "tp[0]"*n0
++	mov	$nlo,#0
++	umlal	$alo,$nlo,$nj,$n0	@ np[0]*n0+"t[0]"
++	mov	$tp,sp
++
++.L1st:
++	ldr	$aj,[$ap],#4		@ ap[j],ap++
++	mov	$alo,$ahi
++	ldr	$nj,[$np],#4		@ np[j],np++
++	mov	$ahi,#0
++	umlal	$alo,$ahi,$aj,$bi	@ ap[j]*bp[0]
++	mov	$nhi,#0
++	umlal	$nlo,$nhi,$nj,$n0	@ np[j]*n0
++	adds	$nlo,$nlo,$alo
++	str	$nlo,[$tp],#4		@ tp[j-1]=,tp++
++	adc	$nlo,$nhi,#0
++	cmp	$tp,$num
++	bne	.L1st
++
++	adds	$nlo,$nlo,$ahi
++	ldr	$tp,[$_bp]		@ restore bp
++	mov	$nhi,#0
++	ldr	$n0,[$_n0]		@ restore n0
++	adc	$nhi,$nhi,#0
++	str	$nlo,[$num]		@ tp[num-1]=
++	str	$nhi,[$num,#4]		@ tp[num]=
++
++.Louter:
++	sub	$tj,$num,sp		@ "original" $num-1 value
++	sub	$ap,$ap,$tj		@ "rewind" ap to &ap[1]
++	ldr	$bi,[$tp,#4]!		@ *(++bp)
++	sub	$np,$np,$tj		@ "rewind" np to &np[1]
++	ldr	$aj,[$ap,#-4]		@ ap[0]
++	ldr	$alo,[sp]		@ tp[0]
++	ldr	$nj,[$np,#-4]		@ np[0]
++	ldr	$tj,[sp,#4]		@ tp[1]
++
++	mov	$ahi,#0
++	umlal	$alo,$ahi,$aj,$bi	@ ap[0]*bp[i]+tp[0]
++	str	$tp,[$_bp]		@ save bp
++	mul	$n0,$alo,$n0
++	mov	$nlo,#0
++	umlal	$alo,$nlo,$nj,$n0	@ np[0]*n0+"tp[0]"
++	mov	$tp,sp
++
++.Linner:
++	ldr	$aj,[$ap],#4		@ ap[j],ap++
++	adds	$alo,$ahi,$tj		@ +=tp[j]
++	ldr	$nj,[$np],#4		@ np[j],np++
++	mov	$ahi,#0
++	umlal	$alo,$ahi,$aj,$bi	@ ap[j]*bp[i]
++	mov	$nhi,#0
++	umlal	$nlo,$nhi,$nj,$n0	@ np[j]*n0
++	adc	$ahi,$ahi,#0
++	ldr	$tj,[$tp,#8]		@ tp[j+1]
++	adds	$nlo,$nlo,$alo
++	str	$nlo,[$tp],#4		@ tp[j-1]=,tp++
++	adc	$nlo,$nhi,#0
++	cmp	$tp,$num
++	bne	.Linner
++
++	adds	$nlo,$nlo,$ahi
++	mov	$nhi,#0
++	ldr	$tp,[$_bp]		@ restore bp
++	adc	$nhi,$nhi,#0
++	ldr	$n0,[$_n0]		@ restore n0
++	adds	$nlo,$nlo,$tj
++	ldr	$tj,[$_bpend]		@ restore &bp[num]
++	adc	$nhi,$nhi,#0
++	str	$nlo,[$num]		@ tp[num-1]=
++	str	$nhi,[$num,#4]		@ tp[num]=
++
++	cmp	$tp,$tj
++	bne	.Louter
++
++	ldr	$rp,[$_rp]		@ pull rp
++	add	$num,$num,#4		@ $num to point at &tp[num]
++	sub	$aj,$num,sp		@ "original" num value
++	mov	$tp,sp			@ "rewind" $tp
++	mov	$ap,$tp			@ "borrow" $ap
++	sub	$np,$np,$aj		@ "rewind" $np to &np[0]
++
++	subs	$tj,$tj,$tj		@ "clear" carry flag
++.Lsub:	ldr	$tj,[$tp],#4
++	ldr	$nj,[$np],#4
++	sbcs	$tj,$tj,$nj		@ tp[j]-np[j]
++	str	$tj,[$rp],#4		@ rp[j]=
++	teq	$tp,$num		@ preserve carry
++	bne	.Lsub
++	sbcs	$nhi,$nhi,#0		@ upmost carry
++	mov	$tp,sp			@ "rewind" $tp
++	sub	$rp,$rp,$aj		@ "rewind" $rp
++
++	and	$ap,$tp,$nhi
++	bic	$np,$rp,$nhi
++	orr	$ap,$ap,$np		@ ap=borrow?tp:rp
++
++.Lcopy:	ldr	$tj,[$ap],#4		@ copy or in-place refresh
++	str	sp,[$tp],#4		@ zap tp
++	str	$tj,[$rp],#4
++	cmp	$tp,$num
++	bne	.Lcopy
++
++	add	sp,$num,#4		@ skip over tp[num+1]
++	ldmia	sp!,{r4-r12,lr}		@ restore registers
++	add	sp,sp,#2*4		@ skip over {r0,r2}
++	mov	r0,#1
++.Labrt:
++#if __ARM_ARCH__>=5
++	ret				@ bx lr
++#else
++	tst	lr,#1
++	moveq	pc,lr			@ be binary compatible with V4, yet
++	bx	lr			@ interoperable with Thumb ISA:-)
++#endif
++.size	bn_mul_mont,.-bn_mul_mont
++___
++{
++sub Dlo()   { shift=~m|q([1]?[0-9])|?"d".($1*2):"";     }
++sub Dhi()   { shift=~m|q([1]?[0-9])|?"d".($1*2+1):"";   }
++
++my ($A0,$A1,$A2,$A3)=map("d$_",(0..3));
++my ($N0,$N1,$N2,$N3)=map("d$_",(4..7));
++my ($Z,$Temp)=("q4","q5");
++my ($A0xB,$A1xB,$A2xB,$A3xB,$A4xB,$A5xB,$A6xB,$A7xB)=map("q$_",(6..13));
++my ($Bi,$Ni,$M0)=map("d$_",(28..31));
++my $zero=&Dlo($Z);
++my $temp=&Dlo($Temp);
++
++my ($rptr,$aptr,$bptr,$nptr,$n0,$num)=map("r$_",(0..5));
++my ($tinptr,$toutptr,$inner,$outer)=map("r$_",(6..9));
++
++$code.=<<___;
++#if __ARM_MAX_ARCH__>=7
++.arch	armv7-a
++.fpu	neon
++
++.type	bn_mul8x_mont_neon,%function
++.align	5
++bn_mul8x_mont_neon:
++	mov	ip,sp
++	stmdb	sp!,{r4-r11}
++	vstmdb	sp!,{d8-d15}		@ ABI specification says so
++	ldmia	ip,{r4-r5}		@ load rest of parameter block
++
++	sub		$toutptr,sp,#16
++	vld1.32		{${Bi}[0]}, [$bptr,:32]!
++	sub		$toutptr,$toutptr,$num,lsl#4
++	vld1.32		{$A0-$A3},  [$aptr]!		@ can't specify :32 :-(
++	and		$toutptr,$toutptr,#-64
++	vld1.32		{${M0}[0]}, [$n0,:32]
++	mov		sp,$toutptr			@ alloca
++	veor		$zero,$zero,$zero
++	subs		$inner,$num,#8
++	vzip.16		$Bi,$zero
++
++	vmull.u32	$A0xB,$Bi,${A0}[0]
++	vmull.u32	$A1xB,$Bi,${A0}[1]
++	vmull.u32	$A2xB,$Bi,${A1}[0]
++	vshl.i64	$temp,`&Dhi("$A0xB")`,#16
++	vmull.u32	$A3xB,$Bi,${A1}[1]
++
++	vadd.u64	$temp,$temp,`&Dlo("$A0xB")`
++	veor		$zero,$zero,$zero
++	vmul.u32	$Ni,$temp,$M0
++
++	vmull.u32	$A4xB,$Bi,${A2}[0]
++	 vld1.32	{$N0-$N3}, [$nptr]!
++	vmull.u32	$A5xB,$Bi,${A2}[1]
++	vmull.u32	$A6xB,$Bi,${A3}[0]
++	vzip.16		$Ni,$zero
++	vmull.u32	$A7xB,$Bi,${A3}[1]
++
++	bne	.LNEON_1st
++
++	@ special case for num=8, everything is in register bank...
++
++	vmlal.u32	$A0xB,$Ni,${N0}[0]
++	sub		$outer,$num,#1
++	vmlal.u32	$A1xB,$Ni,${N0}[1]
++	vmlal.u32	$A2xB,$Ni,${N1}[0]
++	vmlal.u32	$A3xB,$Ni,${N1}[1]
++
++	vmlal.u32	$A4xB,$Ni,${N2}[0]
++	vmov		$Temp,$A0xB
++	vmlal.u32	$A5xB,$Ni,${N2}[1]
++	vmov		$A0xB,$A1xB
++	vmlal.u32	$A6xB,$Ni,${N3}[0]
++	vmov		$A1xB,$A2xB
++	vmlal.u32	$A7xB,$Ni,${N3}[1]
++	vmov		$A2xB,$A3xB
++	vmov		$A3xB,$A4xB
++	vshr.u64	$temp,$temp,#16
++	vmov		$A4xB,$A5xB
++	vmov		$A5xB,$A6xB
++	vadd.u64	$temp,$temp,`&Dhi("$Temp")`
++	vmov		$A6xB,$A7xB
++	veor		$A7xB,$A7xB
++	vshr.u64	$temp,$temp,#16
++
++	b	.LNEON_outer8
++
++.align	4
++.LNEON_outer8:
++	vld1.32		{${Bi}[0]}, [$bptr,:32]!
++	veor		$zero,$zero,$zero
++	vzip.16		$Bi,$zero
++	vadd.u64	`&Dlo("$A0xB")`,`&Dlo("$A0xB")`,$temp
++
++	vmlal.u32	$A0xB,$Bi,${A0}[0]
++	vmlal.u32	$A1xB,$Bi,${A0}[1]
++	vmlal.u32	$A2xB,$Bi,${A1}[0]
++	vshl.i64	$temp,`&Dhi("$A0xB")`,#16
++	vmlal.u32	$A3xB,$Bi,${A1}[1]
++
++	vadd.u64	$temp,$temp,`&Dlo("$A0xB")`
++	veor		$zero,$zero,$zero
++	subs		$outer,$outer,#1
++	vmul.u32	$Ni,$temp,$M0
++
++	vmlal.u32	$A4xB,$Bi,${A2}[0]
++	vmlal.u32	$A5xB,$Bi,${A2}[1]
++	vmlal.u32	$A6xB,$Bi,${A3}[0]
++	vzip.16		$Ni,$zero
++	vmlal.u32	$A7xB,$Bi,${A3}[1]
++
++	vmlal.u32	$A0xB,$Ni,${N0}[0]
++	vmlal.u32	$A1xB,$Ni,${N0}[1]
++	vmlal.u32	$A2xB,$Ni,${N1}[0]
++	vmlal.u32	$A3xB,$Ni,${N1}[1]
++
++	vmlal.u32	$A4xB,$Ni,${N2}[0]
++	vmov		$Temp,$A0xB
++	vmlal.u32	$A5xB,$Ni,${N2}[1]
++	vmov		$A0xB,$A1xB
++	vmlal.u32	$A6xB,$Ni,${N3}[0]
++	vmov		$A1xB,$A2xB
++	vmlal.u32	$A7xB,$Ni,${N3}[1]
++	vmov		$A2xB,$A3xB
++	vmov		$A3xB,$A4xB
++	vshr.u64	$temp,$temp,#16
++	vmov		$A4xB,$A5xB
++	vmov		$A5xB,$A6xB
++	vadd.u64	$temp,$temp,`&Dhi("$Temp")`
++	vmov		$A6xB,$A7xB
++	veor		$A7xB,$A7xB
++	vshr.u64	$temp,$temp,#16
++
++	bne	.LNEON_outer8
++
++	vadd.u64	`&Dlo("$A0xB")`,`&Dlo("$A0xB")`,$temp
++	mov		$toutptr,sp
++	vshr.u64	$temp,`&Dlo("$A0xB")`,#16
++	mov		$inner,$num
++	vadd.u64	`&Dhi("$A0xB")`,`&Dhi("$A0xB")`,$temp
++	add		$tinptr,sp,#16
++	vshr.u64	$temp,`&Dhi("$A0xB")`,#16
++	vzip.16		`&Dlo("$A0xB")`,`&Dhi("$A0xB")`
++
++	b	.LNEON_tail2
++
++.align	4
++.LNEON_1st:
++	vmlal.u32	$A0xB,$Ni,${N0}[0]
++	 vld1.32	{$A0-$A3}, [$aptr]!
++	vmlal.u32	$A1xB,$Ni,${N0}[1]
++	subs		$inner,$inner,#8
++	vmlal.u32	$A2xB,$Ni,${N1}[0]
++	vmlal.u32	$A3xB,$Ni,${N1}[1]
++
++	vmlal.u32	$A4xB,$Ni,${N2}[0]
++	 vld1.32	{$N0-$N1}, [$nptr]!
++	vmlal.u32	$A5xB,$Ni,${N2}[1]
++	 vst1.64	{$A0xB-$A1xB}, [$toutptr,:256]!
++	vmlal.u32	$A6xB,$Ni,${N3}[0]
++	vmlal.u32	$A7xB,$Ni,${N3}[1]
++	 vst1.64	{$A2xB-$A3xB}, [$toutptr,:256]!
++
++	vmull.u32	$A0xB,$Bi,${A0}[0]
++	 vld1.32	{$N2-$N3}, [$nptr]!
++	vmull.u32	$A1xB,$Bi,${A0}[1]
++	 vst1.64	{$A4xB-$A5xB}, [$toutptr,:256]!
++	vmull.u32	$A2xB,$Bi,${A1}[0]
++	vmull.u32	$A3xB,$Bi,${A1}[1]
++	 vst1.64	{$A6xB-$A7xB}, [$toutptr,:256]!
++
++	vmull.u32	$A4xB,$Bi,${A2}[0]
++	vmull.u32	$A5xB,$Bi,${A2}[1]
++	vmull.u32	$A6xB,$Bi,${A3}[0]
++	vmull.u32	$A7xB,$Bi,${A3}[1]
++
++	bne	.LNEON_1st
++
++	vmlal.u32	$A0xB,$Ni,${N0}[0]
++	add		$tinptr,sp,#16
++	vmlal.u32	$A1xB,$Ni,${N0}[1]
++	sub		$aptr,$aptr,$num,lsl#2		@ rewind $aptr
++	vmlal.u32	$A2xB,$Ni,${N1}[0]
++	 vld1.64	{$Temp}, [sp,:128]
++	vmlal.u32	$A3xB,$Ni,${N1}[1]
++	sub		$outer,$num,#1
++
++	vmlal.u32	$A4xB,$Ni,${N2}[0]
++	vst1.64		{$A0xB-$A1xB}, [$toutptr,:256]!
++	vmlal.u32	$A5xB,$Ni,${N2}[1]
++	vshr.u64	$temp,$temp,#16
++	 vld1.64	{$A0xB},       [$tinptr, :128]!
++	vmlal.u32	$A6xB,$Ni,${N3}[0]
++	vst1.64		{$A2xB-$A3xB}, [$toutptr,:256]!
++	vmlal.u32	$A7xB,$Ni,${N3}[1]
++
++	vst1.64		{$A4xB-$A5xB}, [$toutptr,:256]!
++	vadd.u64	$temp,$temp,`&Dhi("$Temp")`
++	veor		$Z,$Z,$Z
++	vst1.64		{$A6xB-$A7xB}, [$toutptr,:256]!
++	 vld1.64	{$A1xB-$A2xB}, [$tinptr, :256]!
++	vst1.64		{$Z},          [$toutptr,:128]
++	vshr.u64	$temp,$temp,#16
++
++	b		.LNEON_outer
++
++.align	4
++.LNEON_outer:
++	vld1.32		{${Bi}[0]}, [$bptr,:32]!
++	sub		$nptr,$nptr,$num,lsl#2		@ rewind $nptr
++	vld1.32		{$A0-$A3},  [$aptr]!
++	veor		$zero,$zero,$zero
++	mov		$toutptr,sp
++	vzip.16		$Bi,$zero
++	sub		$inner,$num,#8
++	vadd.u64	`&Dlo("$A0xB")`,`&Dlo("$A0xB")`,$temp
++
++	vmlal.u32	$A0xB,$Bi,${A0}[0]
++	 vld1.64	{$A3xB-$A4xB},[$tinptr,:256]!
++	vmlal.u32	$A1xB,$Bi,${A0}[1]
++	vmlal.u32	$A2xB,$Bi,${A1}[0]
++	 vld1.64	{$A5xB-$A6xB},[$tinptr,:256]!
++	vmlal.u32	$A3xB,$Bi,${A1}[1]
++
++	vshl.i64	$temp,`&Dhi("$A0xB")`,#16
++	veor		$zero,$zero,$zero
++	vadd.u64	$temp,$temp,`&Dlo("$A0xB")`
++	 vld1.64	{$A7xB},[$tinptr,:128]!
++	vmul.u32	$Ni,$temp,$M0
++
++	vmlal.u32	$A4xB,$Bi,${A2}[0]
++	 vld1.32	{$N0-$N3}, [$nptr]!
++	vmlal.u32	$A5xB,$Bi,${A2}[1]
++	vmlal.u32	$A6xB,$Bi,${A3}[0]
++	vzip.16		$Ni,$zero
++	vmlal.u32	$A7xB,$Bi,${A3}[1]
++
++.LNEON_inner:
++	vmlal.u32	$A0xB,$Ni,${N0}[0]
++	 vld1.32	{$A0-$A3}, [$aptr]!
++	vmlal.u32	$A1xB,$Ni,${N0}[1]
++	 subs		$inner,$inner,#8
++	vmlal.u32	$A2xB,$Ni,${N1}[0]
++	vmlal.u32	$A3xB,$Ni,${N1}[1]
++	vst1.64		{$A0xB-$A1xB}, [$toutptr,:256]!
++
++	vmlal.u32	$A4xB,$Ni,${N2}[0]
++	 vld1.64	{$A0xB},       [$tinptr, :128]!
++	vmlal.u32	$A5xB,$Ni,${N2}[1]
++	vst1.64		{$A2xB-$A3xB}, [$toutptr,:256]!
++	vmlal.u32	$A6xB,$Ni,${N3}[0]
++	 vld1.64	{$A1xB-$A2xB}, [$tinptr, :256]!
++	vmlal.u32	$A7xB,$Ni,${N3}[1]
++	vst1.64		{$A4xB-$A5xB}, [$toutptr,:256]!
++
++	vmlal.u32	$A0xB,$Bi,${A0}[0]
++	 vld1.64	{$A3xB-$A4xB}, [$tinptr, :256]!
++	vmlal.u32	$A1xB,$Bi,${A0}[1]
++	vst1.64		{$A6xB-$A7xB}, [$toutptr,:256]!
++	vmlal.u32	$A2xB,$Bi,${A1}[0]
++	 vld1.64	{$A5xB-$A6xB}, [$tinptr, :256]!
++	vmlal.u32	$A3xB,$Bi,${A1}[1]
++	 vld1.32	{$N0-$N3}, [$nptr]!
++
++	vmlal.u32	$A4xB,$Bi,${A2}[0]
++	 vld1.64	{$A7xB},       [$tinptr, :128]!
++	vmlal.u32	$A5xB,$Bi,${A2}[1]
++	vmlal.u32	$A6xB,$Bi,${A3}[0]
++	vmlal.u32	$A7xB,$Bi,${A3}[1]
++
++	bne	.LNEON_inner
++
++	vmlal.u32	$A0xB,$Ni,${N0}[0]
++	add		$tinptr,sp,#16
++	vmlal.u32	$A1xB,$Ni,${N0}[1]
++	sub		$aptr,$aptr,$num,lsl#2		@ rewind $aptr
++	vmlal.u32	$A2xB,$Ni,${N1}[0]
++	 vld1.64	{$Temp}, [sp,:128]
++	vmlal.u32	$A3xB,$Ni,${N1}[1]
++	subs		$outer,$outer,#1
++
++	vmlal.u32	$A4xB,$Ni,${N2}[0]
++	vst1.64		{$A0xB-$A1xB}, [$toutptr,:256]!
++	vmlal.u32	$A5xB,$Ni,${N2}[1]
++	 vld1.64	{$A0xB},       [$tinptr, :128]!
++	vshr.u64	$temp,$temp,#16
++	vst1.64		{$A2xB-$A3xB}, [$toutptr,:256]!
++	vmlal.u32	$A6xB,$Ni,${N3}[0]
++	 vld1.64	{$A1xB-$A2xB}, [$tinptr, :256]!
++	vmlal.u32	$A7xB,$Ni,${N3}[1]
++
++	vst1.64		{$A4xB-$A5xB}, [$toutptr,:256]!
++	vadd.u64	$temp,$temp,`&Dhi("$Temp")`
++	vst1.64		{$A6xB-$A7xB}, [$toutptr,:256]!
++	vshr.u64	$temp,$temp,#16
++
++	bne	.LNEON_outer
++
++	mov		$toutptr,sp
++	mov		$inner,$num
++
++.LNEON_tail:
++	vadd.u64	`&Dlo("$A0xB")`,`&Dlo("$A0xB")`,$temp
++	vld1.64		{$A3xB-$A4xB}, [$tinptr, :256]!
++	vshr.u64	$temp,`&Dlo("$A0xB")`,#16
++	vadd.u64	`&Dhi("$A0xB")`,`&Dhi("$A0xB")`,$temp
++	vld1.64		{$A5xB-$A6xB}, [$tinptr, :256]!
++	vshr.u64	$temp,`&Dhi("$A0xB")`,#16
++	vld1.64		{$A7xB},       [$tinptr, :128]!
++	vzip.16		`&Dlo("$A0xB")`,`&Dhi("$A0xB")`
++
++.LNEON_tail2:
++	vadd.u64	`&Dlo("$A1xB")`,`&Dlo("$A1xB")`,$temp
++	vst1.32		{`&Dlo("$A0xB")`[0]}, [$toutptr, :32]!
++	vshr.u64	$temp,`&Dlo("$A1xB")`,#16
++	vadd.u64	`&Dhi("$A1xB")`,`&Dhi("$A1xB")`,$temp
++	vshr.u64	$temp,`&Dhi("$A1xB")`,#16
++	vzip.16		`&Dlo("$A1xB")`,`&Dhi("$A1xB")`
++
++	vadd.u64	`&Dlo("$A2xB")`,`&Dlo("$A2xB")`,$temp
++	vst1.32		{`&Dlo("$A1xB")`[0]}, [$toutptr, :32]!
++	vshr.u64	$temp,`&Dlo("$A2xB")`,#16
++	vadd.u64	`&Dhi("$A2xB")`,`&Dhi("$A2xB")`,$temp
++	vshr.u64	$temp,`&Dhi("$A2xB")`,#16
++	vzip.16		`&Dlo("$A2xB")`,`&Dhi("$A2xB")`
++
++	vadd.u64	`&Dlo("$A3xB")`,`&Dlo("$A3xB")`,$temp
++	vst1.32		{`&Dlo("$A2xB")`[0]}, [$toutptr, :32]!
++	vshr.u64	$temp,`&Dlo("$A3xB")`,#16
++	vadd.u64	`&Dhi("$A3xB")`,`&Dhi("$A3xB")`,$temp
++	vshr.u64	$temp,`&Dhi("$A3xB")`,#16
++	vzip.16		`&Dlo("$A3xB")`,`&Dhi("$A3xB")`
++
++	vadd.u64	`&Dlo("$A4xB")`,`&Dlo("$A4xB")`,$temp
++	vst1.32		{`&Dlo("$A3xB")`[0]}, [$toutptr, :32]!
++	vshr.u64	$temp,`&Dlo("$A4xB")`,#16
++	vadd.u64	`&Dhi("$A4xB")`,`&Dhi("$A4xB")`,$temp
++	vshr.u64	$temp,`&Dhi("$A4xB")`,#16
++	vzip.16		`&Dlo("$A4xB")`,`&Dhi("$A4xB")`
++
++	vadd.u64	`&Dlo("$A5xB")`,`&Dlo("$A5xB")`,$temp
++	vst1.32		{`&Dlo("$A4xB")`[0]}, [$toutptr, :32]!
++	vshr.u64	$temp,`&Dlo("$A5xB")`,#16
++	vadd.u64	`&Dhi("$A5xB")`,`&Dhi("$A5xB")`,$temp
++	vshr.u64	$temp,`&Dhi("$A5xB")`,#16
++	vzip.16		`&Dlo("$A5xB")`,`&Dhi("$A5xB")`
++
++	vadd.u64	`&Dlo("$A6xB")`,`&Dlo("$A6xB")`,$temp
++	vst1.32		{`&Dlo("$A5xB")`[0]}, [$toutptr, :32]!
++	vshr.u64	$temp,`&Dlo("$A6xB")`,#16
++	vadd.u64	`&Dhi("$A6xB")`,`&Dhi("$A6xB")`,$temp
++	vld1.64		{$A0xB}, [$tinptr, :128]!
++	vshr.u64	$temp,`&Dhi("$A6xB")`,#16
++	vzip.16		`&Dlo("$A6xB")`,`&Dhi("$A6xB")`
++
++	vadd.u64	`&Dlo("$A7xB")`,`&Dlo("$A7xB")`,$temp
++	vst1.32		{`&Dlo("$A6xB")`[0]}, [$toutptr, :32]!
++	vshr.u64	$temp,`&Dlo("$A7xB")`,#16
++	vadd.u64	`&Dhi("$A7xB")`,`&Dhi("$A7xB")`,$temp
++	vld1.64		{$A1xB-$A2xB},	[$tinptr, :256]!
++	vshr.u64	$temp,`&Dhi("$A7xB")`,#16
++	vzip.16		`&Dlo("$A7xB")`,`&Dhi("$A7xB")`
++	subs		$inner,$inner,#8
++	vst1.32		{`&Dlo("$A7xB")`[0]}, [$toutptr, :32]!
++
++	bne	.LNEON_tail
++
++	vst1.32	{${temp}[0]}, [$toutptr, :32]		@ top-most bit
++	sub	$nptr,$nptr,$num,lsl#2			@ rewind $nptr
++	subs	$aptr,sp,#0				@ clear carry flag
++	add	$bptr,sp,$num,lsl#2
++
++.LNEON_sub:
++	ldmia	$aptr!, {r4-r7}
++	ldmia	$nptr!, {r8-r11}
++	sbcs	r8, r4,r8
++	sbcs	r9, r5,r9
++	sbcs	r10,r6,r10
++	sbcs	r11,r7,r11
++	teq	$aptr,$bptr				@ preserves carry
++	stmia	$rptr!, {r8-r11}
++	bne	.LNEON_sub
++
++	ldr	r10, [$aptr]				@ load top-most bit
++	veor	q0,q0,q0
++	sub	r11,$bptr,sp				@ this is num*4
++	veor	q1,q1,q1
++	mov	$aptr,sp
++	sub	$rptr,$rptr,r11				@ rewind $rptr
++	mov	$nptr,$bptr				@ second 3/4th of frame
++	sbcs	r10,r10,#0				@ result is carry flag
++
++.LNEON_copy_n_zap:
++	ldmia	$aptr!, {r4-r7}
++	ldmia	$rptr,  {r8-r11}
++	movcc	r8, r4
++	vst1.64	{q0-q1}, [$nptr,:256]!			@ wipe
++	movcc	r9, r5
++	movcc	r10,r6
++	vst1.64	{q0-q1}, [$nptr,:256]!			@ wipe
++	movcc	r11,r7
++	ldmia	$aptr, {r4-r7}
++	stmia	$rptr!, {r8-r11}
++	sub	$aptr,$aptr,#16
++	ldmia	$rptr, {r8-r11}
++	movcc	r8, r4
++	vst1.64	{q0-q1}, [$aptr,:256]!			@ wipe
++	movcc	r9, r5
++	movcc	r10,r6
++	vst1.64	{q0-q1}, [$nptr,:256]!			@ wipe
++	movcc	r11,r7
++	teq	$aptr,$bptr				@ preserves carry
++	stmia	$rptr!, {r8-r11}
++	bne	.LNEON_copy_n_zap
++
++	sub	sp,ip,#96
++        vldmia  sp!,{d8-d15}
++        ldmia   sp!,{r4-r11}
++	ret						@ bx lr
++.size	bn_mul8x_mont_neon,.-bn_mul8x_mont_neon
++#endif
++___
++}
++$code.=<<___;
++.asciz	"Montgomery multiplication for ARMv4/NEON, CRYPTOGAMS by <appro\@openssl.org>"
++.align	2
++#if __ARM_MAX_ARCH__>=7
++.comm	OPENSSL_armcap_P,4,4
++.hidden	OPENSSL_armcap_P
++#endif
++___
++
++$code =~ s/\`([^\`]*)\`/eval $1/gem;
++$code =~ s/\bbx\s+lr\b/.word\t0xe12fff1e/gm;	# make it possible to compile with -march=armv4
++$code =~ s/\bret\b/bx	lr/gm;
++print $code;
++close STDOUT;
+--- /dev/null
++++ b/crypto/boringssl/sha/asm/sha1-armv4-large.pl
+@@ -0,0 +1,701 @@
++#!/usr/bin/env perl
++
++# ====================================================================
++# Written by Andy Polyakov <appro@openssl.org> for the OpenSSL
++# project. The module is, however, dual licensed under OpenSSL and
++# CRYPTOGAMS licenses depending on where you obtain it. For further
++# details see http://www.openssl.org/~appro/cryptogams/.
++# ====================================================================
++
++# sha1_block procedure for ARMv4.
++#
++# January 2007.
++
++# Size/performance trade-off
++# ====================================================================
++# impl		size in bytes	comp cycles[*]	measured performance
++# ====================================================================
++# thumb		304		3212		4420
++# armv4-small	392/+29%	1958/+64%	2250/+96%
++# armv4-compact	740/+89%	1552/+26%	1840/+22%
++# armv4-large	1420/+92%	1307/+19%	1370/+34%[***]
++# full unroll	~5100/+260%	~1260/+4%	~1300/+5%
++# ====================================================================
++# thumb		= same as 'small' but in Thumb instructions[**] and
++#		  with recurring code in two private functions;
++# small		= detached Xload/update, loops are folded;
++# compact	= detached Xload/update, 5x unroll;
++# large		= interleaved Xload/update, 5x unroll;
++# full unroll	= interleaved Xload/update, full unroll, estimated[!];
++#
++# [*]	Manually counted instructions in "grand" loop body. Measured
++#	performance is affected by prologue and epilogue overhead,
++#	i-cache availability, branch penalties, etc.
++# [**]	While each Thumb instruction is twice smaller, they are not as
++#	diverse as ARM ones: e.g., there are only two arithmetic
++#	instructions with 3 arguments, no [fixed] rotate, addressing
++#	modes are limited. As result it takes more instructions to do
++#	the same job in Thumb, therefore the code is never twice as
++#	small and always slower.
++# [***]	which is also ~35% better than compiler generated code. Dual-
++#	issue Cortex A8 core was measured to process input block in
++#	~990 cycles.
++
++# August 2010.
++#
++# Rescheduling for dual-issue pipeline resulted in 13% improvement on
++# Cortex A8 core and in absolute terms ~870 cycles per input block
++# [or 13.6 cycles per byte].
++
++# February 2011.
++#
++# Profiler-assisted and platform-specific optimization resulted in 10%
++# improvement on Cortex A8 core and 12.2 cycles per byte.
++
++# September 2013.
++#
++# Add NEON implementation (see sha1-586.pl for background info). On
++# Cortex A8 it was measured to process one byte in 6.7 cycles or >80%
++# faster than integer-only code. Because [fully unrolled] NEON code
++# is ~2.5x larger and there are some redundant instructions executed
++# when processing last block, improvement is not as big for smallest
++# blocks, only ~30%. Snapdragon S4 is a tad faster, 6.4 cycles per
++# byte, which is also >80% faster than integer-only code. Cortex-A15
++# is even faster spending 5.6 cycles per byte outperforming integer-
++# only code by factor of 2.
++
++# May 2014.
++#
++# Add ARMv8 code path performing at 2.35 cpb on Apple A7.
++
++$flavour = shift;
++if ($flavour=~/\w[\w\-]*\.\w+$/) { $output=$flavour; undef $flavour; }
++else { while (($output=shift) && ($output!~/\w[\w\-]*\.\w+$/)) {} }
++
++if ($flavour && $flavour ne "void") {
++    $0 =~ m/(.*[\/\\])[^\/\\]+$/; $dir=$1;
++    ( $xlate="${dir}arm-xlate.pl" and -f $xlate ) or
++    ( $xlate="${dir}../../perlasm/arm-xlate.pl" and -f $xlate) or
++    die "can't locate arm-xlate.pl";
++
++    open STDOUT,"| \"$^X\" $xlate $flavour $output";
++} else {
++    open STDOUT,">$output";
++}
++
++$ctx="r0";
++$inp="r1";
++$len="r2";
++$a="r3";
++$b="r4";
++$c="r5";
++$d="r6";
++$e="r7";
++$K="r8";
++$t0="r9";
++$t1="r10";
++$t2="r11";
++$t3="r12";
++$Xi="r14";
++@V=($a,$b,$c,$d,$e);
++
++sub Xupdate {
++my ($a,$b,$c,$d,$e,$opt1,$opt2)=@_;
++$code.=<<___;
++	ldr	$t0,[$Xi,#15*4]
++	ldr	$t1,[$Xi,#13*4]
++	ldr	$t2,[$Xi,#7*4]
++	add	$e,$K,$e,ror#2			@ E+=K_xx_xx
++	ldr	$t3,[$Xi,#2*4]
++	eor	$t0,$t0,$t1
++	eor	$t2,$t2,$t3			@ 1 cycle stall
++	eor	$t1,$c,$d			@ F_xx_xx
++	mov	$t0,$t0,ror#31
++	add	$e,$e,$a,ror#27			@ E+=ROR(A,27)
++	eor	$t0,$t0,$t2,ror#31
++	str	$t0,[$Xi,#-4]!
++	$opt1					@ F_xx_xx
++	$opt2					@ F_xx_xx
++	add	$e,$e,$t0			@ E+=X[i]
++___
++}
++
++sub BODY_00_15 {
++my ($a,$b,$c,$d,$e)=@_;
++$code.=<<___;
++#if __ARM_ARCH__<7
++	ldrb	$t1,[$inp,#2]
++	ldrb	$t0,[$inp,#3]
++	ldrb	$t2,[$inp,#1]
++	add	$e,$K,$e,ror#2			@ E+=K_00_19
++	ldrb	$t3,[$inp],#4
++	orr	$t0,$t0,$t1,lsl#8
++	eor	$t1,$c,$d			@ F_xx_xx
++	orr	$t0,$t0,$t2,lsl#16
++	add	$e,$e,$a,ror#27			@ E+=ROR(A,27)
++	orr	$t0,$t0,$t3,lsl#24
++#else
++	ldr	$t0,[$inp],#4			@ handles unaligned
++	add	$e,$K,$e,ror#2			@ E+=K_00_19
++	eor	$t1,$c,$d			@ F_xx_xx
++	add	$e,$e,$a,ror#27			@ E+=ROR(A,27)
++#ifdef __ARMEL__
++	rev	$t0,$t0				@ byte swap
++#endif
++#endif
++	and	$t1,$b,$t1,ror#2
++	add	$e,$e,$t0			@ E+=X[i]
++	eor	$t1,$t1,$d,ror#2		@ F_00_19(B,C,D)
++	str	$t0,[$Xi,#-4]!
++	add	$e,$e,$t1			@ E+=F_00_19(B,C,D)
++___
++}
++
++sub BODY_16_19 {
++my ($a,$b,$c,$d,$e)=@_;
++	&Xupdate(@_,"and $t1,$b,$t1,ror#2");
++$code.=<<___;
++	eor	$t1,$t1,$d,ror#2		@ F_00_19(B,C,D)
++	add	$e,$e,$t1			@ E+=F_00_19(B,C,D)
++___
++}
++
++sub BODY_20_39 {
++my ($a,$b,$c,$d,$e)=@_;
++	&Xupdate(@_,"eor $t1,$b,$t1,ror#2");
++$code.=<<___;
++	add	$e,$e,$t1			@ E+=F_20_39(B,C,D)
++___
++}
++
++sub BODY_40_59 {
++my ($a,$b,$c,$d,$e)=@_;
++	&Xupdate(@_,"and $t1,$b,$t1,ror#2","and $t2,$c,$d");
++$code.=<<___;
++	add	$e,$e,$t1			@ E+=F_40_59(B,C,D)
++	add	$e,$e,$t2,ror#2
++___
++}
++
++$code=<<___;
++#include <openssl/arm_arch.h>
++
++.text
++.code	32
++
++.global	sha1_block_data_order
++.type	sha1_block_data_order,%function
++
++.align	5
++sha1_block_data_order:
++#if __ARM_MAX_ARCH__>=7
++	sub	r3,pc,#8		@ sha1_block_data_order
++	ldr	r12,.LOPENSSL_armcap
++	ldr	r12,[r3,r12]		@ OPENSSL_armcap_P
++#ifdef	__APPLE__
++	ldr	r12,[r12]
++#endif
++	tst	r12,#ARMV8_SHA1
++	bne	.LARMv8
++	tst	r12,#ARMV7_NEON
++	bne	.LNEON
++#endif
++	stmdb	sp!,{r4-r12,lr}
++	add	$len,$inp,$len,lsl#6	@ $len to point at the end of $inp
++	ldmia	$ctx,{$a,$b,$c,$d,$e}
++.Lloop:
++	ldr	$K,.LK_00_19
++	mov	$Xi,sp
++	sub	sp,sp,#15*4
++	mov	$c,$c,ror#30
++	mov	$d,$d,ror#30
++	mov	$e,$e,ror#30		@ [6]
++.L_00_15:
++___
++for($i=0;$i<5;$i++) {
++	&BODY_00_15(@V);	unshift(@V,pop(@V));
++}
++$code.=<<___;
++	teq	$Xi,sp
++	bne	.L_00_15		@ [((11+4)*5+2)*3]
++	sub	sp,sp,#25*4
++___
++	&BODY_00_15(@V);	unshift(@V,pop(@V));
++	&BODY_16_19(@V);	unshift(@V,pop(@V));
++	&BODY_16_19(@V);	unshift(@V,pop(@V));
++	&BODY_16_19(@V);	unshift(@V,pop(@V));
++	&BODY_16_19(@V);	unshift(@V,pop(@V));
++$code.=<<___;
++
++	ldr	$K,.LK_20_39		@ [+15+16*4]
++	cmn	sp,#0			@ [+3], clear carry to denote 20_39
++.L_20_39_or_60_79:
++___
++for($i=0;$i<5;$i++) {
++	&BODY_20_39(@V);	unshift(@V,pop(@V));
++}
++$code.=<<___;
++	teq	$Xi,sp			@ preserve carry
++	bne	.L_20_39_or_60_79	@ [+((12+3)*5+2)*4]
++	bcs	.L_done			@ [+((12+3)*5+2)*4], spare 300 bytes
++
++	ldr	$K,.LK_40_59
++	sub	sp,sp,#20*4		@ [+2]
++.L_40_59:
++___
++for($i=0;$i<5;$i++) {
++	&BODY_40_59(@V);	unshift(@V,pop(@V));
++}
++$code.=<<___;
++	teq	$Xi,sp
++	bne	.L_40_59		@ [+((12+5)*5+2)*4]
++
++	ldr	$K,.LK_60_79
++	sub	sp,sp,#20*4
++	cmp	sp,#0			@ set carry to denote 60_79
++	b	.L_20_39_or_60_79	@ [+4], spare 300 bytes
++.L_done:
++	add	sp,sp,#80*4		@ "deallocate" stack frame
++	ldmia	$ctx,{$K,$t0,$t1,$t2,$t3}
++	add	$a,$K,$a
++	add	$b,$t0,$b
++	add	$c,$t1,$c,ror#2
++	add	$d,$t2,$d,ror#2
++	add	$e,$t3,$e,ror#2
++	stmia	$ctx,{$a,$b,$c,$d,$e}
++	teq	$inp,$len
++	bne	.Lloop			@ [+18], total 1307
++
++#if __ARM_ARCH__>=5
++	ldmia	sp!,{r4-r12,pc}
++#else
++	ldmia	sp!,{r4-r12,lr}
++	tst	lr,#1
++	moveq	pc,lr			@ be binary compatible with V4, yet
++	bx	lr			@ interoperable with Thumb ISA:-)
++#endif
++.size	sha1_block_data_order,.-sha1_block_data_order
++
++.align	5
++.LK_00_19:	.word	0x5a827999
++.LK_20_39:	.word	0x6ed9eba1
++.LK_40_59:	.word	0x8f1bbcdc
++.LK_60_79:	.word	0xca62c1d6
++#if __ARM_MAX_ARCH__>=7
++.LOPENSSL_armcap:
++.word	OPENSSL_armcap_P-sha1_block_data_order
++#endif
++.asciz	"SHA1 block transform for ARMv4/NEON/ARMv8, CRYPTOGAMS by <appro\@openssl.org>"
++.align	5
++___
++#####################################################################
++# NEON stuff
++#
++{{{
++my @V=($a,$b,$c,$d,$e);
++my ($K_XX_XX,$Ki,$t0,$t1,$Xfer,$saved_sp)=map("r$_",(8..12,14));
++my $Xi=4;
++my @X=map("q$_",(8..11,0..3));
++my @Tx=("q12","q13");
++my ($K,$zero)=("q14","q15");
++my $j=0;
++
++sub AUTOLOAD()          # thunk [simplified] x86-style perlasm
++{ my $opcode = $AUTOLOAD; $opcode =~ s/.*:://; $opcode =~ s/_/\./;
++  my $arg = pop;
++    $arg = "#$arg" if ($arg*1 eq $arg);
++    $code .= "\t$opcode\t".join(',',@_,$arg)."\n";
++}
++
++sub body_00_19 () {
++	(
++	'($a,$b,$c,$d,$e)=@V;'.		# '$code.="@ $j\n";'.
++	'&bic	($t0,$d,$b)',
++	'&add	($e,$e,$Ki)',		# e+=X[i]+K
++	'&and	($t1,$c,$b)',
++	'&ldr	($Ki,sprintf "[sp,#%d]",4*(($j+1)&15))',
++	'&add	($e,$e,$a,"ror#27")',	# e+=ROR(A,27)
++	'&eor	($t1,$t1,$t0)',		# F_00_19
++	'&mov	($b,$b,"ror#2")',	# b=ROR(b,2)
++	'&add	($e,$e,$t1);'.		# e+=F_00_19
++	'$j++;	unshift(@V,pop(@V));'
++	)
++}
++sub body_20_39 () {
++	(
++	'($a,$b,$c,$d,$e)=@V;'.		# '$code.="@ $j\n";'.
++	'&eor	($t0,$b,$d)',
++	'&add	($e,$e,$Ki)',		# e+=X[i]+K
++	'&ldr	($Ki,sprintf "[sp,#%d]",4*(($j+1)&15)) if ($j<79)',
++	'&eor	($t1,$t0,$c)',		# F_20_39
++	'&add	($e,$e,$a,"ror#27")',	# e+=ROR(A,27)
++	'&mov	($b,$b,"ror#2")',	# b=ROR(b,2)
++	'&add	($e,$e,$t1);'.		# e+=F_20_39
++	'$j++;	unshift(@V,pop(@V));'
++	)
++}
++sub body_40_59 () {
++	(
++	'($a,$b,$c,$d,$e)=@V;'.		# '$code.="@ $j\n";'.
++	'&add	($e,$e,$Ki)',		# e+=X[i]+K
++	'&and	($t0,$c,$d)',
++	'&ldr	($Ki,sprintf "[sp,#%d]",4*(($j+1)&15))',
++	'&add	($e,$e,$a,"ror#27")',	# e+=ROR(A,27)
++	'&eor	($t1,$c,$d)',
++	'&add	($e,$e,$t0)',
++	'&and	($t1,$t1,$b)',
++	'&mov	($b,$b,"ror#2")',	# b=ROR(b,2)
++	'&add	($e,$e,$t1);'.		# e+=F_40_59
++	'$j++;	unshift(@V,pop(@V));'
++	)
++}
++
++sub Xupdate_16_31 ()
++{ use integer;
++  my $body = shift;
++  my @insns = (&$body,&$body,&$body,&$body);
++  my ($a,$b,$c,$d,$e);
++
++	&vext_8		(@X[0],@X[-4&7],@X[-3&7],8);	# compose "X[-14]" in "X[0]"
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &vadd_i32	(@Tx[1],@X[-1&7],$K);
++	 eval(shift(@insns));
++	  &vld1_32	("{$K\[]}","[$K_XX_XX,:32]!")	if ($Xi%5==0);
++	 eval(shift(@insns));
++	&vext_8		(@Tx[0],@X[-1&7],$zero,4);	# "X[-3]", 3 words
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&veor		(@X[0],@X[0],@X[-4&7]);		# "X[0]"^="X[-16]"
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&veor		(@Tx[0],@Tx[0],@X[-2&7]);	# "X[-3]"^"X[-8]"
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&veor		(@Tx[0],@Tx[0],@X[0]);		# "X[0]"^="X[-3]"^"X[-8]
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &vst1_32	("{@Tx[1]}","[$Xfer,:128]!");	# X[]+K xfer
++	  &sub		($Xfer,$Xfer,64)		if ($Xi%4==0);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vext_8		(@Tx[1],$zero,@Tx[0],4);	# "X[0]"<<96, extract one dword
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vadd_i32	(@X[0],@Tx[0],@Tx[0]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vsri_32	(@X[0],@Tx[0],31);		# "X[0]"<<<=1
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vshr_u32	(@Tx[0],@Tx[1],30);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vshl_u32	(@Tx[1],@Tx[1],2);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&veor		(@X[0],@X[0],@Tx[0]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&veor		(@X[0],@X[0],@Tx[1]);		# "X[0]"^=("X[0]">>96)<<<2
++
++	foreach (@insns) { eval; }	# remaining instructions [if any]
++
++  $Xi++;	push(@X,shift(@X));	# "rotate" X[]
++}
++
++sub Xupdate_32_79 ()
++{ use integer;
++  my $body = shift;
++  my @insns = (&$body,&$body,&$body,&$body);
++  my ($a,$b,$c,$d,$e);
++
++	&vext_8		(@Tx[0],@X[-2&7],@X[-1&7],8);	# compose "X[-6]"
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&veor		(@X[0],@X[0],@X[-4&7]);		# "X[0]"="X[-32]"^"X[-16]"
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&veor		(@X[0],@X[0],@X[-7&7]);		# "X[0]"^="X[-28]"
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &vadd_i32	(@Tx[1],@X[-1&7],$K);
++	 eval(shift(@insns));
++	  &vld1_32	("{$K\[]}","[$K_XX_XX,:32]!")	if ($Xi%5==0);
++	 eval(shift(@insns));
++	&veor		(@Tx[0],@Tx[0],@X[0]);		# "X[-6]"^="X[0]"
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vshr_u32	(@X[0],@Tx[0],30);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &vst1_32	("{@Tx[1]}","[$Xfer,:128]!");	# X[]+K xfer
++	  &sub		($Xfer,$Xfer,64)		if ($Xi%4==0);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vsli_32	(@X[0],@Tx[0],2);		# "X[0]"="X[-6]"<<<2
++
++	foreach (@insns) { eval; }	# remaining instructions [if any]
++
++  $Xi++;	push(@X,shift(@X));	# "rotate" X[]
++}
++
++sub Xuplast_80 ()
++{ use integer;
++  my $body = shift;
++  my @insns = (&$body,&$body,&$body,&$body);
++  my ($a,$b,$c,$d,$e);
++
++	&vadd_i32	(@Tx[1],@X[-1&7],$K);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vst1_32	("{@Tx[1]}","[$Xfer,:128]!");
++	&sub		($Xfer,$Xfer,64);
++
++	&teq		($inp,$len);
++	&sub		($K_XX_XX,$K_XX_XX,16);	# rewind $K_XX_XX
++	&subeq		($inp,$inp,64);		# reload last block to avoid SEGV
++	&vld1_8		("{@X[-4&7]-@X[-3&7]}","[$inp]!");
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vld1_8		("{@X[-2&7]-@X[-1&7]}","[$inp]!");
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vld1_32	("{$K\[]}","[$K_XX_XX,:32]!");	# load K_00_19
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vrev32_8	(@X[-4&7],@X[-4&7]);
++
++	foreach (@insns) { eval; }		# remaining instructions
++
++   $Xi=0;
++}
++
++sub Xloop()
++{ use integer;
++  my $body = shift;
++  my @insns = (&$body,&$body,&$body,&$body);
++  my ($a,$b,$c,$d,$e);
++
++	&vrev32_8	(@X[($Xi-3)&7],@X[($Xi-3)&7]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vadd_i32	(@X[$Xi&7],@X[($Xi-4)&7],$K);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vst1_32	("{@X[$Xi&7]}","[$Xfer,:128]!");# X[]+K xfer to IALU
++
++	foreach (@insns) { eval; }
++
++  $Xi++;
++}
++
++$code.=<<___;
++#if __ARM_MAX_ARCH__>=7
++.arch	armv7-a
++.fpu	neon
++
++.type	sha1_block_data_order_neon,%function
++.align	4
++sha1_block_data_order_neon:
++.LNEON:
++	stmdb	sp!,{r4-r12,lr}
++	add	$len,$inp,$len,lsl#6	@ $len to point at the end of $inp
++	@ dmb				@ errata #451034 on early Cortex A8
++	@ vstmdb	sp!,{d8-d15}	@ ABI specification says so
++	mov	$saved_sp,sp
++	sub	sp,sp,#64		@ alloca
++	adr	$K_XX_XX,.LK_00_19
++	bic	sp,sp,#15		@ align for 128-bit stores
++
++	ldmia	$ctx,{$a,$b,$c,$d,$e}	@ load context
++	mov	$Xfer,sp
++
++	vld1.8		{@X[-4&7]-@X[-3&7]},[$inp]!	@ handles unaligned
++	veor		$zero,$zero,$zero
++	vld1.8		{@X[-2&7]-@X[-1&7]},[$inp]!
++	vld1.32		{${K}\[]},[$K_XX_XX,:32]!	@ load K_00_19
++	vrev32.8	@X[-4&7],@X[-4&7]		@ yes, even on
++	vrev32.8	@X[-3&7],@X[-3&7]		@ big-endian...
++	vrev32.8	@X[-2&7],@X[-2&7]
++	vadd.i32	@X[0],@X[-4&7],$K
++	vrev32.8	@X[-1&7],@X[-1&7]
++	vadd.i32	@X[1],@X[-3&7],$K
++	vst1.32		{@X[0]},[$Xfer,:128]!
++	vadd.i32	@X[2],@X[-2&7],$K
++	vst1.32		{@X[1]},[$Xfer,:128]!
++	vst1.32		{@X[2]},[$Xfer,:128]!
++	ldr		$Ki,[sp]			@ big RAW stall
++
++.Loop_neon:
++___
++	&Xupdate_16_31(\&body_00_19);
++	&Xupdate_16_31(\&body_00_19);
++	&Xupdate_16_31(\&body_00_19);
++	&Xupdate_16_31(\&body_00_19);
++	&Xupdate_32_79(\&body_00_19);
++	&Xupdate_32_79(\&body_20_39);
++	&Xupdate_32_79(\&body_20_39);
++	&Xupdate_32_79(\&body_20_39);
++	&Xupdate_32_79(\&body_20_39);
++	&Xupdate_32_79(\&body_20_39);
++	&Xupdate_32_79(\&body_40_59);
++	&Xupdate_32_79(\&body_40_59);
++	&Xupdate_32_79(\&body_40_59);
++	&Xupdate_32_79(\&body_40_59);
++	&Xupdate_32_79(\&body_40_59);
++	&Xupdate_32_79(\&body_20_39);
++	&Xuplast_80(\&body_20_39);
++	&Xloop(\&body_20_39);
++	&Xloop(\&body_20_39);
++	&Xloop(\&body_20_39);
++$code.=<<___;
++	ldmia	$ctx,{$Ki,$t0,$t1,$Xfer}	@ accumulate context
++	add	$a,$a,$Ki
++	ldr	$Ki,[$ctx,#16]
++	add	$b,$b,$t0
++	add	$c,$c,$t1
++	add	$d,$d,$Xfer
++	moveq	sp,$saved_sp
++	add	$e,$e,$Ki
++	ldrne	$Ki,[sp]
++	stmia	$ctx,{$a,$b,$c,$d,$e}
++	addne	$Xfer,sp,#3*16
++	bne	.Loop_neon
++
++	@ vldmia	sp!,{d8-d15}
++	ldmia	sp!,{r4-r12,pc}
++.size	sha1_block_data_order_neon,.-sha1_block_data_order_neon
++#endif
++___
++}}}
++#####################################################################
++# ARMv8 stuff
++#
++{{{
++my ($ABCD,$E,$E0,$E1)=map("q$_",(0..3));
++my @MSG=map("q$_",(4..7));
++my @Kxx=map("q$_",(8..11));
++my ($W0,$W1,$ABCD_SAVE)=map("q$_",(12..14));
++
++$code.=<<___;
++#if __ARM_MAX_ARCH__>=7
++.type	sha1_block_data_order_armv8,%function
++.align	5
++sha1_block_data_order_armv8:
++.LARMv8:
++	vstmdb	sp!,{d8-d15}		@ ABI specification says so
++
++	veor	$E,$E,$E
++	adr	r3,.LK_00_19
++	vld1.32	{$ABCD},[$ctx]!
++	vld1.32	{$E\[0]},[$ctx]
++	sub	$ctx,$ctx,#16
++	vld1.32	{@Kxx[0]\[]},[r3,:32]!
++	vld1.32	{@Kxx[1]\[]},[r3,:32]!
++	vld1.32	{@Kxx[2]\[]},[r3,:32]!
++	vld1.32	{@Kxx[3]\[]},[r3,:32]
++
++.Loop_v8:
++	vld1.8		{@MSG[0]-@MSG[1]},[$inp]!
++	vld1.8		{@MSG[2]-@MSG[3]},[$inp]!
++	vrev32.8	@MSG[0],@MSG[0]
++	vrev32.8	@MSG[1],@MSG[1]
++
++	vadd.i32	$W0,@Kxx[0],@MSG[0]
++	vrev32.8	@MSG[2],@MSG[2]
++	vmov		$ABCD_SAVE,$ABCD	@ offload
++	subs		$len,$len,#1
++
++	vadd.i32	$W1,@Kxx[0],@MSG[1]
++	vrev32.8	@MSG[3],@MSG[3]
++	sha1h		$E1,$ABCD		@ 0
++	sha1c		$ABCD,$E,$W0
++	vadd.i32	$W0,@Kxx[$j],@MSG[2]
++	sha1su0		@MSG[0],@MSG[1],@MSG[2]
++___
++for ($j=0,$i=1;$i<20-3;$i++) {
++my $f=("c","p","m","p")[$i/5];
++$code.=<<___;
++	sha1h		$E0,$ABCD		@ $i
++	sha1$f		$ABCD,$E1,$W1
++	vadd.i32	$W1,@Kxx[$j],@MSG[3]
++	sha1su1		@MSG[0],@MSG[3]
++___
++$code.=<<___ if ($i<20-4);
++	sha1su0		@MSG[1],@MSG[2],@MSG[3]
++___
++	($E0,$E1)=($E1,$E0);	($W0,$W1)=($W1,$W0);
++	push(@MSG,shift(@MSG));	$j++ if ((($i+3)%5)==0);
++}
++$code.=<<___;
++	sha1h		$E0,$ABCD		@ $i
++	sha1p		$ABCD,$E1,$W1
++	vadd.i32	$W1,@Kxx[$j],@MSG[3]
++
++	sha1h		$E1,$ABCD		@ 18
++	sha1p		$ABCD,$E0,$W0
++
++	sha1h		$E0,$ABCD		@ 19
++	sha1p		$ABCD,$E1,$W1
++
++	vadd.i32	$E,$E,$E0
++	vadd.i32	$ABCD,$ABCD,$ABCD_SAVE
++	bne		.Loop_v8
++
++	vst1.32		{$ABCD},[$ctx]!
++	vst1.32		{$E\[0]},[$ctx]
++
++	vldmia	sp!,{d8-d15}
++	ret					@ bx lr
++.size	sha1_block_data_order_armv8,.-sha1_block_data_order_armv8
++#endif
++___
++}}}
++$code.=<<___;
++#if __ARM_MAX_ARCH__>=7
++.comm	OPENSSL_armcap_P,4,4
++.hidden	OPENSSL_armcap_P
++#endif
++___
++
++{   my  %opcode = (
++	"sha1c"		=> 0xf2000c40,	"sha1p"		=> 0xf2100c40,
++	"sha1m"		=> 0xf2200c40,	"sha1su0"	=> 0xf2300c40,
++	"sha1h"		=> 0xf3b902c0,	"sha1su1"	=> 0xf3ba0380	);
++
++    sub unsha1 {
++	my ($mnemonic,$arg)=@_;
++
++	if ($arg =~ m/q([0-9]+)(?:,\s*q([0-9]+))?,\s*q([0-9]+)/o) {
++	    my $word = $opcode{$mnemonic}|(($1&7)<<13)|(($1&8)<<19)
++					 |(($2&7)<<17)|(($2&8)<<4)
++					 |(($3&7)<<1) |(($3&8)<<2);
++	    # since ARMv7 instructions are always encoded little-endian.
++	    # correct solution is to use .inst directive, but older
++	    # assemblers don't implement it:-(
++	    sprintf ".byte\t0x%02x,0x%02x,0x%02x,0x%02x\t@ %s %s",
++			$word&0xff,($word>>8)&0xff,
++			($word>>16)&0xff,($word>>24)&0xff,
++			$mnemonic,$arg;
++	}
++    }
++}
++
++foreach (split($/,$code)) {
++	s/{q([0-9]+)\[\]}/sprintf "{d%d[],d%d[]}",2*$1,2*$1+1/eo	or
++	s/{q([0-9]+)\[0\]}/sprintf "{d%d[0]}",2*$1/eo;
++
++	s/\b(sha1\w+)\s+(q.*)/unsha1($1,$2)/geo;
++
++	s/\bret\b/bx	lr/o		or
++	s/\bbx\s+lr\b/.word\t0xe12fff1e/o;	# make it possible to compile with -march=armv4
++
++	print $_,$/;
++}
++
++close STDOUT; # enforce flush
+--- /dev/null
++++ b/crypto/boringssl/sha/asm/sha256-armv4.pl
+@@ -0,0 +1,735 @@
++#!/usr/bin/env perl
++
++# ====================================================================
++# Written by Andy Polyakov <appro@openssl.org> for the OpenSSL
++# project. The module is, however, dual licensed under OpenSSL and
++# CRYPTOGAMS licenses depending on where you obtain it. For further
++# details see http://www.openssl.org/~appro/cryptogams/.
++#
++# Permission to use under GPL terms is granted.
++# ====================================================================
++
++# SHA256 block procedure for ARMv4. May 2007.
++
++# Performance is ~2x better than gcc 3.4 generated code and in "abso-
++# lute" terms is ~2250 cycles per 64-byte block or ~35 cycles per
++# byte [on single-issue Xscale PXA250 core].
++
++# July 2010.
++#
++# Rescheduling for dual-issue pipeline resulted in 22% improvement on
++# Cortex A8 core and ~20 cycles per processed byte.
++
++# February 2011.
++#
++# Profiler-assisted and platform-specific optimization resulted in 16%
++# improvement on Cortex A8 core and ~15.4 cycles per processed byte.
++
++# September 2013.
++#
++# Add NEON implementation. On Cortex A8 it was measured to process one
++# byte in 12.5 cycles or 23% faster than integer-only code. Snapdragon
++# S4 does it in 12.5 cycles too, but it's 50% faster than integer-only
++# code (meaning that latter performs sub-optimally, nothing was done
++# about it).
++
++# May 2014.
++#
++# Add ARMv8 code path performing at 2.0 cpb on Apple A7.
++
++$flavour = shift;
++if ($flavour=~/\w[\w\-]*\.\w+$/) { $output=$flavour; undef $flavour; }
++else { while (($output=shift) && ($output!~/\w[\w\-]*\.\w+$/)) {} }
++
++if ($flavour && $flavour ne "void") {
++    $0 =~ m/(.*[\/\\])[^\/\\]+$/; $dir=$1;
++    ( $xlate="${dir}arm-xlate.pl" and -f $xlate ) or
++    ( $xlate="${dir}../../perlasm/arm-xlate.pl" and -f $xlate) or
++    die "can't locate arm-xlate.pl";
++
++    open STDOUT,"| \"$^X\" $xlate $flavour $output";
++} else {
++    open STDOUT,">$output";
++}
++
++$ctx="r0";	$t0="r0";
++$inp="r1";	$t4="r1";
++$len="r2";	$t1="r2";
++$T1="r3";	$t3="r3";
++$A="r4";
++$B="r5";
++$C="r6";
++$D="r7";
++$E="r8";
++$F="r9";
++$G="r10";
++$H="r11";
++@V=($A,$B,$C,$D,$E,$F,$G,$H);
++$t2="r12";
++$Ktbl="r14";
++
++@Sigma0=( 2,13,22);
++@Sigma1=( 6,11,25);
++@sigma0=( 7,18, 3);
++@sigma1=(17,19,10);
++
++sub BODY_00_15 {
++my ($i,$a,$b,$c,$d,$e,$f,$g,$h) = @_;
++
++$code.=<<___ if ($i<16);
++#if __ARM_ARCH__>=7
++	@ ldr	$t1,[$inp],#4			@ $i
++# if $i==15
++	str	$inp,[sp,#17*4]			@ make room for $t4
++# endif
++	eor	$t0,$e,$e,ror#`$Sigma1[1]-$Sigma1[0]`
++	add	$a,$a,$t2			@ h+=Maj(a,b,c) from the past
++	eor	$t0,$t0,$e,ror#`$Sigma1[2]-$Sigma1[0]`	@ Sigma1(e)
++# ifndef __ARMEB__
++	rev	$t1,$t1
++# endif
++#else
++	@ ldrb	$t1,[$inp,#3]			@ $i
++	add	$a,$a,$t2			@ h+=Maj(a,b,c) from the past
++	ldrb	$t2,[$inp,#2]
++	ldrb	$t0,[$inp,#1]
++	orr	$t1,$t1,$t2,lsl#8
++	ldrb	$t2,[$inp],#4
++	orr	$t1,$t1,$t0,lsl#16
++# if $i==15
++	str	$inp,[sp,#17*4]			@ make room for $t4
++# endif
++	eor	$t0,$e,$e,ror#`$Sigma1[1]-$Sigma1[0]`
++	orr	$t1,$t1,$t2,lsl#24
++	eor	$t0,$t0,$e,ror#`$Sigma1[2]-$Sigma1[0]`	@ Sigma1(e)
++#endif
++___
++$code.=<<___;
++	ldr	$t2,[$Ktbl],#4			@ *K256++
++	add	$h,$h,$t1			@ h+=X[i]
++	str	$t1,[sp,#`$i%16`*4]
++	eor	$t1,$f,$g
++	add	$h,$h,$t0,ror#$Sigma1[0]	@ h+=Sigma1(e)
++	and	$t1,$t1,$e
++	add	$h,$h,$t2			@ h+=K256[i]
++	eor	$t1,$t1,$g			@ Ch(e,f,g)
++	eor	$t0,$a,$a,ror#`$Sigma0[1]-$Sigma0[0]`
++	add	$h,$h,$t1			@ h+=Ch(e,f,g)
++#if $i==31
++	and	$t2,$t2,#0xff
++	cmp	$t2,#0xf2			@ done?
++#endif
++#if $i<15
++# if __ARM_ARCH__>=7
++	ldr	$t1,[$inp],#4			@ prefetch
++# else
++	ldrb	$t1,[$inp,#3]
++# endif
++	eor	$t2,$a,$b			@ a^b, b^c in next round
++#else
++	ldr	$t1,[sp,#`($i+2)%16`*4]		@ from future BODY_16_xx
++	eor	$t2,$a,$b			@ a^b, b^c in next round
++	ldr	$t4,[sp,#`($i+15)%16`*4]	@ from future BODY_16_xx
++#endif
++	eor	$t0,$t0,$a,ror#`$Sigma0[2]-$Sigma0[0]`	@ Sigma0(a)
++	and	$t3,$t3,$t2			@ (b^c)&=(a^b)
++	add	$d,$d,$h			@ d+=h
++	eor	$t3,$t3,$b			@ Maj(a,b,c)
++	add	$h,$h,$t0,ror#$Sigma0[0]	@ h+=Sigma0(a)
++	@ add	$h,$h,$t3			@ h+=Maj(a,b,c)
++___
++	($t2,$t3)=($t3,$t2);
++}
++
++sub BODY_16_XX {
++my ($i,$a,$b,$c,$d,$e,$f,$g,$h) = @_;
++
++$code.=<<___;
++	@ ldr	$t1,[sp,#`($i+1)%16`*4]		@ $i
++	@ ldr	$t4,[sp,#`($i+14)%16`*4]
++	mov	$t0,$t1,ror#$sigma0[0]
++	add	$a,$a,$t2			@ h+=Maj(a,b,c) from the past
++	mov	$t2,$t4,ror#$sigma1[0]
++	eor	$t0,$t0,$t1,ror#$sigma0[1]
++	eor	$t2,$t2,$t4,ror#$sigma1[1]
++	eor	$t0,$t0,$t1,lsr#$sigma0[2]	@ sigma0(X[i+1])
++	ldr	$t1,[sp,#`($i+0)%16`*4]
++	eor	$t2,$t2,$t4,lsr#$sigma1[2]	@ sigma1(X[i+14])
++	ldr	$t4,[sp,#`($i+9)%16`*4]
++
++	add	$t2,$t2,$t0
++	eor	$t0,$e,$e,ror#`$Sigma1[1]-$Sigma1[0]`	@ from BODY_00_15
++	add	$t1,$t1,$t2
++	eor	$t0,$t0,$e,ror#`$Sigma1[2]-$Sigma1[0]`	@ Sigma1(e)
++	add	$t1,$t1,$t4			@ X[i]
++___
++	&BODY_00_15(@_);
++}
++
++$code=<<___;
++#ifndef __KERNEL__
++# include <openssl/arm_arch.h>
++#else
++# define __ARM_ARCH__ __LINUX_ARM_ARCH__
++# define __ARM_MAX_ARCH__ 7
++#endif
++
++.text
++#if __ARM_ARCH__<7
++.code	32
++#else
++.syntax unified
++# if defined(__thumb2__) && !defined(__APPLE__)
++#  define adrl adr
++.thumb
++# else
++.code   32
++# endif
++#endif
++
++.type	K256,%object
++.align	5
++K256:
++.word	0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5
++.word	0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5
++.word	0xd807aa98,0x12835b01,0x243185be,0x550c7dc3
++.word	0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174
++.word	0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc
++.word	0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da
++.word	0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7
++.word	0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967
++.word	0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13
++.word	0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85
++.word	0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3
++.word	0xd192e819,0xd6990624,0xf40e3585,0x106aa070
++.word	0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5
++.word	0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3
++.word	0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208
++.word	0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2
++.size	K256,.-K256
++.word	0				@ terminator
++#if __ARM_MAX_ARCH__>=7 && !defined(__KERNEL__)
++.LOPENSSL_armcap:
++.word	OPENSSL_armcap_P-.Lsha256_block_data_order
++#endif
++.align	5
++
++.global	sha256_block_data_order
++.type	sha256_block_data_order,%function
++sha256_block_data_order:
++.Lsha256_block_data_order:
++#if __ARM_ARCH__<7
++	sub	r3,pc,#8		@ sha256_block_data_order
++#else
++	adr	r3,sha256_block_data_order
++#endif
++#if __ARM_MAX_ARCH__>=7 && !defined(__KERNEL__)
++	ldr	r12,.LOPENSSL_armcap
++	ldr	r12,[r3,r12]		@ OPENSSL_armcap_P
++#ifdef	__APPLE__
++	ldr	r12,[r12]
++#endif
++	tst	r12,#ARMV8_SHA256
++	bne	.LARMv8
++	tst	r12,#ARMV7_NEON
++	bne	.LNEON
++#endif
++	add	$len,$inp,$len,lsl#6	@ len to point at the end of inp
++	stmdb	sp!,{$ctx,$inp,$len,r4-r11,lr}
++	ldmia	$ctx,{$A,$B,$C,$D,$E,$F,$G,$H}
++	sub	$Ktbl,r3,#256+32	@ K256
++	sub	sp,sp,#16*4		@ alloca(X[16])
++.Loop:
++# if __ARM_ARCH__>=7
++	ldr	$t1,[$inp],#4
++# else
++	ldrb	$t1,[$inp,#3]
++# endif
++	eor	$t3,$B,$C		@ magic
++	eor	$t2,$t2,$t2
++___
++for($i=0;$i<16;$i++)	{ &BODY_00_15($i,@V); unshift(@V,pop(@V)); }
++$code.=".Lrounds_16_xx:\n";
++for (;$i<32;$i++)	{ &BODY_16_XX($i,@V); unshift(@V,pop(@V)); }
++$code.=<<___;
++#if __ARM_ARCH__>=7
++	ite	eq			@ Thumb2 thing, sanity check in ARM
++#endif
++	ldreq	$t3,[sp,#16*4]		@ pull ctx
++	bne	.Lrounds_16_xx
++
++	add	$A,$A,$t2		@ h+=Maj(a,b,c) from the past
++	ldr	$t0,[$t3,#0]
++	ldr	$t1,[$t3,#4]
++	ldr	$t2,[$t3,#8]
++	add	$A,$A,$t0
++	ldr	$t0,[$t3,#12]
++	add	$B,$B,$t1
++	ldr	$t1,[$t3,#16]
++	add	$C,$C,$t2
++	ldr	$t2,[$t3,#20]
++	add	$D,$D,$t0
++	ldr	$t0,[$t3,#24]
++	add	$E,$E,$t1
++	ldr	$t1,[$t3,#28]
++	add	$F,$F,$t2
++	ldr	$inp,[sp,#17*4]		@ pull inp
++	ldr	$t2,[sp,#18*4]		@ pull inp+len
++	add	$G,$G,$t0
++	add	$H,$H,$t1
++	stmia	$t3,{$A,$B,$C,$D,$E,$F,$G,$H}
++	cmp	$inp,$t2
++	sub	$Ktbl,$Ktbl,#256	@ rewind Ktbl
++	bne	.Loop
++
++	add	sp,sp,#`16+3`*4	@ destroy frame
++#if __ARM_ARCH__>=5
++	ldmia	sp!,{r4-r11,pc}
++#else
++	ldmia	sp!,{r4-r11,lr}
++	tst	lr,#1
++	moveq	pc,lr			@ be binary compatible with V4, yet
++	bx	lr			@ interoperable with Thumb ISA:-)
++#endif
++.size	sha256_block_data_order,.-sha256_block_data_order
++___
++######################################################################
++# NEON stuff
++#
++{{{
++my @X=map("q$_",(0..3));
++my ($T0,$T1,$T2,$T3,$T4,$T5)=("q8","q9","q10","q11","d24","d25");
++my $Xfer=$t4;
++my $j=0;
++
++sub Dlo()   { shift=~m|q([1]?[0-9])|?"d".($1*2):"";     }
++sub Dhi()   { shift=~m|q([1]?[0-9])|?"d".($1*2+1):"";   }
++
++sub AUTOLOAD()          # thunk [simplified] x86-style perlasm
++{ my $opcode = $AUTOLOAD; $opcode =~ s/.*:://; $opcode =~ s/_/\./;
++  my $arg = pop;
++    $arg = "#$arg" if ($arg*1 eq $arg);
++    $code .= "\t$opcode\t".join(',',@_,$arg)."\n";
++}
++
++sub Xupdate()
++{ use integer;
++  my $body = shift;
++  my @insns = (&$body,&$body,&$body,&$body);
++  my ($a,$b,$c,$d,$e,$f,$g,$h);
++
++	&vext_8		($T0,@X[0],@X[1],4);	# X[1..4]
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vext_8		($T1,@X[2],@X[3],4);	# X[9..12]
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vshr_u32	($T2,$T0,$sigma0[0]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vadd_i32	(@X[0],@X[0],$T1);	# X[0..3] += X[9..12]
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vshr_u32	($T1,$T0,$sigma0[2]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vsli_32	($T2,$T0,32-$sigma0[0]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vshr_u32	($T3,$T0,$sigma0[1]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&veor		($T1,$T1,$T2);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vsli_32	($T3,$T0,32-$sigma0[1]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &vshr_u32	($T4,&Dhi(@X[3]),$sigma1[0]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&veor		($T1,$T1,$T3);		# sigma0(X[1..4])
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &vsli_32	($T4,&Dhi(@X[3]),32-$sigma1[0]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &vshr_u32	($T5,&Dhi(@X[3]),$sigma1[2]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vadd_i32	(@X[0],@X[0],$T1);	# X[0..3] += sigma0(X[1..4])
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &veor		($T5,$T5,$T4);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &vshr_u32	($T4,&Dhi(@X[3]),$sigma1[1]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &vsli_32	($T4,&Dhi(@X[3]),32-$sigma1[1]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &veor		($T5,$T5,$T4);		# sigma1(X[14..15])
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vadd_i32	(&Dlo(@X[0]),&Dlo(@X[0]),$T5);# X[0..1] += sigma1(X[14..15])
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &vshr_u32	($T4,&Dlo(@X[0]),$sigma1[0]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &vsli_32	($T4,&Dlo(@X[0]),32-$sigma1[0]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &vshr_u32	($T5,&Dlo(@X[0]),$sigma1[2]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &veor		($T5,$T5,$T4);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &vshr_u32	($T4,&Dlo(@X[0]),$sigma1[1]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vld1_32	("{$T0}","[$Ktbl,:128]!");
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &vsli_32	($T4,&Dlo(@X[0]),32-$sigma1[1]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	  &veor		($T5,$T5,$T4);		# sigma1(X[16..17])
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vadd_i32	(&Dhi(@X[0]),&Dhi(@X[0]),$T5);# X[2..3] += sigma1(X[16..17])
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vadd_i32	($T0,$T0,@X[0]);
++	 while($#insns>=2) { eval(shift(@insns)); }
++	&vst1_32	("{$T0}","[$Xfer,:128]!");
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++
++	push(@X,shift(@X));		# "rotate" X[]
++}
++
++sub Xpreload()
++{ use integer;
++  my $body = shift;
++  my @insns = (&$body,&$body,&$body,&$body);
++  my ($a,$b,$c,$d,$e,$f,$g,$h);
++
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vld1_32	("{$T0}","[$Ktbl,:128]!");
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vrev32_8	(@X[0],@X[0]);
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	 eval(shift(@insns));
++	&vadd_i32	($T0,$T0,@X[0]);
++	 foreach (@insns) { eval; }	# remaining instructions
++	&vst1_32	("{$T0}","[$Xfer,:128]!");
++
++	push(@X,shift(@X));		# "rotate" X[]
++}
++
++sub body_00_15 () {
++	(
++	'($a,$b,$c,$d,$e,$f,$g,$h)=@V;'.
++	'&add	($h,$h,$t1)',			# h+=X[i]+K[i]
++	'&eor	($t1,$f,$g)',
++	'&eor	($t0,$e,$e,"ror#".($Sigma1[1]-$Sigma1[0]))',
++	'&add	($a,$a,$t2)',			# h+=Maj(a,b,c) from the past
++	'&and	($t1,$t1,$e)',
++	'&eor	($t2,$t0,$e,"ror#".($Sigma1[2]-$Sigma1[0]))',	# Sigma1(e)
++	'&eor	($t0,$a,$a,"ror#".($Sigma0[1]-$Sigma0[0]))',
++	'&eor	($t1,$t1,$g)',			# Ch(e,f,g)
++	'&add	($h,$h,$t2,"ror#$Sigma1[0]")',	# h+=Sigma1(e)
++	'&eor	($t2,$a,$b)',			# a^b, b^c in next round
++	'&eor	($t0,$t0,$a,"ror#".($Sigma0[2]-$Sigma0[0]))',	# Sigma0(a)
++	'&add	($h,$h,$t1)',			# h+=Ch(e,f,g)
++	'&ldr	($t1,sprintf "[sp,#%d]",4*(($j+1)&15))	if (($j&15)!=15);'.
++	'&ldr	($t1,"[$Ktbl]")				if ($j==15);'.
++	'&ldr	($t1,"[sp,#64]")			if ($j==31)',
++	'&and	($t3,$t3,$t2)',			# (b^c)&=(a^b)
++	'&add	($d,$d,$h)',			# d+=h
++	'&add	($h,$h,$t0,"ror#$Sigma0[0]");'.	# h+=Sigma0(a)
++	'&eor	($t3,$t3,$b)',			# Maj(a,b,c)
++	'$j++;	unshift(@V,pop(@V)); ($t2,$t3)=($t3,$t2);'
++	)
++}
++
++$code.=<<___;
++#if __ARM_MAX_ARCH__>=7
++.arch	armv7-a
++.fpu	neon
++
++.global	sha256_block_data_order_neon
++.type	sha256_block_data_order_neon,%function
++.align	4
++sha256_block_data_order_neon:
++.LNEON:
++	stmdb	sp!,{r4-r12,lr}
++
++	sub	$H,sp,#16*4+16
++	adrl	$Ktbl,K256
++	bic	$H,$H,#15		@ align for 128-bit stores
++	mov	$t2,sp
++	mov	sp,$H			@ alloca
++	add	$len,$inp,$len,lsl#6	@ len to point at the end of inp
++
++	vld1.8		{@X[0]},[$inp]!
++	vld1.8		{@X[1]},[$inp]!
++	vld1.8		{@X[2]},[$inp]!
++	vld1.8		{@X[3]},[$inp]!
++	vld1.32		{$T0},[$Ktbl,:128]!
++	vld1.32		{$T1},[$Ktbl,:128]!
++	vld1.32		{$T2},[$Ktbl,:128]!
++	vld1.32		{$T3},[$Ktbl,:128]!
++	vrev32.8	@X[0],@X[0]		@ yes, even on
++	str		$ctx,[sp,#64]
++	vrev32.8	@X[1],@X[1]		@ big-endian
++	str		$inp,[sp,#68]
++	mov		$Xfer,sp
++	vrev32.8	@X[2],@X[2]
++	str		$len,[sp,#72]
++	vrev32.8	@X[3],@X[3]
++	str		$t2,[sp,#76]		@ save original sp
++	vadd.i32	$T0,$T0,@X[0]
++	vadd.i32	$T1,$T1,@X[1]
++	vst1.32		{$T0},[$Xfer,:128]!
++	vadd.i32	$T2,$T2,@X[2]
++	vst1.32		{$T1},[$Xfer,:128]!
++	vadd.i32	$T3,$T3,@X[3]
++	vst1.32		{$T2},[$Xfer,:128]!
++	vst1.32		{$T3},[$Xfer,:128]!
++
++	ldmia		$ctx,{$A-$H}
++	sub		$Xfer,$Xfer,#64
++	ldr		$t1,[sp,#0]
++	eor		$t2,$t2,$t2
++	eor		$t3,$B,$C
++	b		.L_00_48
++
++.align	4
++.L_00_48:
++___
++	&Xupdate(\&body_00_15);
++	&Xupdate(\&body_00_15);
++	&Xupdate(\&body_00_15);
++	&Xupdate(\&body_00_15);
++$code.=<<___;
++	teq	$t1,#0				@ check for K256 terminator
++	ldr	$t1,[sp,#0]
++	sub	$Xfer,$Xfer,#64
++	bne	.L_00_48
++
++	ldr		$inp,[sp,#68]
++	ldr		$t0,[sp,#72]
++	sub		$Ktbl,$Ktbl,#256	@ rewind $Ktbl
++	teq		$inp,$t0
++	it		eq
++	subeq		$inp,$inp,#64		@ avoid SEGV
++	vld1.8		{@X[0]},[$inp]!		@ load next input block
++	vld1.8		{@X[1]},[$inp]!
++	vld1.8		{@X[2]},[$inp]!
++	vld1.8		{@X[3]},[$inp]!
++	it		ne
++	strne		$inp,[sp,#68]
++	mov		$Xfer,sp
++___
++	&Xpreload(\&body_00_15);
++	&Xpreload(\&body_00_15);
++	&Xpreload(\&body_00_15);
++	&Xpreload(\&body_00_15);
++$code.=<<___;
++	ldr	$t0,[$t1,#0]
++	add	$A,$A,$t2			@ h+=Maj(a,b,c) from the past
++	ldr	$t2,[$t1,#4]
++	ldr	$t3,[$t1,#8]
++	ldr	$t4,[$t1,#12]
++	add	$A,$A,$t0			@ accumulate
++	ldr	$t0,[$t1,#16]
++	add	$B,$B,$t2
++	ldr	$t2,[$t1,#20]
++	add	$C,$C,$t3
++	ldr	$t3,[$t1,#24]
++	add	$D,$D,$t4
++	ldr	$t4,[$t1,#28]
++	add	$E,$E,$t0
++	str	$A,[$t1],#4
++	add	$F,$F,$t2
++	str	$B,[$t1],#4
++	add	$G,$G,$t3
++	str	$C,[$t1],#4
++	add	$H,$H,$t4
++	str	$D,[$t1],#4
++	stmia	$t1,{$E-$H}
++
++	ittte	ne
++	movne	$Xfer,sp
++	ldrne	$t1,[sp,#0]
++	eorne	$t2,$t2,$t2
++	ldreq	sp,[sp,#76]			@ restore original sp
++	itt	ne
++	eorne	$t3,$B,$C
++	bne	.L_00_48
++
++	ldmia	sp!,{r4-r12,pc}
++.size	sha256_block_data_order_neon,.-sha256_block_data_order_neon
++#endif
++___
++}}}
++######################################################################
++# ARMv8 stuff
++#
++{{{
++my ($ABCD,$EFGH,$abcd)=map("q$_",(0..2));
++my @MSG=map("q$_",(8..11));
++my ($W0,$W1,$ABCD_SAVE,$EFGH_SAVE)=map("q$_",(12..15));
++my $Ktbl="r3";
++
++$code.=<<___;
++#if __ARM_MAX_ARCH__>=7 && !defined(__KERNEL__)
++
++# if defined(__thumb2__) && !defined(__APPLE__)
++#  define INST(a,b,c,d)	.byte	c,d|0xc,a,b
++# else
++#  define INST(a,b,c,d)	.byte	a,b,c,d
++# endif
++
++.type	sha256_block_data_order_armv8,%function
++.align	5
++sha256_block_data_order_armv8:
++.LARMv8:
++	vld1.32	{$ABCD,$EFGH},[$ctx]
++# ifdef	__APPLE__
++	sub	$Ktbl,$Ktbl,#256+32
++# elif	defined(__thumb2__)
++	adr	$Ktbl,.LARMv8
++	sub	$Ktbl,$Ktbl,#.LARMv8-K256
++# else
++	adrl	$Ktbl,K256
++# endif
++	add	$len,$inp,$len,lsl#6	@ len to point at the end of inp
++
++.Loop_v8:
++	vld1.8		{@MSG[0]-@MSG[1]},[$inp]!
++	vld1.8		{@MSG[2]-@MSG[3]},[$inp]!
++	vld1.32		{$W0},[$Ktbl]!
++	vrev32.8	@MSG[0],@MSG[0]
++	vrev32.8	@MSG[1],@MSG[1]
++	vrev32.8	@MSG[2],@MSG[2]
++	vrev32.8	@MSG[3],@MSG[3]
++	vmov		$ABCD_SAVE,$ABCD	@ offload
++	vmov		$EFGH_SAVE,$EFGH
++	teq		$inp,$len
++___
++for($i=0;$i<12;$i++) {
++$code.=<<___;
++	vld1.32		{$W1},[$Ktbl]!
++	vadd.i32	$W0,$W0,@MSG[0]
++	sha256su0	@MSG[0],@MSG[1]
++	vmov		$abcd,$ABCD
++	sha256h		$ABCD,$EFGH,$W0
++	sha256h2	$EFGH,$abcd,$W0
++	sha256su1	@MSG[0],@MSG[2],@MSG[3]
++___
++	($W0,$W1)=($W1,$W0);	push(@MSG,shift(@MSG));
++}
++$code.=<<___;
++	vld1.32		{$W1},[$Ktbl]!
++	vadd.i32	$W0,$W0,@MSG[0]
++	vmov		$abcd,$ABCD
++	sha256h		$ABCD,$EFGH,$W0
++	sha256h2	$EFGH,$abcd,$W0
++
++	vld1.32		{$W0},[$Ktbl]!
++	vadd.i32	$W1,$W1,@MSG[1]
++	vmov		$abcd,$ABCD
++	sha256h		$ABCD,$EFGH,$W1
++	sha256h2	$EFGH,$abcd,$W1
++
++	vld1.32		{$W1},[$Ktbl]
++	vadd.i32	$W0,$W0,@MSG[2]
++	sub		$Ktbl,$Ktbl,#256-16	@ rewind
++	vmov		$abcd,$ABCD
++	sha256h		$ABCD,$EFGH,$W0
++	sha256h2	$EFGH,$abcd,$W0
++
++	vadd.i32	$W1,$W1,@MSG[3]
++	vmov		$abcd,$ABCD
++	sha256h		$ABCD,$EFGH,$W1
++	sha256h2	$EFGH,$abcd,$W1
++
++	vadd.i32	$ABCD,$ABCD,$ABCD_SAVE
++	vadd.i32	$EFGH,$EFGH,$EFGH_SAVE
++	it		ne
++	bne		.Loop_v8
++
++	vst1.32		{$ABCD,$EFGH},[$ctx]
++
++	ret		@ bx lr
++.size	sha256_block_data_order_armv8,.-sha256_block_data_order_armv8
++#endif
++___
++}}}
++$code.=<<___;
++.asciz  "SHA256 block transform for ARMv4/NEON/ARMv8, CRYPTOGAMS by <appro\@openssl.org>"
++.align	2
++#if __ARM_MAX_ARCH__>=7 && !defined(__KERNEL__)
++.comm   OPENSSL_armcap_P,4,4
++.hidden OPENSSL_armcap_P
++#endif
++___
++
++open SELF,$0;
++while(<SELF>) {
++	next if (/^#!/);
++	last if (!s/^#/@/ and !/^$/);
++	print;
++}
++close SELF;
++
++{   my  %opcode = (
++	"sha256h"	=> 0xf3000c40,	"sha256h2"	=> 0xf3100c40,
++	"sha256su0"	=> 0xf3ba03c0,	"sha256su1"	=> 0xf3200c40	);
++
++    sub unsha256 {
++	my ($mnemonic,$arg)=@_;
++
++	if ($arg =~ m/q([0-9]+)(?:,\s*q([0-9]+))?,\s*q([0-9]+)/o) {
++	    my $word = $opcode{$mnemonic}|(($1&7)<<13)|(($1&8)<<19)
++					 |(($2&7)<<17)|(($2&8)<<4)
++					 |(($3&7)<<1) |(($3&8)<<2);
++	    # since ARMv7 instructions are always encoded little-endian.
++	    # correct solution is to use .inst directive, but older
++	    # assemblers don't implement it:-(
++	    sprintf "INST(0x%02x,0x%02x,0x%02x,0x%02x)\t@ %s %s",
++			$word&0xff,($word>>8)&0xff,
++			($word>>16)&0xff,($word>>24)&0xff,
++			$mnemonic,$arg;
++	}
++    }
++}
++
++foreach (split($/,$code)) {
++
++	s/\`([^\`]*)\`/eval $1/geo;
++
++	s/\b(sha256\w+)\s+(q.*)/unsha256($1,$2)/geo;
++
++	s/\bret\b/bx	lr/go		or
++	s/\bbx\s+lr\b/.word\t0xe12fff1e/go;	# make it possible to compile with -march=armv4
++
++	print $_,"\n";
++}
++
++close STDOUT; # enforce flush
+--- /dev/null
++++ b/crypto/boringssl/sha/asm/sha512-armv4.pl
+@@ -0,0 +1,666 @@
++#!/usr/bin/env perl
++
++# ====================================================================
++# Written by Andy Polyakov <appro@openssl.org> for the OpenSSL
++# project. The module is, however, dual licensed under OpenSSL and
++# CRYPTOGAMS licenses depending on where you obtain it. For further
++# details see http://www.openssl.org/~appro/cryptogams/.
++#
++# Permission to use under GPL terms is granted.
++# ====================================================================
++
++# SHA512 block procedure for ARMv4. September 2007.
++
++# This code is ~4.5 (four and a half) times faster than code generated
++# by gcc 3.4 and it spends ~72 clock cycles per byte [on single-issue
++# Xscale PXA250 core].
++#
++# July 2010.
++#
++# Rescheduling for dual-issue pipeline resulted in 6% improvement on
++# Cortex A8 core and ~40 cycles per processed byte.
++
++# February 2011.
++#
++# Profiler-assisted and platform-specific optimization resulted in 7%
++# improvement on Coxtex A8 core and ~38 cycles per byte.
++
++# March 2011.
++#
++# Add NEON implementation. On Cortex A8 it was measured to process
++# one byte in 23.3 cycles or ~60% faster than integer-only code.
++
++# August 2012.
++#
++# Improve NEON performance by 12% on Snapdragon S4. In absolute
++# terms it's 22.6 cycles per byte, which is disappointing result.
++# Technical writers asserted that 3-way S4 pipeline can sustain
++# multiple NEON instructions per cycle, but dual NEON issue could
++# not be observed, see http://www.openssl.org/~appro/Snapdragon-S4.html
++# for further details. On side note Cortex-A15 processes one byte in
++# 16 cycles.
++
++# Byte order [in]dependence. =========================================
++#
++# Originally caller was expected to maintain specific *dword* order in
++# h[0-7], namely with most significant dword at *lower* address, which
++# was reflected in below two parameters as 0 and 4. Now caller is
++# expected to maintain native byte order for whole 64-bit values.
++$hi="HI";
++$lo="LO";
++# ====================================================================
++
++$flavour = shift;
++if ($flavour=~/\w[\w\-]*\.\w+$/) { $output=$flavour; undef $flavour; }
++else { while (($output=shift) && ($output!~/\w[\w\-]*\.\w+$/)) {} }
++
++if ($flavour && $flavour ne "void") {
++    $0 =~ m/(.*[\/\\])[^\/\\]+$/; $dir=$1;
++    ( $xlate="${dir}arm-xlate.pl" and -f $xlate ) or
++    ( $xlate="${dir}../../perlasm/arm-xlate.pl" and -f $xlate) or
++    die "can't locate arm-xlate.pl";
++
++    open STDOUT,"| \"$^X\" $xlate $flavour $output";
++} else {
++    open STDOUT,">$output";
++}
++
++$ctx="r0";	# parameter block
++$inp="r1";
++$len="r2";
++
++$Tlo="r3";
++$Thi="r4";
++$Alo="r5";
++$Ahi="r6";
++$Elo="r7";
++$Ehi="r8";
++$t0="r9";
++$t1="r10";
++$t2="r11";
++$t3="r12";
++############	r13 is stack pointer
++$Ktbl="r14";
++############	r15 is program counter
++
++$Aoff=8*0;
++$Boff=8*1;
++$Coff=8*2;
++$Doff=8*3;
++$Eoff=8*4;
++$Foff=8*5;
++$Goff=8*6;
++$Hoff=8*7;
++$Xoff=8*8;
++
++sub BODY_00_15() {
++my $magic = shift;
++$code.=<<___;
++	@ Sigma1(x)	(ROTR((x),14) ^ ROTR((x),18)  ^ ROTR((x),41))
++	@ LO		lo>>14^hi<<18 ^ lo>>18^hi<<14 ^ hi>>9^lo<<23
++	@ HI		hi>>14^lo<<18 ^ hi>>18^lo<<14 ^ lo>>9^hi<<23
++	mov	$t0,$Elo,lsr#14
++	str	$Tlo,[sp,#$Xoff+0]
++	mov	$t1,$Ehi,lsr#14
++	str	$Thi,[sp,#$Xoff+4]
++	eor	$t0,$t0,$Ehi,lsl#18
++	ldr	$t2,[sp,#$Hoff+0]	@ h.lo
++	eor	$t1,$t1,$Elo,lsl#18
++	ldr	$t3,[sp,#$Hoff+4]	@ h.hi
++	eor	$t0,$t0,$Elo,lsr#18
++	eor	$t1,$t1,$Ehi,lsr#18
++	eor	$t0,$t0,$Ehi,lsl#14
++	eor	$t1,$t1,$Elo,lsl#14
++	eor	$t0,$t0,$Ehi,lsr#9
++	eor	$t1,$t1,$Elo,lsr#9
++	eor	$t0,$t0,$Elo,lsl#23
++	eor	$t1,$t1,$Ehi,lsl#23	@ Sigma1(e)
++	adds	$Tlo,$Tlo,$t0
++	ldr	$t0,[sp,#$Foff+0]	@ f.lo
++	adc	$Thi,$Thi,$t1		@ T += Sigma1(e)
++	ldr	$t1,[sp,#$Foff+4]	@ f.hi
++	adds	$Tlo,$Tlo,$t2
++	ldr	$t2,[sp,#$Goff+0]	@ g.lo
++	adc	$Thi,$Thi,$t3		@ T += h
++	ldr	$t3,[sp,#$Goff+4]	@ g.hi
++
++	eor	$t0,$t0,$t2
++	str	$Elo,[sp,#$Eoff+0]
++	eor	$t1,$t1,$t3
++	str	$Ehi,[sp,#$Eoff+4]
++	and	$t0,$t0,$Elo
++	str	$Alo,[sp,#$Aoff+0]
++	and	$t1,$t1,$Ehi
++	str	$Ahi,[sp,#$Aoff+4]
++	eor	$t0,$t0,$t2
++	ldr	$t2,[$Ktbl,#$lo]	@ K[i].lo
++	eor	$t1,$t1,$t3		@ Ch(e,f,g)
++	ldr	$t3,[$Ktbl,#$hi]	@ K[i].hi
++
++	adds	$Tlo,$Tlo,$t0
++	ldr	$Elo,[sp,#$Doff+0]	@ d.lo
++	adc	$Thi,$Thi,$t1		@ T += Ch(e,f,g)
++	ldr	$Ehi,[sp,#$Doff+4]	@ d.hi
++	adds	$Tlo,$Tlo,$t2
++	and	$t0,$t2,#0xff
++	adc	$Thi,$Thi,$t3		@ T += K[i]
++	adds	$Elo,$Elo,$Tlo
++	ldr	$t2,[sp,#$Boff+0]	@ b.lo
++	adc	$Ehi,$Ehi,$Thi		@ d += T
++	teq	$t0,#$magic
++
++	ldr	$t3,[sp,#$Coff+0]	@ c.lo
++#if __ARM_ARCH__>=7
++	it	eq			@ Thumb2 thing, sanity check in ARM
++#endif
++	orreq	$Ktbl,$Ktbl,#1
++	@ Sigma0(x)	(ROTR((x),28) ^ ROTR((x),34) ^ ROTR((x),39))
++	@ LO		lo>>28^hi<<4  ^ hi>>2^lo<<30 ^ hi>>7^lo<<25
++	@ HI		hi>>28^lo<<4  ^ lo>>2^hi<<30 ^ lo>>7^hi<<25
++	mov	$t0,$Alo,lsr#28
++	mov	$t1,$Ahi,lsr#28
++	eor	$t0,$t0,$Ahi,lsl#4
++	eor	$t1,$t1,$Alo,lsl#4
++	eor	$t0,$t0,$Ahi,lsr#2
++	eor	$t1,$t1,$Alo,lsr#2
++	eor	$t0,$t0,$Alo,lsl#30
++	eor	$t1,$t1,$Ahi,lsl#30
++	eor	$t0,$t0,$Ahi,lsr#7
++	eor	$t1,$t1,$Alo,lsr#7
++	eor	$t0,$t0,$Alo,lsl#25
++	eor	$t1,$t1,$Ahi,lsl#25	@ Sigma0(a)
++	adds	$Tlo,$Tlo,$t0
++	and	$t0,$Alo,$t2
++	adc	$Thi,$Thi,$t1		@ T += Sigma0(a)
++
++	ldr	$t1,[sp,#$Boff+4]	@ b.hi
++	orr	$Alo,$Alo,$t2
++	ldr	$t2,[sp,#$Coff+4]	@ c.hi
++	and	$Alo,$Alo,$t3
++	and	$t3,$Ahi,$t1
++	orr	$Ahi,$Ahi,$t1
++	orr	$Alo,$Alo,$t0		@ Maj(a,b,c).lo
++	and	$Ahi,$Ahi,$t2
++	adds	$Alo,$Alo,$Tlo
++	orr	$Ahi,$Ahi,$t3		@ Maj(a,b,c).hi
++	sub	sp,sp,#8
++	adc	$Ahi,$Ahi,$Thi		@ h += T
++	tst	$Ktbl,#1
++	add	$Ktbl,$Ktbl,#8
++___
++}
++$code=<<___;
++#ifndef __KERNEL__
++# include <openssl/arm_arch.h>
++# define VFP_ABI_PUSH	vstmdb	sp!,{d8-d15}
++# define VFP_ABI_POP	vldmia	sp!,{d8-d15}
++#else
++# define __ARM_ARCH__ __LINUX_ARM_ARCH__
++# define __ARM_MAX_ARCH__ 7
++# define VFP_ABI_PUSH
++# define VFP_ABI_POP
++#endif
++
++#ifdef __ARMEL__
++# define LO 0
++# define HI 4
++# define WORD64(hi0,lo0,hi1,lo1)	.word	lo0,hi0, lo1,hi1
++#else
++# define HI 0
++# define LO 4
++# define WORD64(hi0,lo0,hi1,lo1)	.word	hi0,lo0, hi1,lo1
++#endif
++
++.text
++#if __ARM_ARCH__<7 || defined(__APPLE__)
++.code	32
++#else
++.syntax unified
++# ifdef __thumb2__
++#  define adrl adr
++.thumb
++# else
++.code   32
++# endif
++#endif
++
++.type	K512,%object
++.align	5
++K512:
++WORD64(0x428a2f98,0xd728ae22, 0x71374491,0x23ef65cd)
++WORD64(0xb5c0fbcf,0xec4d3b2f, 0xe9b5dba5,0x8189dbbc)
++WORD64(0x3956c25b,0xf348b538, 0x59f111f1,0xb605d019)
++WORD64(0x923f82a4,0xaf194f9b, 0xab1c5ed5,0xda6d8118)
++WORD64(0xd807aa98,0xa3030242, 0x12835b01,0x45706fbe)
++WORD64(0x243185be,0x4ee4b28c, 0x550c7dc3,0xd5ffb4e2)
++WORD64(0x72be5d74,0xf27b896f, 0x80deb1fe,0x3b1696b1)
++WORD64(0x9bdc06a7,0x25c71235, 0xc19bf174,0xcf692694)
++WORD64(0xe49b69c1,0x9ef14ad2, 0xefbe4786,0x384f25e3)
++WORD64(0x0fc19dc6,0x8b8cd5b5, 0x240ca1cc,0x77ac9c65)
++WORD64(0x2de92c6f,0x592b0275, 0x4a7484aa,0x6ea6e483)
++WORD64(0x5cb0a9dc,0xbd41fbd4, 0x76f988da,0x831153b5)
++WORD64(0x983e5152,0xee66dfab, 0xa831c66d,0x2db43210)
++WORD64(0xb00327c8,0x98fb213f, 0xbf597fc7,0xbeef0ee4)
++WORD64(0xc6e00bf3,0x3da88fc2, 0xd5a79147,0x930aa725)
++WORD64(0x06ca6351,0xe003826f, 0x14292967,0x0a0e6e70)
++WORD64(0x27b70a85,0x46d22ffc, 0x2e1b2138,0x5c26c926)
++WORD64(0x4d2c6dfc,0x5ac42aed, 0x53380d13,0x9d95b3df)
++WORD64(0x650a7354,0x8baf63de, 0x766a0abb,0x3c77b2a8)
++WORD64(0x81c2c92e,0x47edaee6, 0x92722c85,0x1482353b)
++WORD64(0xa2bfe8a1,0x4cf10364, 0xa81a664b,0xbc423001)
++WORD64(0xc24b8b70,0xd0f89791, 0xc76c51a3,0x0654be30)
++WORD64(0xd192e819,0xd6ef5218, 0xd6990624,0x5565a910)
++WORD64(0xf40e3585,0x5771202a, 0x106aa070,0x32bbd1b8)
++WORD64(0x19a4c116,0xb8d2d0c8, 0x1e376c08,0x5141ab53)
++WORD64(0x2748774c,0xdf8eeb99, 0x34b0bcb5,0xe19b48a8)
++WORD64(0x391c0cb3,0xc5c95a63, 0x4ed8aa4a,0xe3418acb)
++WORD64(0x5b9cca4f,0x7763e373, 0x682e6ff3,0xd6b2b8a3)
++WORD64(0x748f82ee,0x5defb2fc, 0x78a5636f,0x43172f60)
++WORD64(0x84c87814,0xa1f0ab72, 0x8cc70208,0x1a6439ec)
++WORD64(0x90befffa,0x23631e28, 0xa4506ceb,0xde82bde9)
++WORD64(0xbef9a3f7,0xb2c67915, 0xc67178f2,0xe372532b)
++WORD64(0xca273ece,0xea26619c, 0xd186b8c7,0x21c0c207)
++WORD64(0xeada7dd6,0xcde0eb1e, 0xf57d4f7f,0xee6ed178)
++WORD64(0x06f067aa,0x72176fba, 0x0a637dc5,0xa2c898a6)
++WORD64(0x113f9804,0xbef90dae, 0x1b710b35,0x131c471b)
++WORD64(0x28db77f5,0x23047d84, 0x32caab7b,0x40c72493)
++WORD64(0x3c9ebe0a,0x15c9bebc, 0x431d67c4,0x9c100d4c)
++WORD64(0x4cc5d4be,0xcb3e42b6, 0x597f299c,0xfc657e2a)
++WORD64(0x5fcb6fab,0x3ad6faec, 0x6c44198c,0x4a475817)
++.size	K512,.-K512
++#if __ARM_MAX_ARCH__>=7 && !defined(__KERNEL__)
++.LOPENSSL_armcap:
++.word	OPENSSL_armcap_P-.Lsha512_block_data_order
++.skip	32-4
++#else
++.skip	32
++#endif
++
++.global	sha512_block_data_order
++.type	sha512_block_data_order,%function
++sha512_block_data_order:
++.Lsha512_block_data_order:
++#if __ARM_ARCH__<7
++	sub	r3,pc,#8		@ sha512_block_data_order
++#else
++	adr	r3,sha512_block_data_order
++#endif
++#if __ARM_MAX_ARCH__>=7 && !defined(__KERNEL__)
++	ldr	r12,.LOPENSSL_armcap
++	ldr	r12,[r3,r12]		@ OPENSSL_armcap_P
++#ifdef	__APPLE__
++	ldr	r12,[r12]
++#endif
++	tst	r12,#ARMV7_NEON
++	bne	.LNEON
++#endif
++	add	$len,$inp,$len,lsl#7	@ len to point at the end of inp
++	stmdb	sp!,{r4-r12,lr}
++	sub	$Ktbl,r3,#672		@ K512
++	sub	sp,sp,#9*8
++
++	ldr	$Elo,[$ctx,#$Eoff+$lo]
++	ldr	$Ehi,[$ctx,#$Eoff+$hi]
++	ldr	$t0, [$ctx,#$Goff+$lo]
++	ldr	$t1, [$ctx,#$Goff+$hi]
++	ldr	$t2, [$ctx,#$Hoff+$lo]
++	ldr	$t3, [$ctx,#$Hoff+$hi]
++.Loop:
++	str	$t0, [sp,#$Goff+0]
++	str	$t1, [sp,#$Goff+4]
++	str	$t2, [sp,#$Hoff+0]
++	str	$t3, [sp,#$Hoff+4]
++	ldr	$Alo,[$ctx,#$Aoff+$lo]
++	ldr	$Ahi,[$ctx,#$Aoff+$hi]
++	ldr	$Tlo,[$ctx,#$Boff+$lo]
++	ldr	$Thi,[$ctx,#$Boff+$hi]
++	ldr	$t0, [$ctx,#$Coff+$lo]
++	ldr	$t1, [$ctx,#$Coff+$hi]
++	ldr	$t2, [$ctx,#$Doff+$lo]
++	ldr	$t3, [$ctx,#$Doff+$hi]
++	str	$Tlo,[sp,#$Boff+0]
++	str	$Thi,[sp,#$Boff+4]
++	str	$t0, [sp,#$Coff+0]
++	str	$t1, [sp,#$Coff+4]
++	str	$t2, [sp,#$Doff+0]
++	str	$t3, [sp,#$Doff+4]
++	ldr	$Tlo,[$ctx,#$Foff+$lo]
++	ldr	$Thi,[$ctx,#$Foff+$hi]
++	str	$Tlo,[sp,#$Foff+0]
++	str	$Thi,[sp,#$Foff+4]
++
++.L00_15:
++#if __ARM_ARCH__<7
++	ldrb	$Tlo,[$inp,#7]
++	ldrb	$t0, [$inp,#6]
++	ldrb	$t1, [$inp,#5]
++	ldrb	$t2, [$inp,#4]
++	ldrb	$Thi,[$inp,#3]
++	ldrb	$t3, [$inp,#2]
++	orr	$Tlo,$Tlo,$t0,lsl#8
++	ldrb	$t0, [$inp,#1]
++	orr	$Tlo,$Tlo,$t1,lsl#16
++	ldrb	$t1, [$inp],#8
++	orr	$Tlo,$Tlo,$t2,lsl#24
++	orr	$Thi,$Thi,$t3,lsl#8
++	orr	$Thi,$Thi,$t0,lsl#16
++	orr	$Thi,$Thi,$t1,lsl#24
++#else
++	ldr	$Tlo,[$inp,#4]
++	ldr	$Thi,[$inp],#8
++#ifdef __ARMEL__
++	rev	$Tlo,$Tlo
++	rev	$Thi,$Thi
++#endif
++#endif
++___
++	&BODY_00_15(0x94);
++$code.=<<___;
++	tst	$Ktbl,#1
++	beq	.L00_15
++	ldr	$t0,[sp,#`$Xoff+8*(16-1)`+0]
++	ldr	$t1,[sp,#`$Xoff+8*(16-1)`+4]
++	bic	$Ktbl,$Ktbl,#1
++.L16_79:
++	@ sigma0(x)	(ROTR((x),1)  ^ ROTR((x),8)  ^ ((x)>>7))
++	@ LO		lo>>1^hi<<31  ^ lo>>8^hi<<24 ^ lo>>7^hi<<25
++	@ HI		hi>>1^lo<<31  ^ hi>>8^lo<<24 ^ hi>>7
++	mov	$Tlo,$t0,lsr#1
++	ldr	$t2,[sp,#`$Xoff+8*(16-14)`+0]
++	mov	$Thi,$t1,lsr#1
++	ldr	$t3,[sp,#`$Xoff+8*(16-14)`+4]
++	eor	$Tlo,$Tlo,$t1,lsl#31
++	eor	$Thi,$Thi,$t0,lsl#31
++	eor	$Tlo,$Tlo,$t0,lsr#8
++	eor	$Thi,$Thi,$t1,lsr#8
++	eor	$Tlo,$Tlo,$t1,lsl#24
++	eor	$Thi,$Thi,$t0,lsl#24
++	eor	$Tlo,$Tlo,$t0,lsr#7
++	eor	$Thi,$Thi,$t1,lsr#7
++	eor	$Tlo,$Tlo,$t1,lsl#25
++
++	@ sigma1(x)	(ROTR((x),19) ^ ROTR((x),61) ^ ((x)>>6))
++	@ LO		lo>>19^hi<<13 ^ hi>>29^lo<<3 ^ lo>>6^hi<<26
++	@ HI		hi>>19^lo<<13 ^ lo>>29^hi<<3 ^ hi>>6
++	mov	$t0,$t2,lsr#19
++	mov	$t1,$t3,lsr#19
++	eor	$t0,$t0,$t3,lsl#13
++	eor	$t1,$t1,$t2,lsl#13
++	eor	$t0,$t0,$t3,lsr#29
++	eor	$t1,$t1,$t2,lsr#29
++	eor	$t0,$t0,$t2,lsl#3
++	eor	$t1,$t1,$t3,lsl#3
++	eor	$t0,$t0,$t2,lsr#6
++	eor	$t1,$t1,$t3,lsr#6
++	ldr	$t2,[sp,#`$Xoff+8*(16-9)`+0]
++	eor	$t0,$t0,$t3,lsl#26
++
++	ldr	$t3,[sp,#`$Xoff+8*(16-9)`+4]
++	adds	$Tlo,$Tlo,$t0
++	ldr	$t0,[sp,#`$Xoff+8*16`+0]
++	adc	$Thi,$Thi,$t1
++
++	ldr	$t1,[sp,#`$Xoff+8*16`+4]
++	adds	$Tlo,$Tlo,$t2
++	adc	$Thi,$Thi,$t3
++	adds	$Tlo,$Tlo,$t0
++	adc	$Thi,$Thi,$t1
++___
++	&BODY_00_15(0x17);
++$code.=<<___;
++#if __ARM_ARCH__>=7
++	ittt	eq			@ Thumb2 thing, sanity check in ARM
++#endif
++	ldreq	$t0,[sp,#`$Xoff+8*(16-1)`+0]
++	ldreq	$t1,[sp,#`$Xoff+8*(16-1)`+4]
++	beq	.L16_79
++	bic	$Ktbl,$Ktbl,#1
++
++	ldr	$Tlo,[sp,#$Boff+0]
++	ldr	$Thi,[sp,#$Boff+4]
++	ldr	$t0, [$ctx,#$Aoff+$lo]
++	ldr	$t1, [$ctx,#$Aoff+$hi]
++	ldr	$t2, [$ctx,#$Boff+$lo]
++	ldr	$t3, [$ctx,#$Boff+$hi]
++	adds	$t0,$Alo,$t0
++	str	$t0, [$ctx,#$Aoff+$lo]
++	adc	$t1,$Ahi,$t1
++	str	$t1, [$ctx,#$Aoff+$hi]
++	adds	$t2,$Tlo,$t2
++	str	$t2, [$ctx,#$Boff+$lo]
++	adc	$t3,$Thi,$t3
++	str	$t3, [$ctx,#$Boff+$hi]
++
++	ldr	$Alo,[sp,#$Coff+0]
++	ldr	$Ahi,[sp,#$Coff+4]
++	ldr	$Tlo,[sp,#$Doff+0]
++	ldr	$Thi,[sp,#$Doff+4]
++	ldr	$t0, [$ctx,#$Coff+$lo]
++	ldr	$t1, [$ctx,#$Coff+$hi]
++	ldr	$t2, [$ctx,#$Doff+$lo]
++	ldr	$t3, [$ctx,#$Doff+$hi]
++	adds	$t0,$Alo,$t0
++	str	$t0, [$ctx,#$Coff+$lo]
++	adc	$t1,$Ahi,$t1
++	str	$t1, [$ctx,#$Coff+$hi]
++	adds	$t2,$Tlo,$t2
++	str	$t2, [$ctx,#$Doff+$lo]
++	adc	$t3,$Thi,$t3
++	str	$t3, [$ctx,#$Doff+$hi]
++
++	ldr	$Tlo,[sp,#$Foff+0]
++	ldr	$Thi,[sp,#$Foff+4]
++	ldr	$t0, [$ctx,#$Eoff+$lo]
++	ldr	$t1, [$ctx,#$Eoff+$hi]
++	ldr	$t2, [$ctx,#$Foff+$lo]
++	ldr	$t3, [$ctx,#$Foff+$hi]
++	adds	$Elo,$Elo,$t0
++	str	$Elo,[$ctx,#$Eoff+$lo]
++	adc	$Ehi,$Ehi,$t1
++	str	$Ehi,[$ctx,#$Eoff+$hi]
++	adds	$t2,$Tlo,$t2
++	str	$t2, [$ctx,#$Foff+$lo]
++	adc	$t3,$Thi,$t3
++	str	$t3, [$ctx,#$Foff+$hi]
++
++	ldr	$Alo,[sp,#$Goff+0]
++	ldr	$Ahi,[sp,#$Goff+4]
++	ldr	$Tlo,[sp,#$Hoff+0]
++	ldr	$Thi,[sp,#$Hoff+4]
++	ldr	$t0, [$ctx,#$Goff+$lo]
++	ldr	$t1, [$ctx,#$Goff+$hi]
++	ldr	$t2, [$ctx,#$Hoff+$lo]
++	ldr	$t3, [$ctx,#$Hoff+$hi]
++	adds	$t0,$Alo,$t0
++	str	$t0, [$ctx,#$Goff+$lo]
++	adc	$t1,$Ahi,$t1
++	str	$t1, [$ctx,#$Goff+$hi]
++	adds	$t2,$Tlo,$t2
++	str	$t2, [$ctx,#$Hoff+$lo]
++	adc	$t3,$Thi,$t3
++	str	$t3, [$ctx,#$Hoff+$hi]
++
++	add	sp,sp,#640
++	sub	$Ktbl,$Ktbl,#640
++
++	teq	$inp,$len
++	bne	.Loop
++
++	add	sp,sp,#8*9		@ destroy frame
++#if __ARM_ARCH__>=5
++	ldmia	sp!,{r4-r12,pc}
++#else
++	ldmia	sp!,{r4-r12,lr}
++	tst	lr,#1
++	moveq	pc,lr			@ be binary compatible with V4, yet
++	bx	lr			@ interoperable with Thumb ISA:-)
++#endif
++.size	sha512_block_data_order,.-sha512_block_data_order
++___
++
++{
++my @Sigma0=(28,34,39);
++my @Sigma1=(14,18,41);
++my @sigma0=(1, 8, 7);
++my @sigma1=(19,61,6);
++
++my $Ktbl="r3";
++my $cnt="r12";	# volatile register known as ip, intra-procedure-call scratch
++
++my @X=map("d$_",(0..15));
++my @V=($A,$B,$C,$D,$E,$F,$G,$H)=map("d$_",(16..23));
++
++sub NEON_00_15() {
++my $i=shift;
++my ($a,$b,$c,$d,$e,$f,$g,$h)=@_;
++my ($t0,$t1,$t2,$T1,$K,$Ch,$Maj)=map("d$_",(24..31));	# temps
++
++$code.=<<___ if ($i<16 || $i&1);
++	vshr.u64	$t0,$e,#@Sigma1[0]	@ $i
++#if $i<16
++	vld1.64		{@X[$i%16]},[$inp]!	@ handles unaligned
++#endif
++	vshr.u64	$t1,$e,#@Sigma1[1]
++#if $i>0
++	 vadd.i64	$a,$Maj			@ h+=Maj from the past
++#endif
++	vshr.u64	$t2,$e,#@Sigma1[2]
++___
++$code.=<<___;
++	vld1.64		{$K},[$Ktbl,:64]!	@ K[i++]
++	vsli.64		$t0,$e,#`64-@Sigma1[0]`
++	vsli.64		$t1,$e,#`64-@Sigma1[1]`
++	vmov		$Ch,$e
++	vsli.64		$t2,$e,#`64-@Sigma1[2]`
++#if $i<16 && defined(__ARMEL__)
++	vrev64.8	@X[$i],@X[$i]
++#endif
++	veor		$t1,$t0
++	vbsl		$Ch,$f,$g		@ Ch(e,f,g)
++	vshr.u64	$t0,$a,#@Sigma0[0]
++	veor		$t2,$t1			@ Sigma1(e)
++	vadd.i64	$T1,$Ch,$h
++	vshr.u64	$t1,$a,#@Sigma0[1]
++	vsli.64		$t0,$a,#`64-@Sigma0[0]`
++	vadd.i64	$T1,$t2
++	vshr.u64	$t2,$a,#@Sigma0[2]
++	vadd.i64	$K,@X[$i%16]
++	vsli.64		$t1,$a,#`64-@Sigma0[1]`
++	veor		$Maj,$a,$b
++	vsli.64		$t2,$a,#`64-@Sigma0[2]`
++	veor		$h,$t0,$t1
++	vadd.i64	$T1,$K
++	vbsl		$Maj,$c,$b		@ Maj(a,b,c)
++	veor		$h,$t2			@ Sigma0(a)
++	vadd.i64	$d,$T1
++	vadd.i64	$Maj,$T1
++	@ vadd.i64	$h,$Maj
++___
++}
++
++sub NEON_16_79() {
++my $i=shift;
++
++if ($i&1)	{ &NEON_00_15($i,@_); return; }
++
++# 2x-vectorized, therefore runs every 2nd round
++my @X=map("q$_",(0..7));			# view @X as 128-bit vector
++my ($t0,$t1,$s0,$s1) = map("q$_",(12..15));	# temps
++my ($d0,$d1,$d2) = map("d$_",(24..26));		# temps from NEON_00_15
++my $e=@_[4];					# $e from NEON_00_15
++$i /= 2;
++$code.=<<___;
++	vshr.u64	$t0,@X[($i+7)%8],#@sigma1[0]
++	vshr.u64	$t1,@X[($i+7)%8],#@sigma1[1]
++	 vadd.i64	@_[0],d30			@ h+=Maj from the past
++	vshr.u64	$s1,@X[($i+7)%8],#@sigma1[2]
++	vsli.64		$t0,@X[($i+7)%8],#`64-@sigma1[0]`
++	vext.8		$s0,@X[$i%8],@X[($i+1)%8],#8	@ X[i+1]
++	vsli.64		$t1,@X[($i+7)%8],#`64-@sigma1[1]`
++	veor		$s1,$t0
++	vshr.u64	$t0,$s0,#@sigma0[0]
++	veor		$s1,$t1				@ sigma1(X[i+14])
++	vshr.u64	$t1,$s0,#@sigma0[1]
++	vadd.i64	@X[$i%8],$s1
++	vshr.u64	$s1,$s0,#@sigma0[2]
++	vsli.64		$t0,$s0,#`64-@sigma0[0]`
++	vsli.64		$t1,$s0,#`64-@sigma0[1]`
++	vext.8		$s0,@X[($i+4)%8],@X[($i+5)%8],#8	@ X[i+9]
++	veor		$s1,$t0
++	vshr.u64	$d0,$e,#@Sigma1[0]		@ from NEON_00_15
++	vadd.i64	@X[$i%8],$s0
++	vshr.u64	$d1,$e,#@Sigma1[1]		@ from NEON_00_15
++	veor		$s1,$t1				@ sigma0(X[i+1])
++	vshr.u64	$d2,$e,#@Sigma1[2]		@ from NEON_00_15
++	vadd.i64	@X[$i%8],$s1
++___
++	&NEON_00_15(2*$i,@_);
++}
++
++$code.=<<___;
++#if __ARM_MAX_ARCH__>=7
++.arch	armv7-a
++.fpu	neon
++
++.global	sha512_block_data_order_neon
++.type	sha512_block_data_order_neon,%function
++.align	4
++sha512_block_data_order_neon:
++.LNEON:
++	dmb				@ errata #451034 on early Cortex A8
++	add	$len,$inp,$len,lsl#7	@ len to point at the end of inp
++	adr	$Ktbl,K512
++	VFP_ABI_PUSH
++	vldmia	$ctx,{$A-$H}		@ load context
++.Loop_neon:
++___
++for($i=0;$i<16;$i++)	{ &NEON_00_15($i,@V); unshift(@V,pop(@V)); }
++$code.=<<___;
++	mov		$cnt,#4
++.L16_79_neon:
++	subs		$cnt,#1
++___
++for(;$i<32;$i++)	{ &NEON_16_79($i,@V); unshift(@V,pop(@V)); }
++$code.=<<___;
++	bne		.L16_79_neon
++
++	 vadd.i64	$A,d30		@ h+=Maj from the past
++	vldmia		$ctx,{d24-d31}	@ load context to temp
++	vadd.i64	q8,q12		@ vectorized accumulate
++	vadd.i64	q9,q13
++	vadd.i64	q10,q14
++	vadd.i64	q11,q15
++	vstmia		$ctx,{$A-$H}	@ save context
++	teq		$inp,$len
++	sub		$Ktbl,#640	@ rewind K512
++	bne		.Loop_neon
++
++	VFP_ABI_POP
++	ret				@ bx lr
++.size	sha512_block_data_order_neon,.-sha512_block_data_order_neon
++#endif
++___
++}
++$code.=<<___;
++.asciz	"SHA512 block transform for ARMv4/NEON, CRYPTOGAMS by <appro\@openssl.org>"
++.align	2
++#if __ARM_MAX_ARCH__>=7 && !defined(__KERNEL__)
++.comm	OPENSSL_armcap_P,4,4
++.hidden	OPENSSL_armcap_P
++#endif
++___
++
++$code =~ s/\`([^\`]*)\`/eval $1/gem;
++$code =~ s/\bbx\s+lr\b/.word\t0xe12fff1e/gm;	# make it possible to compile with -march=armv4
++$code =~ s/\bret\b/bx	lr/gm;
++
++open SELF,$0;
++while(<SELF>) {
++	next if (/^#!/);
++	last if (!s/^#/@/ and !/^$/);
++	print;
++}
++close SELF;
++
++print $code;
++close STDOUT; # enforce flush
