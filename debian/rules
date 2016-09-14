@@ -1,6 +1,10 @@
 #!/usr/bin/make -f
 #export DH_VERBOSE=1
 
+export DEB_BUILD_MAINT_OPTIONS=hardening=+all
+debian_cflags:=$(shell dpkg-buildflags --get CFLAGS) $(shell dpkg-buildflags --get CPPFLAGS)
+debian_ldflags:=$(shell dpkg-buildflags --get LDFLAGS)
+
 LIBCRYPTO_VERSION := $(shell cat crypto/VERSION | cut -f 1 -d ':' | tr -d '\n')
 LIBSSL_VERSION := $(shell cat ssl/VERSION | cut -f 1 -d ':' | tr -d '\n')
 LIBTLS_VERSION := $(shell cat tls/VERSION | cut -f 1 -d ':' | tr -d '\n')
