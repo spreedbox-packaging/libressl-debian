@@ -1,3 +1,9 @@
+libressl (2.4.2-1ppa1~trusty5) trusty; urgency=medium
+
+  * Build with all hardening enabled.
+
+ -- Joachim Bauch <bauch@struktur.de>  Wed, 14 Sep 2016 12:24:49 +0200
+
 libressl (2.4.2-1ppa1~trusty4) trusty; urgency=low
 
   * Fixed compilation issue on i386.
