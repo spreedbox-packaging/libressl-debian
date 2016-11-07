@@ -1,3 +1,9 @@
+libressl (2.4.4-1ppa1~trusty1) trusty; urgency=medium
+
+  * Imported Upstream version 2.4.4
+
+ -- Joachim Bauch <bauch@struktur.de>  Mon, 07 Nov 2016 09:09:34 +0100
+
 libressl (2.4.3-1ppa1~trusty1) trusty; urgency=medium
 
   * Only check for new releases of the 2.4.x line.
