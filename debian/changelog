@@ -1,3 +1,9 @@
+libressl (2.4.4-1ppa1~precise1) precise; urgency=medium
+
+  * Backport for Precise (14.04)
+
+ -- Simon Eisenmann <simon@struktur.de>  Wed, 09 Nov 2016 11:24:32 +0100
+
 libressl (2.4.4-1ppa1~trusty1) trusty; urgency=medium
 
   * Imported Upstream version 2.4.4
