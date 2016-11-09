@@ -1,4 +1,4 @@
-/* $OpenBSD: ts_rsp_verify.c,v 1.11 2014/07/10 13:58:23 jsing Exp $ */
+/* $OpenBSD: ts_rsp_verify.c,v 1.15 2015/07/19 05:42:55 miod Exp $ */
 /* Written by Zoltan Glozik (zglozik@stones.com) for the OpenSSL
  * project 2002.
  */
@@ -234,26 +234,32 @@ static int
 TS_verify_cert(X509_STORE *store, STACK_OF(X509) *untrusted, X509 *signer,
     STACK_OF(X509) **chain)
 {
-	X509_STORE_CTX	cert_ctx;
+	X509_STORE_CTX cert_ctx;
 	int i;
-	int ret = 1;
+	int ret = 0;
 
 	/* chain is an out argument. */
 	*chain = NULL;
-	X509_STORE_CTX_init(&cert_ctx, store, signer, untrusted);
+	if (X509_STORE_CTX_init(&cert_ctx, store, signer, untrusted) == 0) {
+		TSerr(TS_F_TS_VERIFY_CERT, ERR_R_X509_LIB);
+		goto err;
+	}
 	X509_STORE_CTX_set_purpose(&cert_ctx, X509_PURPOSE_TIMESTAMP_SIGN);
 	i = X509_verify_cert(&cert_ctx);
 	if (i <= 0) {
 		int j = X509_STORE_CTX_get_error(&cert_ctx);
+
 		TSerr(TS_F_TS_VERIFY_CERT, TS_R_CERTIFICATE_VERIFY_ERROR);
 		ERR_asprintf_error_data("Verify error:%s",
 		    X509_verify_cert_error_string(j));
-		ret = 0;
+		goto err;
 	} else {
 		/* Get a copy of the certificate chain. */
 		*chain = X509_STORE_CTX_get1_chain(&cert_ctx);
+		ret = 1;
 	}
 
+err:
 	X509_STORE_CTX_cleanup(&cert_ctx);
 
 	return ret;
@@ -305,6 +311,8 @@ ESS_get_signing_cert(PKCS7_SIGNER_INFO *si)
 	attr = PKCS7_get_signed_attribute(si,
 	    NID_id_smime_aa_signingCertificate);
 	if (!attr)
+		return NULL;
+	if (attr->type != V_ASN1_SEQUENCE)
 		return NULL;
 	p = attr->value.sequence->data;
 	return d2i_ESS_SIGNING_CERT(NULL, &p, attr->value.sequence->length);
@@ -698,6 +706,9 @@ TS_check_signer_name(GENERAL_NAME *tsa_name, X509 *signer)
 	int idx = -1;
 	int found = 0;
 
+	if (signer == NULL)
+		return 0;
+
 	/* Check the subject name first. */
 	if (tsa_name->type == GEN_DIRNAME &&
 	    X509_name_cmp(tsa_name->d.dirn, signer->cert_info->subject) == 0)
@@ -707,7 +718,7 @@ TS_check_signer_name(GENERAL_NAME *tsa_name, X509 *signer)
 	gen_names = X509_get_ext_d2i(signer, NID_subject_alt_name,
 	    NULL, &idx);
 	while (gen_names != NULL &&
-	    !(found = TS_find_name(gen_names, tsa_name) >= 0)) {
+	    !(found = (TS_find_name(gen_names, tsa_name) >= 0))) {
 		/* Get the next subject alternative name,
 		   although there should be no more than one. */
 		GENERAL_NAMES_free(gen_names);

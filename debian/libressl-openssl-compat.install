@@ -1,2 +1,2 @@
-apps/openssl.cnf etc/ssl/
+apps/openssl/openssl.cnf etc/ssl/
 debian/c_rehash usr/bin

@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_pkt.c,v 1.39 2015/01/21 00:15:50 doug Exp $ */
+/* $OpenBSD: d1_pkt.c,v 1.47 2015/09/10 17:57:50 jsing Exp $ */
 /*
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
@@ -124,6 +124,7 @@
 #include <openssl/evp.h>
 
 #include "pqueue.h"
+#include "bytestring.h"
 
 /* mod 128 saturating subtract of two 64-bit values in big-endian order */
 static int
@@ -464,11 +465,9 @@ err:
 int
 dtls1_get_record(SSL *s)
 {
-	int ssl_major, ssl_minor;
 	int i, n;
 	SSL3_RECORD *rr;
 	unsigned char *p = NULL;
-	unsigned short version;
 	DTLS1_BITMAP *bitmap;
 	unsigned int is_next_epoch;
 
@@ -484,64 +483,68 @@ dtls1_get_record(SSL *s)
 		return 1;
 
 	/* get something from the wire */
+	if (0) {
 again:
+		/* dump this record on all retries */
+		rr->length = 0;
+		s->packet_length = 0;
+	}
+
 	/* check if we have the header */
 	if ((s->rstate != SSL_ST_READ_BODY) ||
-		(s->packet_length < DTLS1_RT_HEADER_LENGTH)) {
+	    (s->packet_length < DTLS1_RT_HEADER_LENGTH)) {
+		CBS header, seq_no;
+		uint16_t epoch, len, ssl_version;
+		uint8_t type;
+
 		n = ssl3_read_n(s, DTLS1_RT_HEADER_LENGTH, s->s3->rbuf.len, 0);
 		/* read timeout is handled by dtls1_read_bytes */
 		if (n <= 0)
 			return(n); /* error or non-blocking */
 
 		/* this packet contained a partial record, dump it */
-		if (s->packet_length != DTLS1_RT_HEADER_LENGTH) {
-			s->packet_length = 0;
+		if (s->packet_length != DTLS1_RT_HEADER_LENGTH)
 			goto again;
-		}
 
 		s->rstate = SSL_ST_READ_BODY;
 
-		p = s->packet;
+		CBS_init(&header, s->packet, s->packet_length);
 
 		/* Pull apart the header into the DTLS1_RECORD */
-		rr->type= *(p++);
-		ssl_major= *(p++);
-		ssl_minor= *(p++);
-		version = (ssl_major << 8)|ssl_minor;
+		if (!CBS_get_u8(&header, &type))
+			goto again;
+		if (!CBS_get_u16(&header, &ssl_version))
+			goto again;
 
 		/* sequence number is 64 bits, with top 2 bytes = epoch */
-		n2s(p, rr->epoch);
-
-		memcpy(&(s->s3->read_sequence[2]), p, 6);
-		p += 6;
-
-		n2s(p, rr->length);
-
-		/* Lets check version */
-		if (!s->first_packet) {
-			if (version != s->version) {
-				/* unexpected version, silently discard */
-				rr->length = 0;
-				s->packet_length = 0;
-				goto again;
-			}
-		}
-
-		if ((version & 0xff00) != (s->version & 0xff00)) {
-			/* wrong version, silently discard record */
-			rr->length = 0;
-			s->packet_length = 0;
+		if (!CBS_get_u16(&header, &epoch) ||
+		    !CBS_get_bytes(&header, &seq_no, 6))
 			goto again;
-		}
 
-		if (rr->length > SSL3_RT_MAX_ENCRYPTED_LENGTH) {
-			/* record too long, silently discard it */
-			rr->length = 0;
-			s->packet_length = 0;
+		if (!CBS_write_bytes(&seq_no, &(s->s3->read_sequence[2]),
+		    sizeof(s->s3->read_sequence) - 2, NULL))
 			goto again;
-		}
+		if (!CBS_get_u16(&header, &len))
+			goto again;
+
+		rr->type = type;
+		rr->epoch = epoch;
+		rr->length = len;
+
+		/* unexpected version, silently discard */
+		if (!s->first_packet && ssl_version != s->version)
+			goto again;
+
+		/* wrong version, silently discard record */
+		if ((ssl_version & 0xff00) != (s->version & 0xff00))
+			goto again;
+
+		/* record too long, silently discard it */
+		if (rr->length > SSL3_RT_MAX_ENCRYPTED_LENGTH)
+			goto again;
 
 		/* now s->rstate == SSL_ST_READ_BODY */
+		p = (unsigned char *)CBS_data(&header);
 	}
 
 	/* s->rstate == SSL_ST_READ_BODY, get and decode the data */
@@ -554,11 +557,8 @@ again:
 			return(n); /* error or non-blocking io */
 
 		/* this packet contained a partial record, dump it */
-		if (n != i) {
-			rr->length = 0;
-			s->packet_length = 0;
+		if (n != i)
 			goto again;
-		}
 
 		/* now n == rr->length,
 		 * and s->packet_length == DTLS1_RT_HEADER_LENGTH + rr->length */
@@ -567,28 +567,20 @@ again:
 
 	/* match epochs.  NULL means the packet is dropped on the floor */
 	bitmap = dtls1_get_bitmap(s, rr, &is_next_epoch);
-	if (bitmap == NULL) {
-		rr->length = 0;
-		s->packet_length = 0;
-		/* dump this record */
+	if (bitmap == NULL)
 		goto again;
-		/* get another record */
-	}
 
-		/* Check whether this is a repeat, or aged record.
-		 * Don't check if we're listening and this message is
-		 * a ClientHello. They can look as if they're replayed,
-		 * since they arrive from different connections and
-		 * would be dropped unnecessarily.
-		 */
-		if (!(s->d1->listen && rr->type == SSL3_RT_HANDSHAKE &&
-		    p != NULL && *p == SSL3_MT_CLIENT_HELLO) &&
-		    !dtls1_record_replay_check(s, bitmap)) {
-			rr->length = 0;
-			s->packet_length=0; /* dump this record */
-			goto again;
-			/* get another record */
-		}
+	/*
+	 * Check whether this is a repeat, or aged record.
+	 * Don't check if we're listening and this message is
+	 * a ClientHello. They can look as if they're replayed,
+	 * since they arrive from different connections and
+	 * would be dropped unnecessarily.
+	 */
+	if (!(s->d1->listen && rr->type == SSL3_RT_HANDSHAKE &&
+	    p != NULL && *p == SSL3_MT_CLIENT_HELLO) &&
+	    !dtls1_record_replay_check(s, bitmap))
+		goto again;
 
 	/* just read a 0 length packet */
 	if (rr->length == 0)
@@ -607,23 +599,16 @@ again:
 			/* Mark receipt of record. */
 			dtls1_record_bitmap_update(s, bitmap);
 		}
-		rr->length = 0;
-		s->packet_length = 0;
 		goto again;
 	}
 
-	if (!dtls1_process_record(s)) {
-		rr->length = 0;
-		s->packet_length = 0;
-		/* dump this record */
+	if (!dtls1_process_record(s))
 		goto again;
-		/* get another record */
-	}
+
 	/* Mark receipt of record. */
 	dtls1_record_bitmap_update(s, bitmap);
 
 	return (1);
-
 }
 
 /* Return up to 'len' payload bytes received in 'type' records.
@@ -986,9 +971,6 @@ start:
 
 		dtls1_get_ccs_header(rr->data, &ccs_hdr);
 
-		if (s->version == DTLS1_BAD_VER)
-			ccs_hdr_len = 3;
-
 		/* 'Change Cipher Spec' is just a single byte, so we know
 		 * exactly what the record payload has to look like */
 		/* XDTLS: check that epoch is consistent */
@@ -1021,10 +1003,6 @@ start:
 		/* do this whenever CCS is processed */
 		dtls1_reset_seq_numbers(s, SSL3_CC_READ);
 
-		if (s->version == DTLS1_BAD_VER)
-			s->d1->handshake_read_seq++;
-
-
 		goto start;
 	}
 
@@ -1034,7 +1012,8 @@ start:
 		struct hm_header_st msg_hdr;
 
 		/* this may just be a stale retransmit */
-		dtls1_get_message_header(rr->data, &msg_hdr);
+		if (!dtls1_get_message_header(rr->data, &msg_hdr))
+			return -1;
 		if (rr->epoch != s->d1->r_epoch) {
 			rr->length = 0;
 			goto start;
@@ -1340,7 +1319,7 @@ do_dtls1_write(SSL *s, int type, const unsigned char *buf, unsigned int len)
 	wr->type=type; /* not needed but helps for debugging */
 	wr->length += DTLS1_RT_HEADER_LENGTH;
 
-	ssl3_record_sequence_increment(s->s3->write_sequence);
+	tls1_record_sequence_increment(s->s3->write_sequence);
 
 	/* now let's set up wb */
 	wb->left = prefix_len + wr->length;
@@ -1437,7 +1416,7 @@ dtls1_dispatch_alert(SSL *s)
 		|| s->s3->send_alert[1] == DTLS1_AD_MISSING_HANDSHAKE_MESSAGE
 #endif
 		)
-		(void)BIO_flush(s->wbio);
+			(void)BIO_flush(s->wbio);
 
 		if (s->msg_callback)
 			s->msg_callback(1, s->version, SSL3_RT_ALERT,

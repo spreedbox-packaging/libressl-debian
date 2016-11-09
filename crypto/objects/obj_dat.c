@@ -1,4 +1,4 @@
-/* $OpenBSD: obj_dat.c,v 1.31 2014/08/08 04:53:43 guenther Exp $ */
+/* $OpenBSD: obj_dat.c,v 1.35 2015/10/14 21:54:10 tedu Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -70,20 +70,7 @@
 #include <openssl/objects.h>
 
 /* obj_dat.h is generated from objects.h by obj_dat.pl */
-#ifndef OPENSSL_NO_OBJECT
 #include "obj_dat.h"
-#else
-/* You will have to load all the objects needed manually in the application */
-#define NUM_NID 0
-#define NUM_SN 0
-#define NUM_LN 0
-#define NUM_OBJ 0
-static const unsigned char lvalues[1];
-static const ASN1_OBJECT nid_objs[1];
-static const unsigned int sn_objs[1];
-static const unsigned int ln_objs[1];
-static const unsigned int obj_objs[1];
-#endif
 
 DECLARE_OBJ_BSEARCH_CMP_FN(const ASN1_OBJECT *, unsigned int, sn);
 DECLARE_OBJ_BSEARCH_CMP_FN(const ASN1_OBJECT *, unsigned int, ln);
@@ -565,6 +552,10 @@ OBJ_obj2txt(char *buf, int buf_len, const ASN1_OBJECT *a, int no_name)
 			ret++;
 		}
 
+		if (buf_len <= 0) {
+			ret = 0;
+			goto out;
+		}
 		if (use_bn) {
 			char *bndec;
 

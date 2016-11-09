@@ -1,4 +1,4 @@
-/* $OpenBSD: v3_ncons.c,v 1.5 2014/07/11 08:44:49 jsing Exp $ */
+/* $OpenBSD: v3_ncons.c,v 1.8 2015/07/25 16:14:29 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project.
  */
@@ -80,28 +80,82 @@ static int nc_email(ASN1_IA5STRING *sub, ASN1_IA5STRING *eml);
 static int nc_uri(ASN1_IA5STRING *uri, ASN1_IA5STRING *base);
 
 const X509V3_EXT_METHOD v3_name_constraints = {
-	NID_name_constraints, 0,
-	ASN1_ITEM_ref(NAME_CONSTRAINTS),
-	0, 0, 0, 0,
-	0, 0,
-	0, v2i_NAME_CONSTRAINTS,
-	i2r_NAME_CONSTRAINTS, 0,
-	NULL
+	.ext_nid = NID_name_constraints,
+	.ext_flags = 0,
+	.it = ASN1_ITEM_ref(NAME_CONSTRAINTS),
+	.ext_new = NULL,
+	.ext_free = NULL,
+	.d2i = NULL,
+	.i2d = NULL,
+	.i2s = NULL,
+	.s2i = NULL,
+	.i2v = NULL,
+	.v2i = v2i_NAME_CONSTRAINTS,
+	.i2r = i2r_NAME_CONSTRAINTS,
+	.r2i = NULL,
+	.usr_data = NULL,
 };
 
-ASN1_SEQUENCE(GENERAL_SUBTREE) = {
-	ASN1_SIMPLE(GENERAL_SUBTREE, base, GENERAL_NAME),
-	ASN1_IMP_OPT(GENERAL_SUBTREE, minimum, ASN1_INTEGER, 0),
-	ASN1_IMP_OPT(GENERAL_SUBTREE, maximum, ASN1_INTEGER, 1)
-} ASN1_SEQUENCE_END(GENERAL_SUBTREE)
+static const ASN1_TEMPLATE GENERAL_SUBTREE_seq_tt[] = {
+	{
+		.flags = 0,
+		.tag = 0,
+		.offset = offsetof(GENERAL_SUBTREE, base),
+		.field_name = "base",
+		.item = &GENERAL_NAME_it,
+	},
+	{
+		.flags = ASN1_TFLG_IMPLICIT | ASN1_TFLG_OPTIONAL,
+		.tag = 0,
+		.offset = offsetof(GENERAL_SUBTREE, minimum),
+		.field_name = "minimum",
+		.item = &ASN1_INTEGER_it,
+	},
+	{
+		.flags = ASN1_TFLG_IMPLICIT | ASN1_TFLG_OPTIONAL,
+		.tag = 1,
+		.offset = offsetof(GENERAL_SUBTREE, maximum),
+		.field_name = "maximum",
+		.item = &ASN1_INTEGER_it,
+	},
+};
 
-ASN1_SEQUENCE(NAME_CONSTRAINTS) = {
-	ASN1_IMP_SEQUENCE_OF_OPT(NAME_CONSTRAINTS, permittedSubtrees,
-	GENERAL_SUBTREE, 0),
-	ASN1_IMP_SEQUENCE_OF_OPT(NAME_CONSTRAINTS, excludedSubtrees,
-	GENERAL_SUBTREE, 1),
-} ASN1_SEQUENCE_END(NAME_CONSTRAINTS)
+const ASN1_ITEM GENERAL_SUBTREE_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = GENERAL_SUBTREE_seq_tt,
+	.tcount = sizeof(GENERAL_SUBTREE_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(GENERAL_SUBTREE),
+	.sname = "GENERAL_SUBTREE",
+};
 
+static const ASN1_TEMPLATE NAME_CONSTRAINTS_seq_tt[] = {
+	{
+		.flags = ASN1_TFLG_IMPLICIT | ASN1_TFLG_SEQUENCE_OF | ASN1_TFLG_OPTIONAL,
+		.tag = 0,
+		.offset = offsetof(NAME_CONSTRAINTS, permittedSubtrees),
+		.field_name = "permittedSubtrees",
+		.item = &GENERAL_SUBTREE_it,
+	},
+	{
+		.flags = ASN1_TFLG_IMPLICIT | ASN1_TFLG_SEQUENCE_OF | ASN1_TFLG_OPTIONAL,
+		.tag = 1,
+		.offset = offsetof(NAME_CONSTRAINTS, excludedSubtrees),
+		.field_name = "excludedSubtrees",
+		.item = &GENERAL_SUBTREE_it,
+	},
+};
+
+const ASN1_ITEM NAME_CONSTRAINTS_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = NAME_CONSTRAINTS_seq_tt,
+	.tcount = sizeof(NAME_CONSTRAINTS_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(NAME_CONSTRAINTS),
+	.sname = "NAME_CONSTRAINTS",
+};
 
 
 GENERAL_SUBTREE *

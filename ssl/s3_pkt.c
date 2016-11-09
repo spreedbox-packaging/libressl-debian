@@ -1,4 +1,4 @@
-/* $OpenBSD: s3_pkt.c,v 1.53 2014/12/14 15:30:50 jsing Exp $ */
+/* $OpenBSD: s3_pkt.c,v 1.58 2016/07/10 23:07:34 tedu Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -116,6 +116,8 @@
 
 #include <openssl/buffer.h>
 #include <openssl/evp.h>
+
+#include "bytestring.h"
 
 static int do_ssl3_write(SSL *s, int type, const unsigned char *buf,
     unsigned int len, int create_empty_fragment);
@@ -276,64 +278,56 @@ ssl3_read_n(SSL *s, int n, int max, int extend)
 static int
 ssl3_get_record(SSL *s)
 {
-	int ssl_major, ssl_minor, al;
+	int al;
 	int enc_err, n, i, ret = -1;
 	SSL3_RECORD *rr;
 	SSL_SESSION *sess;
-	unsigned char *p;
 	unsigned char md[EVP_MAX_MD_SIZE];
-	short version;
 	unsigned mac_size, orig_len;
-	size_t extra;
 
 	rr = &(s->s3->rrec);
 	sess = s->session;
-
-	if (s->options & SSL_OP_MICROSOFT_BIG_SSLV3_BUFFER)
-		extra = SSL3_RT_MAX_EXTRA;
-	else
-		extra = 0;
-
-	if (extra && !s->s3->init_extra) {
-		/* An application error: SLS_OP_MICROSOFT_BIG_SSLV3_BUFFER
-		 * set after ssl3_setup_buffers() was done */
-		SSLerr(SSL_F_SSL3_GET_RECORD, ERR_R_INTERNAL_ERROR);
-		return -1;
-	}
 
 again:
 	/* check if we have the header */
 	if ((s->rstate != SSL_ST_READ_BODY) ||
 	    (s->packet_length < SSL3_RT_HEADER_LENGTH)) {
+		CBS header;
+		uint16_t len, ssl_version;
+		uint8_t type;
+
 		n = ssl3_read_n(s, SSL3_RT_HEADER_LENGTH, s->s3->rbuf.len, 0);
 		if (n <= 0)
 			return(n); /* error or non-blocking */
 		s->rstate = SSL_ST_READ_BODY;
 
-		p = s->packet;
+		CBS_init(&header, s->packet, n);
 
 		/* Pull apart the header into the SSL3_RECORD */
-		rr->type= *(p++);
-		ssl_major= *(p++);
-		ssl_minor= *(p++);
-		version = (ssl_major << 8)|ssl_minor;
-		n2s(p, rr->length);
-
-		/* Lets check version */
-		if (!s->first_packet) {
-			if (version != s->version) {
-				SSLerr(SSL_F_SSL3_GET_RECORD,
-				    SSL_R_WRONG_VERSION_NUMBER);
-				if ((s->version & 0xFF00) == (version & 0xFF00) &&
-				    !s->enc_write_ctx && !s->write_hash)
-					/* Send back error using their minor version number :-) */
-					s->version = (unsigned short)version;
-				al = SSL_AD_PROTOCOL_VERSION;
-				goto f_err;
-			}
+		if (!CBS_get_u8(&header, &type) ||
+		    !CBS_get_u16(&header, &ssl_version) ||
+		    !CBS_get_u16(&header, &len)) {
+			SSLerr(SSL_F_SSL3_GET_RECORD,
+			    SSL_R_BAD_PACKET_LENGTH);
+			goto err;
 		}
 
-		if ((version >> 8) != SSL3_VERSION_MAJOR) {
+		rr->type = type;
+		rr->length = len;
+
+		/* Lets check version */
+		if (!s->first_packet && ssl_version != s->version) {
+			SSLerr(SSL_F_SSL3_GET_RECORD,
+			    SSL_R_WRONG_VERSION_NUMBER);
+			if ((s->version & 0xFF00) == (ssl_version & 0xFF00) &&
+			    !s->enc_write_ctx && !s->write_hash)
+				/* Send back error using their minor version number :-) */
+				s->version = ssl_version;
+			al = SSL_AD_PROTOCOL_VERSION;
+			goto f_err;
+		}
+
+		if ((ssl_version >> 8) != SSL3_VERSION_MAJOR) {
 			SSLerr(SSL_F_SSL3_GET_RECORD,
 			    SSL_R_WRONG_VERSION_NUMBER);
 			goto err;
@@ -379,7 +373,7 @@ again:
 	 * rr->length bytes of encrypted compressed stuff. */
 
 	/* check is not needed I believe */
-	if (rr->length > SSL3_RT_MAX_ENCRYPTED_LENGTH + extra) {
+	if (rr->length > SSL3_RT_MAX_ENCRYPTED_LENGTH) {
 		al = SSL_AD_RECORD_OVERFLOW;
 		SSLerr(SSL_F_SSL3_GET_RECORD, SSL_R_ENCRYPTED_LENGTH_TOO_LONG);
 		goto f_err;
@@ -449,7 +443,7 @@ again:
 		    timingsafe_memcmp(md, mac, (size_t)mac_size) != 0)
 			enc_err = -1;
 		if (rr->length >
-		    SSL3_RT_MAX_COMPRESSED_LENGTH + extra + mac_size)
+		    SSL3_RT_MAX_COMPRESSED_LENGTH + mac_size)
 			enc_err = -1;
 	}
 
@@ -468,7 +462,7 @@ again:
 		goto f_err;
 	}
 
-	if (rr->length > SSL3_RT_MAX_PLAIN_LENGTH + extra) {
+	if (rr->length > SSL3_RT_MAX_PLAIN_LENGTH) {
 		al = SSL_AD_RECORD_OVERFLOW;
 		SSLerr(SSL_F_SSL3_GET_RECORD, SSL_R_DATA_LENGTH_TOO_LONG);
 		goto f_err;
@@ -845,10 +839,11 @@ ssl3_write_pending(SSL *s, int type, const unsigned char *buf, unsigned int len)
 int
 ssl3_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 {
-	int al, i, j, ret;
+	void (*cb)(const SSL *ssl, int type2, int val) = NULL;
+	int al, i, j, ret, rrcount = 0;
 	unsigned int n;
 	SSL3_RECORD *rr;
-	void (*cb)(const SSL *ssl, int type2, int val) = NULL;
+	BIO *bio;
 
 	if (s->s3->rbuf.buf == NULL) /* Not initialized yet */
 		if (!ssl3_setup_read_buffer(s))
@@ -902,7 +897,27 @@ ssl3_read_bytes(SSL *s, int type, unsigned char *buf, int len, int peek)
 			return (-1);
 		}
 	}
+
 start:
+	/*
+	 * Do not process more than three consecutive records, otherwise the
+	 * peer can cause us to loop indefinitely. Instead, return with an
+	 * SSL_ERROR_WANT_READ so the caller can choose when to handle further
+	 * processing. In the future, the total number of non-handshake and
+	 * non-application data records per connection should probably also be
+	 * limited...
+	 */
+	if (rrcount++ >= 3) {
+		if ((bio = SSL_get_rbio(s)) == NULL) {
+			SSLerr(SSL_F_SSL3_READ_BYTES, ERR_R_INTERNAL_ERROR);
+			return -1;
+		}
+		BIO_clear_retry_flags(bio);
+		BIO_set_retry_read(bio);
+		s->rwstate = SSL_READING;
+		return -1;
+	}
+
 	s->rwstate = SSL_NOTHING;
 
 	/*
@@ -962,6 +977,7 @@ start:
 
 		memcpy(buf, &(rr->data[rr->off]), n);
 		if (!peek) {
+			memset(&(rr->data[rr->off]), 0, n);
 			rr->length -= n;
 			rr->off += n;
 			if (rr->length == 0) {
@@ -1055,7 +1071,6 @@ start:
 				if (!(s->mode & SSL_MODE_AUTO_RETRY)) {
 					if (s->s3->rbuf.left == 0) {
 						/* no read-ahead left? */
-						BIO *bio;
 			/* In the case where we try to read application data,
 			 * but we trigger an SSL handshake, we return -1 with
 			 * the retry option set.  Otherwise renegotiation may
@@ -1080,7 +1095,6 @@ start:
 	if (s->server &&
 	    SSL_is_init_finished(s) &&
 	    !s->s3->send_connection_binding &&
-	    (s->version > SSL3_VERSION) &&
 	    (s->s3->handshake_fragment_len >= 4) &&
 	    (s->s3->handshake_fragment[0] == SSL3_MT_CLIENT_HELLO) &&
 	    (s->session != NULL) && (s->session->cipher != NULL)) {
@@ -1345,10 +1359,6 @@ ssl3_send_alert(SSL *s, int level, int desc)
 {
 	/* Map tls/ssl alert value to correct one */
 	desc = s->method->ssl3_enc->alert_value(desc);
-	if (s->version == SSL3_VERSION && desc == SSL_AD_PROTOCOL_VERSION) {
-		/* SSL 3.0 does not have protocol_version alerts */
-		desc = SSL_AD_HANDSHAKE_FAILURE;
-	}
 	if (desc < 0)
 		return -1;
 	/* If a fatal one, remove from cache */

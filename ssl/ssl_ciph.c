@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_ciph.c,v 1.80 2015/01/26 13:06:39 jsing Exp $ */
+/* $OpenBSD: ssl_ciph.c,v 1.85 2016/04/28 16:06:53 jsing Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -414,7 +414,7 @@ static const SSL_CIPHER cipher_aliases[] = {
 	},
 	{
 		.name = SSL_TXT_CHACHA20,
-		.algorithm_enc = SSL_CHACHA20POLY1305,
+		.algorithm_enc = SSL_CHACHA20POLY1305|SSL_CHACHA20POLY1305_OLD,
 	},
 
 	/* MAC aliases */
@@ -732,6 +732,9 @@ ssl_cipher_get_evp_aead(const SSL_SESSION *s, const EVP_AEAD **aead)
 #if !defined(OPENSSL_NO_CHACHA) && !defined(OPENSSL_NO_POLY1305)
 	case SSL_CHACHA20POLY1305:
 		*aead = EVP_aead_chacha20_poly1305();
+		return 1;
+	case SSL_CHACHA20POLY1305_OLD:
+		*aead = EVP_aead_chacha20_poly1305_old();
 		return 1;
 #endif
 	default:
@@ -1358,6 +1361,16 @@ ssl_cipher_process_rulestr(const char *rule_str, CIPHER_ORDER **head_p,
 	return (retval);
 }
 
+static inline int
+ssl_aes_is_accelerated(void)
+{
+#if defined(__i386__) || defined(__x86_64__)
+	return ((OPENSSL_cpu_caps() & (1ULL << 57)) != 0);
+#else
+	return (0);
+#endif
+}
+
 STACK_OF(SSL_CIPHER) *
 ssl_create_cipher_list(const SSL_METHOD *ssl_method,
     STACK_OF(SSL_CIPHER) **cipher_list,
@@ -1406,12 +1419,29 @@ ssl_create_cipher_list(const SSL_METHOD *ssl_method,
 	ssl_cipher_apply_rule(0, SSL_kECDHE, 0, 0, 0, 0, 0, CIPHER_ADD, -1, &head, &tail);
 	ssl_cipher_apply_rule(0, SSL_kECDHE, 0, 0, 0, 0, 0, CIPHER_DEL, -1, &head, &tail);
 
-	/*
-	 * CHACHA20 is fast and safe on all hardware and is thus our preferred
-	 * symmetric cipher, with AES second.
-	 */
-	ssl_cipher_apply_rule(0, 0, 0, SSL_CHACHA20POLY1305, 0, 0, 0, CIPHER_ADD, -1, &head, &tail);
-	ssl_cipher_apply_rule(0, 0, 0, SSL_AES, 0, 0, 0, CIPHER_ADD, -1, &head, &tail);
+	if (ssl_aes_is_accelerated() == 1) {
+		/*
+		 * We have hardware assisted AES - prefer AES as a symmetric
+		 * cipher, with CHACHA20 second.
+		 */
+		ssl_cipher_apply_rule(0, 0, 0, SSL_AES, 0, 0, 0,
+		    CIPHER_ADD, -1, &head, &tail);
+		ssl_cipher_apply_rule(0, 0, 0, SSL_CHACHA20POLY1305,
+		    0, 0, 0, CIPHER_ADD, -1, &head, &tail);
+		ssl_cipher_apply_rule(0, 0, 0, SSL_CHACHA20POLY1305_OLD,
+		    0, 0, 0, CIPHER_ADD, -1, &head, &tail);
+	} else {
+		/*
+		 * CHACHA20 is fast and safe on all hardware and is thus our
+		 * preferred symmetric cipher, with AES second.
+		 */
+		ssl_cipher_apply_rule(0, 0, 0, SSL_CHACHA20POLY1305,
+		    0, 0, 0, CIPHER_ADD, -1, &head, &tail);
+		ssl_cipher_apply_rule(0, 0, 0, SSL_CHACHA20POLY1305_OLD,
+		    0, 0, 0, CIPHER_ADD, -1, &head, &tail);
+		ssl_cipher_apply_rule(0, 0, 0, SSL_AES, 0, 0, 0,
+		    CIPHER_ADD, -1, &head, &tail);
+	}
 
 	/* Temporarily enable everything else for sorting */
 	ssl_cipher_apply_rule(0, 0, 0, 0, 0, 0, 0, CIPHER_ADD, -1, &head, &tail);
@@ -1428,7 +1458,7 @@ ssl_create_cipher_list(const SSL_METHOD *ssl_method,
 	ssl_cipher_apply_rule(0, 0, SSL_aECDH, 0, 0, 0, 0, CIPHER_ORD, -1, &head, &tail);
 	ssl_cipher_apply_rule(0, SSL_kRSA, 0, 0, 0, 0, 0, CIPHER_ORD, -1, &head, &tail);
 
-	/* RC4 is sort-of broken -- move the the end */
+	/* RC4 is sort of broken - move it to the end */
 	ssl_cipher_apply_rule(0, 0, 0, SSL_RC4, 0, 0, 0, CIPHER_ORD, -1, &head, &tail);
 
 	/* Now sort by symmetric encryption strength.  The above ordering remains
@@ -1643,6 +1673,9 @@ SSL_CIPHER_description(const SSL_CIPHER *cipher, char *buf, int len)
 		break;
 	case SSL_CHACHA20POLY1305:
 		enc = "ChaCha20-Poly1305";
+		break;
+	case SSL_CHACHA20POLY1305_OLD:
+		enc = "ChaCha20-Poly1305-Old";
 		break;
 	case SSL_eGOST2814789CNT:
 		enc = "GOST-28178-89-CNT";

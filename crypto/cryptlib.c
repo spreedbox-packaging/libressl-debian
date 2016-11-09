@@ -1,4 +1,4 @@
-/* $OpenBSD: cryptlib.c,v 1.33 2014/07/22 02:21:20 beck Exp $ */
+/* $OpenBSD: cryptlib.c,v 1.36 2015/09/13 10:02:49 miod Exp $ */
 /* ====================================================================
  * Copyright (c) 1998-2006 The OpenSSL Project.  All rights reserved.
  *
@@ -114,7 +114,9 @@
  * SUN MICROSYSTEMS, INC., and contributed to the OpenSSL project.
  */
 
+#include <limits.h>
 #include <stdarg.h>
+#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -431,9 +433,9 @@ CRYPTO_THREADID_set_pointer(CRYPTO_THREADID *id, void *ptr)
 {
 	memset(id, 0, sizeof(*id));
 	id->ptr = ptr;
-#if LONG_MAX >= INTPTR_MAX
+#if ULONG_MAX >= UINTPTR_MAX
 	/*s u 'ptr' can be embedded in 'val' without loss of uniqueness */
-	id->val = (unsigned long)id->ptr;
+	id->val = (uintptr_t)id->ptr;
 #else
 	{
 		SHA256_CTX ctx;
@@ -626,17 +628,11 @@ CRYPTO_get_lock_name(int type)
 	defined(__x86_64) || defined(__x86_64__) || defined(_M_AMD64) || defined(_M_X64)
 
 unsigned int  OPENSSL_ia32cap_P[2];
-unsigned long *
-OPENSSL_ia32cap_loc(void)
+
+uint64_t
+OPENSSL_cpu_caps(void)
 {
-	if (sizeof(long) == 4)
-		/*
-		 * If 32-bit application pulls address of OPENSSL_ia32cap_P[0]
-		 * clear second element to maintain the illusion that vector
-		 * is 32-bit.
-		 */
-		OPENSSL_ia32cap_P[1] = 0;
-	return (unsigned long *)OPENSSL_ia32cap_P;
+	return *(uint64_t *)OPENSSL_ia32cap_P;
 }
 
 #if defined(OPENSSL_CPUID_OBJ) && !defined(OPENSSL_NO_ASM) && !defined(I386_ONLY)
@@ -670,6 +666,12 @@ unsigned long *
 OPENSSL_ia32cap_loc(void)
 {
 	return NULL;
+}
+
+uint64_t
+OPENSSL_cpu_caps(void)
+{
+	return 0;
 }
 #endif
 

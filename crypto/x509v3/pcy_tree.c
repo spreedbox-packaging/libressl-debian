@@ -1,4 +1,4 @@
-/* $OpenBSD: pcy_tree.c,v 1.12 2014/07/11 08:44:49 jsing Exp $ */
+/* $OpenBSD: pcy_tree.c,v 1.15 2015/07/18 00:01:05 beck Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 2004.
  */
@@ -233,7 +233,7 @@ tree_init(X509_POLICY_TREE **ptree, STACK_OF(X509) *certs, unsigned int flags)
 
 	data = policy_data_new(NULL, OBJ_nid2obj(NID_any_policy), 0);
 
-	if (!data || !level_add_node(level, data, NULL, tree))
+	if (!data || !level_add_node(level, data, NULL, tree, NULL))
 		goto bad_tree;
 
 	for (i = n - 2; i >= 0; i--) {
@@ -297,13 +297,13 @@ tree_link_matching_nodes(X509_POLICY_LEVEL *curr, const X509_POLICY_DATA *data)
 	for (i = 0; i < sk_X509_POLICY_NODE_num(last->nodes); i++) {
 		node = sk_X509_POLICY_NODE_value(last->nodes, i);
 		if (policy_node_match(last, node, data->valid_policy)) {
-			if (!level_add_node(curr, data, node, NULL))
+			if (!level_add_node(curr, data, node, NULL, NULL))
 				return 0;
 			matched = 1;
 		}
 	}
 	if (!matched && last->anyPolicy) {
-		if (!level_add_node(curr, data, last->anyPolicy, NULL))
+		if (!level_add_node(curr, data, last->anyPolicy, NULL, NULL))
 			return 0;
 	}
 	return 1;
@@ -352,7 +352,7 @@ tree_add_unmatched(X509_POLICY_LEVEL *curr, const X509_POLICY_CACHE *cache,
 	/* Curr may not have anyPolicy */
 	data->qualifier_set = cache->anyPolicy->qualifier_set;
 	data->flags |= POLICY_DATA_FLAG_SHARED_QUALIFIERS;
-	if (!level_add_node(curr, data, node, tree)) {
+	if (!level_add_node(curr, data, node, tree, NULL)) {
 		policy_data_free(data);
 		return 0;
 	}
@@ -410,7 +410,7 @@ tree_link_any(X509_POLICY_LEVEL *curr, const X509_POLICY_CACHE *cache,
 	/* Finally add link to anyPolicy */
 	if (last->anyPolicy) {
 		if (!level_add_node(curr, cache->anyPolicy,
-		    last->anyPolicy, NULL))
+		    last->anyPolicy, NULL, NULL))
 			return 0;
 	}
 	return 1;
@@ -581,8 +581,8 @@ tree_calculate_user_set(X509_POLICY_TREE *tree,
 			extra->qualifier_set = anyPolicy->data->qualifier_set;
 			extra->flags = POLICY_DATA_FLAG_SHARED_QUALIFIERS |
 			    POLICY_DATA_FLAG_EXTRA_NODE;
-			node = level_add_node(NULL, extra, anyPolicy->parent,
-			    tree);
+			(void) level_add_node(NULL, extra, anyPolicy->parent,
+			    tree, &node);
 		}
 		if (!tree->user_policies) {
 			tree->user_policies = sk_X509_POLICY_NODE_new_null();
@@ -639,8 +639,7 @@ X509_policy_tree_free(X509_POLICY_TREE *tree)
 	sk_X509_POLICY_NODE_pop_free(tree->user_policies, exnode_free);
 
 	for (i = 0, curr = tree->levels; i < tree->nlevel; i++, curr++) {
-		if (curr->cert)
-			X509_free(curr->cert);
+		X509_free(curr->cert);
 		if (curr->nodes)
 			sk_X509_POLICY_NODE_pop_free(curr->nodes,
 		    policy_node_free);
@@ -669,7 +668,7 @@ X509_policy_check(X509_POLICY_TREE **ptree, int *pexplicit_policy,
     STACK_OF(X509) *certs, STACK_OF(ASN1_OBJECT) *policy_oids,
     unsigned int flags)
 {
-	int ret;
+	int ret, ret2;
 	X509_POLICY_TREE *tree = NULL;
 	STACK_OF(X509_POLICY_NODE) *nodes, *auth_nodes = NULL;
 
@@ -739,15 +738,17 @@ X509_policy_check(X509_POLICY_TREE **ptree, int *pexplicit_policy,
 	/* Tree is not empty: continue */
 
 	ret = tree_calculate_authority_set(tree, &auth_nodes);
-
-	if (!ret)
+	if (ret == 0)
 		goto error;
 
-	if (!tree_calculate_user_set(tree, policy_oids, auth_nodes))
-		goto error;
+	ret2 = tree_calculate_user_set(tree, policy_oids, auth_nodes);
 
+	/* Return value 2 means auth_nodes needs to be freed */
 	if (ret == 2)
 		sk_X509_POLICY_NODE_free(auth_nodes);
+
+	if (ret2 == 0)
+		goto error;
 
 	if (tree)
 		*ptree = tree;

@@ -1,4 +1,4 @@
-/* $OpenBSD: eng_list.c,v 1.16 2015/02/07 13:19:15 doug Exp $ */
+/* $OpenBSD: eng_list.c,v 1.20 2015/06/19 06:32:43 bcook Exp $ */
 /* Written by Geoff Thorpe (geoff@geoffthorpe.net) for the OpenSSL
  * project 2000.
  */
@@ -92,11 +92,8 @@ engine_list_cleanup(void)
 {
 	ENGINE *iterator = engine_list_head;
 
-	while (iterator != NULL) {
-		ENGINE_remove(iterator);
+	while (iterator != NULL && ENGINE_remove(iterator))
 		iterator = engine_list_head;
-	}
-	return;
 }
 
 /* These static functions starting with a lower case "engine_" always
@@ -351,7 +348,6 @@ ENGINE *
 ENGINE_by_id(const char *id)
 {
 	ENGINE *iterator;
-	char *load_dir = NULL;
 
 	if (id == NULL) {
 		ENGINEerr(ENGINE_F_ENGINE_BY_ID,
@@ -381,35 +377,11 @@ ENGINE_by_id(const char *id)
 	}
 	CRYPTO_w_unlock(CRYPTO_LOCK_ENGINE);
 
-	/* EEK! Experimental code starts */
-	if (iterator)
-		return iterator;
-	/* Prevent infinite recusrion if we're looking for the dynamic engine. */
-	if (strcmp(id, "dynamic")) {
-		if (issetugid() == 0) {
-			load_dir = getenv("OPENSSL_ENGINES");
-			if (load_dir == NULL)
-				load_dir = ENGINESDIR;
-		} else
-			load_dir = ENGINESDIR;
-
-		iterator = ENGINE_by_id("dynamic");
-		if (!iterator ||
-		    !ENGINE_ctrl_cmd_string(iterator, "ID", id, 0) ||
-		    !ENGINE_ctrl_cmd_string(iterator, "DIR_LOAD", "2", 0) ||
-		    !ENGINE_ctrl_cmd_string(iterator, "DIR_ADD", load_dir, 0) ||
-		    !ENGINE_ctrl_cmd_string(iterator, "LIST_ADD", "1", 0) ||
-		    !ENGINE_ctrl_cmd_string(iterator, "LOAD", NULL, 0))
-			goto notfound;
-		return iterator;
+	if (iterator == NULL) {
+		ENGINEerr(ENGINE_F_ENGINE_BY_ID, ENGINE_R_NO_SUCH_ENGINE);
+		ERR_asprintf_error_data("id=%s", id);
 	}
-
-notfound:
-	ENGINE_free(iterator);
-	ENGINEerr(ENGINE_F_ENGINE_BY_ID, ENGINE_R_NO_SUCH_ENGINE);
-	ERR_asprintf_error_data("id=%s", id);
-	return NULL;
-	/* EEK! Experimental code ends */
+	return iterator;
 }
 
 int

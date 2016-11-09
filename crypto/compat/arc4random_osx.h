@@ -1,4 +1,4 @@
-/*	$OpenBSD: arc4random_osx.h,v 1.8 2014/08/13 06:04:10 deraadt Exp $	*/
+/*	$OpenBSD: arc4random_osx.h,v 1.10 2015/09/11 11:52:55 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1996, David Mazieres <dm@uun.org>
@@ -67,14 +67,15 @@ _rs_allocate(struct _rs **rsp, struct _rsx **rsxp)
 {
 	if ((*rsp = mmap(NULL, sizeof(**rsp), PROT_READ|PROT_WRITE,
 	    MAP_ANON|MAP_PRIVATE, -1, 0)) == MAP_FAILED)
-		return -1;
+		return (-1);
 
 	if ((*rsxp = mmap(NULL, sizeof(**rsxp), PROT_READ|PROT_WRITE,
 	    MAP_ANON|MAP_PRIVATE, -1, 0)) == MAP_FAILED) {
 		munmap(*rsp, sizeof(**rsp));
-		return -1;
+		*rsp = NULL;
+		return (-1);
 	}
 
 	_ARC4_ATFORK(_rs_forkhandler);
-	return 0;
+	return (0);
 }

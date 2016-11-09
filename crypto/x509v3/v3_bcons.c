@@ -1,4 +1,4 @@
-/* $OpenBSD: v3_bcons.c,v 1.10 2014/07/11 08:44:49 jsing Exp $ */
+/* $OpenBSD: v3_bcons.c,v 1.12 2015/07/25 16:00:14 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -71,20 +71,48 @@ static BASIC_CONSTRAINTS *v2i_BASIC_CONSTRAINTS(X509V3_EXT_METHOD *method,
     X509V3_CTX *ctx, STACK_OF(CONF_VALUE) *values);
 
 const X509V3_EXT_METHOD v3_bcons = {
-	NID_basic_constraints, 0,
-	ASN1_ITEM_ref(BASIC_CONSTRAINTS),
-	0, 0, 0, 0,
-	0, 0,
-	(X509V3_EXT_I2V)i2v_BASIC_CONSTRAINTS,
-	(X509V3_EXT_V2I)v2i_BASIC_CONSTRAINTS,
-	NULL, NULL,
-	NULL
+	.ext_nid = NID_basic_constraints,
+	.ext_flags = 0,
+	.it = ASN1_ITEM_ref(BASIC_CONSTRAINTS),
+	.ext_new = NULL,
+	.ext_free = NULL,
+	.d2i = NULL,
+	.i2d = NULL,
+	.i2s = NULL,
+	.s2i = NULL,
+	.i2v = (X509V3_EXT_I2V)i2v_BASIC_CONSTRAINTS,
+	.v2i = (X509V3_EXT_V2I)v2i_BASIC_CONSTRAINTS,
+	.i2r = NULL,
+	.r2i = NULL,
+	.usr_data = NULL,
 };
 
-ASN1_SEQUENCE(BASIC_CONSTRAINTS) = {
-	ASN1_OPT(BASIC_CONSTRAINTS, ca, ASN1_FBOOLEAN),
-	ASN1_OPT(BASIC_CONSTRAINTS, pathlen, ASN1_INTEGER)
-} ASN1_SEQUENCE_END(BASIC_CONSTRAINTS)
+static const ASN1_TEMPLATE BASIC_CONSTRAINTS_seq_tt[] = {
+	{
+		.flags = ASN1_TFLG_OPTIONAL,
+		.tag = 0,
+		.offset = offsetof(BASIC_CONSTRAINTS, ca),
+		.field_name = "ca",
+		.item = &ASN1_FBOOLEAN_it,
+	},
+	{
+		.flags = ASN1_TFLG_OPTIONAL,
+		.tag = 0,
+		.offset = offsetof(BASIC_CONSTRAINTS, pathlen),
+		.field_name = "pathlen",
+		.item = &ASN1_INTEGER_it,
+	},
+};
+
+const ASN1_ITEM BASIC_CONSTRAINTS_it = {
+	.itype = ASN1_ITYPE_SEQUENCE,
+	.utype = V_ASN1_SEQUENCE,
+	.templates = BASIC_CONSTRAINTS_seq_tt,
+	.tcount = sizeof(BASIC_CONSTRAINTS_seq_tt) / sizeof(ASN1_TEMPLATE),
+	.funcs = NULL,
+	.size = sizeof(BASIC_CONSTRAINTS),
+	.sname = "BASIC_CONSTRAINTS",
+};
 
 
 BASIC_CONSTRAINTS *

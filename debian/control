@@ -8,13 +8,14 @@ Build-Depends:
  debhelper (>= 9~),
  dh-autoreconf,
  libtool,
+ perl,
  quilt
 Standards-Version: 3.9.3
 Homepage: http://www.libressl.org/
 Vcs-Git: http://git.intranet.struktur.de/debian/libressl.git
 Vcs-Browser: http://git.intranet.struktur.de/debian/libressl
 
-Package: libressl-crypto-32
+Package: libressl-crypto-38
 Architecture: any
 Multi-Arch: same
 Pre-Depends:
@@ -30,7 +31,7 @@ Description: SSL library, forked from OpenSSL - crypto library
  .
  This package provides the "-crypto" library.
 
-Package: libressl-ssl-32
+Package: libressl-ssl-39
 Architecture: any
 Multi-Arch: same
 Pre-Depends:
@@ -46,7 +47,7 @@ Description: SSL library, forked from OpenSSL - SSL library
  .
  This package provides the "-ssl" library.
 
-Package: libressl-tls-3
+Package: libressl-tls-11
 Architecture: any
 Multi-Arch: same
 Pre-Depends:

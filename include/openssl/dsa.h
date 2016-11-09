@@ -1,4 +1,4 @@
-/* $OpenBSD: dsa.h,v 1.17 2014/06/12 15:49:28 deraadt Exp $ */
+/* $OpenBSD: dsa.h,v 1.20 2016/06/21 04:16:53 bcook Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -89,13 +89,6 @@
 #endif
 
 #define DSA_FLAG_CACHE_MONT_P	0x01
-#define DSA_FLAG_NO_EXP_CONSTTIME       0x02 /* new with 0.9.7h; the built-in DSA
-                                              * implementation now uses constant time
-                                              * modular exponentiation for secret exponents
-                                              * by default. This flag causes the
-                                              * faster variable sliding window method to
-                                              * be used for all exponents.
-                                              */
 
 /* If this flag is set the DSA method is FIPS compliant and can be used
  * in FIPS mode. This is set in the validated module method. If an
@@ -221,9 +214,17 @@ int DSA_get_ex_new_index(long argl, void *argp, CRYPTO_EX_new *new_func,
 int DSA_set_ex_data(DSA *d, int idx, void *arg);
 void *DSA_get_ex_data(DSA *d, int idx);
 
-DSA *	d2i_DSAPublicKey(DSA **a, const unsigned char **pp, long length);
-DSA *	d2i_DSAPrivateKey(DSA **a, const unsigned char **pp, long length);
-DSA * 	d2i_DSAparams(DSA **a, const unsigned char **pp, long length);
+DSA *d2i_DSAPublicKey(DSA **a, const unsigned char **pp, long length);
+int i2d_DSAPublicKey(const DSA *a, unsigned char **pp);
+extern const ASN1_ITEM DSAPublicKey_it;
+
+DSA *d2i_DSAPrivateKey(DSA **a, const unsigned char **pp, long length);
+int i2d_DSAPrivateKey(const DSA *a, unsigned char **pp);
+extern const ASN1_ITEM DSAPrivateKey_it;
+
+DSA *d2i_DSAparams(DSA **a, const unsigned char **pp, long length);
+int i2d_DSAparams(const DSA *a,unsigned char **pp);
+extern const ASN1_ITEM DSAparams_it;
 
 /* Deprecated version */
 #ifndef OPENSSL_NO_DEPRECATED
@@ -239,9 +240,6 @@ int	DSA_generate_parameters_ex(DSA *dsa, int bits,
 		int *counter_ret, unsigned long *h_ret, BN_GENCB *cb);
 
 int	DSA_generate_key(DSA *a);
-int	i2d_DSAPublicKey(const DSA *a, unsigned char **pp);
-int 	i2d_DSAPrivateKey(const DSA *a, unsigned char **pp);
-int	i2d_DSAparams(const DSA *a,unsigned char **pp);
 
 #ifndef OPENSSL_NO_BIO
 int	DSAparams_print(BIO *bp, const DSA *x);

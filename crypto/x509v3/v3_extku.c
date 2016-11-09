@@ -1,4 +1,4 @@
-/* $OpenBSD: v3_extku.c,v 1.10 2014/10/28 05:46:56 miod Exp $ */
+/* $OpenBSD: v3_extku.c,v 1.12 2015/07/25 16:00:14 jsing Exp $ */
 /* Written by Dr Stephen N Henson (steve@openssl.org) for the OpenSSL
  * project 1999.
  */
@@ -69,32 +69,57 @@ static STACK_OF(CONF_VALUE) *i2v_EXTENDED_KEY_USAGE(
     const X509V3_EXT_METHOD *method, void *eku, STACK_OF(CONF_VALUE) *extlist);
 
 const X509V3_EXT_METHOD v3_ext_ku = {
-	NID_ext_key_usage, 0,
-	ASN1_ITEM_ref(EXTENDED_KEY_USAGE),
-	0, 0, 0, 0,
-	0, 0,
-	i2v_EXTENDED_KEY_USAGE,
-	v2i_EXTENDED_KEY_USAGE,
-	0, 0,
-	NULL
+	.ext_nid = NID_ext_key_usage,
+	.ext_flags = 0,
+	.it = ASN1_ITEM_ref(EXTENDED_KEY_USAGE),
+	.ext_new = NULL,
+	.ext_free = NULL,
+	.d2i = NULL,
+	.i2d = NULL,
+	.i2s = NULL,
+	.s2i = NULL,
+	.i2v = i2v_EXTENDED_KEY_USAGE,
+	.v2i = v2i_EXTENDED_KEY_USAGE,
+	.i2r = NULL,
+	.r2i = NULL,
+	.usr_data = NULL,
 };
 
 /* NB OCSP acceptable responses also is a SEQUENCE OF OBJECT */
 const X509V3_EXT_METHOD v3_ocsp_accresp = {
-	NID_id_pkix_OCSP_acceptableResponses, 0,
-	ASN1_ITEM_ref(EXTENDED_KEY_USAGE),
-	0, 0, 0, 0,
-	0, 0,
-	i2v_EXTENDED_KEY_USAGE,
-	v2i_EXTENDED_KEY_USAGE,
-	0, 0,
-	NULL
+	.ext_nid = NID_id_pkix_OCSP_acceptableResponses,
+	.ext_flags = 0,
+	.it = ASN1_ITEM_ref(EXTENDED_KEY_USAGE),
+	.ext_new = NULL,
+	.ext_free = NULL,
+	.d2i = NULL,
+	.i2d = NULL,
+	.i2s = NULL,
+	.s2i = NULL,
+	.i2v = i2v_EXTENDED_KEY_USAGE,
+	.v2i = v2i_EXTENDED_KEY_USAGE,
+	.i2r = NULL,
+	.r2i = NULL,
+	.usr_data = NULL,
 };
 
-ASN1_ITEM_TEMPLATE(EXTENDED_KEY_USAGE) =
-    ASN1_EX_TEMPLATE_TYPE(ASN1_TFLG_SEQUENCE_OF, 0, EXTENDED_KEY_USAGE,
-	ASN1_OBJECT)
-ASN1_ITEM_TEMPLATE_END(EXTENDED_KEY_USAGE)
+static const ASN1_TEMPLATE EXTENDED_KEY_USAGE_item_tt = {
+	.flags = ASN1_TFLG_SEQUENCE_OF,
+	.tag = 0,
+	.offset = 0,
+	.field_name = "EXTENDED_KEY_USAGE",
+	.item = &ASN1_OBJECT_it,
+};
+
+const ASN1_ITEM EXTENDED_KEY_USAGE_it = {
+	.itype = ASN1_ITYPE_PRIMITIVE,
+	.utype = -1,
+	.templates = &EXTENDED_KEY_USAGE_item_tt,
+	.tcount = 0,
+	.funcs = NULL,
+	.size = 0,
+	.sname = "EXTENDED_KEY_USAGE",
+};
 
 
 EXTENDED_KEY_USAGE *

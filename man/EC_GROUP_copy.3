@@ -68,72 +68,10 @@
 .    \}
 .\}
 .rr rF
-.\"
-.\" Accent mark definitions (@(#)ms.acc 1.5 88/02/08 SMI; from UCB 4.2).
-.\" Fear.  Run.  Save yourself.  No user-serviceable parts.
-.    \" fudge factors for nroff and troff
-.if n \{\
-.    ds #H 0
-.    ds #V .8m
-.    ds #F .3m
-.    ds #[ \f1
-.    ds #] \fP
-.\}
-.if t \{\
-.    ds #H ((1u-(\\\\n(.fu%2u))*.13m)
-.    ds #V .6m
-.    ds #F 0
-.    ds #[ \&
-.    ds #] \&
-.\}
-.    \" simple accents for nroff and troff
-.if n \{\
-.    ds ' \&
-.    ds ` \&
-.    ds ^ \&
-.    ds , \&
-.    ds ~ ~
-.    ds /
-.\}
-.if t \{\
-.    ds ' \\k:\h'-(\\n(.wu*8/10-\*(#H)'\'\h"|\\n:u"
-.    ds ` \\k:\h'-(\\n(.wu*8/10-\*(#H)'\`\h'|\\n:u'
-.    ds ^ \\k:\h'-(\\n(.wu*10/11-\*(#H)'^\h'|\\n:u'
-.    ds , \\k:\h'-(\\n(.wu*8/10)',\h'|\\n:u'
-.    ds ~ \\k:\h'-(\\n(.wu-\*(#H-.1m)'~\h'|\\n:u'
-.    ds / \\k:\h'-(\\n(.wu*8/10-\*(#H)'\z\(sl\h'|\\n:u'
-.\}
-.    \" troff and (daisy-wheel) nroff accents
-.ds : \\k:\h'-(\\n(.wu*8/10-\*(#H+.1m+\*(#F)'\v'-\*(#V'\z.\h'.2m+\*(#F'.\h'|\\n:u'\v'\*(#V'
-.ds 8 \h'\*(#H'\(*b\h'-\*(#H'
-.ds o \\k:\h'-(\\n(.wu+\w'\(de'u-\*(#H)/2u'\v'-.3n'\*(#[\z\(de\v'.3n'\h'|\\n:u'\*(#]
-.ds d- \h'\*(#H'\(pd\h'-\w'~'u'\v'-.25m'\f2\(hy\fP\v'.25m'\h'-\*(#H'
-.ds D- D\\k:\h'-\w'D'u'\v'-.11m'\z\(hy\v'.11m'\h'|\\n:u'
-.ds th \*(#[\v'.3m'\s+1I\s-1\v'-.3m'\h'-(\w'I'u*2/3)'\s-1o\s+1\*(#]
-.ds Th \*(#[\s+2I\s-2\h'-\w'I'u*3/5'\v'-.3m'o\v'.3m'\*(#]
-.ds ae a\h'-(\w'a'u*4/10)'e
-.ds Ae A\h'-(\w'A'u*4/10)'E
-.    \" corrections for vroff
-.if v .ds ~ \\k:\h'-(\\n(.wu*9/10-\*(#H)'\s-2\u~\d\s+2\h'|\\n:u'
-.if v .ds ^ \\k:\h'-(\\n(.wu*10/11-\*(#H)'\v'-.4m'^\v'.4m'\h'|\\n:u'
-.    \" for low resolution devices (crt and lpr)
-.if \n(.H>23 .if \n(.V>19 \
-\{\
-.    ds : e
-.    ds 8 ss
-.    ds o a
-.    ds d- d\h'-1'\(ga
-.    ds D- D\h'-1'\(hy
-.    ds th \o'bp'
-.    ds Th \o'LP'
-.    ds ae ae
-.    ds Ae AE
-.\}
-.rm #[ #] #H #V #F C
 .\" ========================================================================
 .\"
 .IX Title "EC_GROUP_copy 3"
-.TH EC_GROUP_copy 3 "2016-01-28" "LibreSSL " "LibreSSL"
+.TH EC_GROUP_copy 3 "2016-11-06" "LibreSSL " "LibreSSL"
 .\" For nroff, turn off justification.  Always turn off hyphenation; it makes
 .\" way too many mistakes in technical documents.
 .if n .ad l
@@ -211,7 +149,7 @@ If the asn1_flag is 1 then this is a named curve with an associated \s-1ASN1 OID
 EC_GROUP_get_asn1_flag and EC_GROUP_set_asn1_flag get and set the status of the asn1_flag for the curve. If set then
 the curve_name must also be set.
 .PP
-The point_coversion_form for a curve controls how \s-1EC_POINT\s0 data is encoded as \s-1ASN1\s0 as defined in X9.62 (\s-1ECDSA\s0).
+The point_conversion_form for a curve controls how \s-1EC_POINT\s0 data is encoded as \s-1ASN1\s0 as defined in X9.62 (\s-1ECDSA\s0).
 point_conversion_form_t is an enum defined as follows:
 .PP
 .Vb 10
@@ -273,7 +211,7 @@ or a pentanomial of the form:
 f(x) = x^m + x^k3 + x^k2 + x^k1 + 1 with m > k3 > k2 > k1 >= 1
 .PP
 The function EC_GROUP_get_basis_type returns a \s-1NID\s0 identifying whether a trinomial or pentanomial is in use for the field. The
-function EC_GROUP_get_trinomial_basis must only be called where f(x) is of the trinomial form, and returns the value of \fBk\fR. Similary
+function EC_GROUP_get_trinomial_basis must only be called where f(x) is of the trinomial form, and returns the value of \fBk\fR. Similarly
 the function EC_GROUP_get_pentanomial_basis must only be called where f(x) is of the pentanomial form, and returns the values of \fBk1\fR,
 \&\fBk2\fR and \fBk3\fR respectively.
 .SH "RETURN VALUES"
@@ -295,7 +233,7 @@ EC_GROUP_get0_seed returns a pointer to the seed that was used to generate the p
 specified. EC_GROUP_get_seed_len returns the length of the seed or 0 if the seed is not specified.
 .PP
 EC_GROUP_set_seed returns the length of the seed that has been set. If the supplied seed is \s-1NULL,\s0 or the supplied seed length is
-0, the the return value will be 1. On error 0 is returned.
+0, the return value will be 1. On error 0 is returned.
 .PP
 EC_GROUP_cmp returns 0 if the curves are equal, 1 if they are not equal, or \-1 on error.
 .PP

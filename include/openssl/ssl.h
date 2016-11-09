@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl.h,v 1.82 2015/02/12 03:45:25 jsing Exp $ */
+/* $OpenBSD: ssl.h,v 1.95 2015/10/25 15:58:57 doug Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -302,7 +302,6 @@ extern "C" {
 #define SSL_TXT_STREEBOG512		"STREEBOG512"
 
 #define SSL_TXT_DTLS1		"DTLSv1"
-#define SSL_TXT_DTLS1_BAD	"DTLSv1-bad"
 #define SSL_TXT_SSLV2		"SSLv2"
 #define SSL_TXT_SSLV3		"SSLv3"
 #define SSL_TXT_TLSV1		"TLSv1"
@@ -382,7 +381,6 @@ struct ssl_cipher_st {
 	const char *name;		/* text name */
 	unsigned long id;		/* id, 4 bytes, first is version */
 
-	/* changed in 0.9.9: these four used to be portions of a single value 'algorithms' */
 	unsigned long algorithm_mkey;	/* key exchange algorithm */
 	unsigned long algorithm_auth;	/* server authentication */
 	unsigned long algorithm_enc;	/* symmetric encryption */
@@ -517,23 +515,9 @@ struct ssl_session_st {
 
 #endif
 
-#define SSL_OP_MICROSOFT_SESS_ID_BUG			0x00000001L
-#define SSL_OP_NETSCAPE_CHALLENGE_BUG			0x00000002L
 /* Allow initial connection to servers that don't support RI */
 #define SSL_OP_LEGACY_SERVER_CONNECT			0x00000004L
-#define SSL_OP_NETSCAPE_REUSE_CIPHER_CHANGE_BUG		0x00000008L
 #define SSL_OP_TLSEXT_PADDING				0x00000010L
-#define SSL_OP_MICROSOFT_BIG_SSLV3_BUFFER		0x00000020L
-#define SSL_OP_SAFARI_ECDHE_ECDSA_BUG			0x00000040L
-#define SSL_OP_SSLEAY_080_CLIENT_DH_BUG			0x00000080L
-#define SSL_OP_TLS_D5_BUG				0x00000100L
-#define SSL_OP_TLS_BLOCK_PADDING_BUG			0x00000200L
-
-/* Hasn't done anything since OpenSSL 0.9.7h, retained for compatibility */
-#define SSL_OP_MSIE_SSLV2_RSA_PADDING			0x0
-
-/* Refers to ancient SSLREF and SSLv2, retained for compatibility */
-#define SSL_OP_SSLREF2_REUSE_CERT_TYPE_BUG		0x0
 
 /* Disable SSL 3.0/TLS 1.0 CBC vulnerability workaround that was added
  * in OpenSSL 0.9.6d.  Usually (depending on the application protocol)
@@ -542,34 +526,21 @@ struct ssl_session_st {
  * at all, which is why it was previously included in SSL_OP_ALL.
  * Now it's not.
  */
-#define SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS              0x00000800L /* added in 0.9.6e */
-
-/* SSL_OP_ALL: various bug workarounds that should be rather harmless.
- *             This used to be 0x000FFFFFL before 0.9.7. */
-#define SSL_OP_ALL					0x800003FFL
+#define SSL_OP_DONT_INSERT_EMPTY_FRAGMENTS		0x00000800L
 
 /* DTLS options */
-#define SSL_OP_NO_QUERY_MTU                 0x00001000L
+#define SSL_OP_NO_QUERY_MTU				0x00001000L
 /* Turn on Cookie Exchange (on relevant for servers) */
-#define SSL_OP_COOKIE_EXCHANGE              0x00002000L
+#define SSL_OP_COOKIE_EXCHANGE				0x00002000L
 /* Don't use RFC4507 ticket extension */
-#define SSL_OP_NO_TICKET	            0x00004000L
-/* Use Cisco's "speshul" version of DTLS_BAD_VER (as client)  */
-#define SSL_OP_CISCO_ANYCONNECT		    0x00008000L
+#define SSL_OP_NO_TICKET				0x00004000L
 
 /* As server, disallow session resumption on renegotiation */
 #define SSL_OP_NO_SESSION_RESUMPTION_ON_RENEGOTIATION	0x00010000L
-/* Don't use compression even if supported */
-#define SSL_OP_NO_COMPRESSION				0x00020000L
-/* Permit unsafe legacy renegotiation */
-#define SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION	0x00040000L
 /* If set, always create a new key when using tmp_ecdh parameters */
 #define SSL_OP_SINGLE_ECDH_USE				0x00080000L
 /* If set, always create a new key when using tmp_dh parameters */
 #define SSL_OP_SINGLE_DH_USE				0x00100000L
-/* Set to always use the tmp_rsa key when doing RSA operations,
- * even when this violates protocol specs */
-#define SSL_OP_EPHEMERAL_RSA				0x00200000L
 /* Set on servers to choose the cipher according to the server's
  * preferences */
 #define SSL_OP_CIPHER_SERVER_PREFERENCE			0x00400000L
@@ -579,23 +550,43 @@ struct ssl_session_st {
  * forbidden to prevent version rollback attacks. */
 #define SSL_OP_TLS_ROLLBACK_BUG				0x00800000L
 
-#define SSL_OP_NO_SSLv2					0x01000000L
-#define SSL_OP_NO_SSLv3					0x02000000L
 #define SSL_OP_NO_TLSv1					0x04000000L
 #define SSL_OP_NO_TLSv1_2				0x08000000L
 #define SSL_OP_NO_TLSv1_1				0x10000000L
 
-/* Obsolete flags kept for compatibility. No sane code should use them. */
-#define SSL_OP_PKCS1_CHECK_1				0x0
-#define SSL_OP_PKCS1_CHECK_2				0x0
-
-#define SSL_OP_NETSCAPE_CA_DN_BUG			0x20000000L
-#define SSL_OP_NETSCAPE_DEMO_CIPHER_CHANGE_BUG		0x40000000L
 /* Make server add server-hello extension from early version of
  * cryptopro draft, when GOST ciphersuite is negotiated.
  * Required for interoperability with CryptoPro CSP 3.x
  */
 #define SSL_OP_CRYPTOPRO_TLSEXT_BUG			0x80000000L
+
+/* SSL_OP_ALL: various bug workarounds that should be rather harmless. */
+#define SSL_OP_ALL \
+    (SSL_OP_LEGACY_SERVER_CONNECT | \
+     SSL_OP_TLSEXT_PADDING | \
+     SSL_OP_CRYPTOPRO_TLSEXT_BUG)
+
+/* Obsolete flags kept for compatibility. No sane code should use them. */
+#define SSL_OP_ALLOW_UNSAFE_LEGACY_RENEGOTIATION	0x0
+#define SSL_OP_CISCO_ANYCONNECT				0x0
+#define SSL_OP_EPHEMERAL_RSA				0x0
+#define SSL_OP_MICROSOFT_BIG_SSLV3_BUFFER		0x0
+#define SSL_OP_MICROSOFT_SESS_ID_BUG			0x0
+#define SSL_OP_MSIE_SSLV2_RSA_PADDING			0x0
+#define SSL_OP_NETSCAPE_CA_DN_BUG			0x0
+#define SSL_OP_NETSCAPE_CHALLENGE_BUG			0x0
+#define SSL_OP_NETSCAPE_DEMO_CIPHER_CHANGE_BUG		0x0
+#define SSL_OP_NETSCAPE_REUSE_CIPHER_CHANGE_BUG		0x0
+#define SSL_OP_NO_COMPRESSION				0x0
+#define SSL_OP_NO_SSLv2					0x0
+#define SSL_OP_NO_SSLv3					0x0
+#define SSL_OP_PKCS1_CHECK_1				0x0
+#define SSL_OP_PKCS1_CHECK_2				0x0
+#define SSL_OP_SAFARI_ECDHE_ECDSA_BUG			0x0
+#define SSL_OP_SSLEAY_080_CLIENT_DH_BUG			0x0
+#define SSL_OP_SSLREF2_REUSE_CERT_TYPE_BUG		0x0
+#define SSL_OP_TLS_BLOCK_PADDING_BUG			0x0
+#define SSL_OP_TLS_D5_BUG				0x0
 
 /* Allow SSL_write(..., n) to return r with 0 < r < n (i.e. report success
  * when just a single record has been written): */
@@ -756,8 +747,6 @@ struct ssl_ctx_st {
 	/* if defined, these override the X509_verify_cert() calls */
 	int (*app_verify_callback)(X509_STORE_CTX *, void *);
 	void *app_verify_arg;
-	/* before OpenSSL 0.9.7, 'app_verify_arg' was ignored
-	 * ('app_verify_callback' was called with just one argument) */
 
 	/* Default password callback. */
 	pem_password_cb *default_passwd_callback;
@@ -1356,6 +1345,7 @@ DECLARE_PEM_rw(SSL_SESSION, SSL_SESSION)
 #define SSL_AD_PROTOCOL_VERSION		TLS1_AD_PROTOCOL_VERSION /* fatal */
 #define SSL_AD_INSUFFICIENT_SECURITY	TLS1_AD_INSUFFICIENT_SECURITY/* fatal */
 #define SSL_AD_INTERNAL_ERROR		TLS1_AD_INTERNAL_ERROR	/* fatal */
+#define SSL_AD_INAPPROPRIATE_FALLBACK	TLS1_AD_INAPPROPRIATE_FALLBACK /* fatal */
 #define SSL_AD_USER_CANCELLED		TLS1_AD_USER_CANCELLED
 #define SSL_AD_NO_RENEGOTIATION		TLS1_AD_NO_RENEGOTIATION
 #define SSL_AD_UNSUPPORTED_EXTENSION	TLS1_AD_UNSUPPORTED_EXTENSION
@@ -1364,7 +1354,6 @@ DECLARE_PEM_rw(SSL_SESSION, SSL_SESSION)
 #define SSL_AD_BAD_CERTIFICATE_STATUS_RESPONSE TLS1_AD_BAD_CERTIFICATE_STATUS_RESPONSE
 #define SSL_AD_BAD_CERTIFICATE_HASH_VALUE TLS1_AD_BAD_CERTIFICATE_HASH_VALUE
 #define SSL_AD_UNKNOWN_PSK_IDENTITY	TLS1_AD_UNKNOWN_PSK_IDENTITY /* fatal */
-#define SSL_AD_INAPPROPRIATE_FALLBACK	TLS1_AD_INAPPROPRIATE_FALLBACK /* fatal */
 
 #define SSL_ERROR_NONE			0
 #define SSL_ERROR_SSL			1
@@ -1684,10 +1673,6 @@ const char *SSL_get_version(const SSL *s);
 /* This sets the 'default' SSL version that SSL_new() will create */
 int SSL_CTX_set_ssl_version(SSL_CTX *ctx, const SSL_METHOD *meth);
 
-const SSL_METHOD *SSLv3_method(void);		/* SSLv3 */
-const SSL_METHOD *SSLv3_server_method(void);	/* SSLv3 */
-const SSL_METHOD *SSLv3_client_method(void);	/* SSLv3 */
-
 const SSL_METHOD *SSLv23_method(void);		/* SSLv3 or TLSv1.* */
 const SSL_METHOD *SSLv23_server_method(void);	/* SSLv3 or TLSv1.* */
 const SSL_METHOD *SSLv23_client_method(void);	/* SSLv3 or TLSv1.* */
@@ -1704,6 +1689,9 @@ const SSL_METHOD *TLSv1_2_method(void);		/* TLSv1.2 */
 const SSL_METHOD *TLSv1_2_server_method(void);	/* TLSv1.2 */
 const SSL_METHOD *TLSv1_2_client_method(void);	/* TLSv1.2 */
 
+const SSL_METHOD *TLS_method(void);		/* TLS v1.0 or later */
+const SSL_METHOD *TLS_server_method(void);	/* TLS v1.0 or later */
+const SSL_METHOD *TLS_client_method(void);	/* TLS v1.0 or later */
 
 const SSL_METHOD *DTLSv1_method(void);		/* DTLSv1.0 */
 const SSL_METHOD *DTLSv1_server_method(void);	/* DTLSv1.0 */

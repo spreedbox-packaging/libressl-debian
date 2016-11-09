@@ -1,19 +1,16 @@
-Index: libressl/Makefile.am
-===================================================================
---- libressl.orig/Makefile.am	2015-03-23 12:27:20.000000000 +0100
-+++ libressl/Makefile.am	2015-03-23 12:29:50.000000000 +0100
-@@ -2,6 +2,6 @@
+--- a/Makefile.am
++++ b/Makefile.am
+@@ -2,7 +2,7 @@
  ACLOCAL_AMFLAGS = -I m4
  
  pkgconfigdir = $(libdir)/pkgconfig
 -pkgconfig_DATA = libcrypto.pc libssl.pc libtls.pc openssl.pc
 +pkgconfig_DATA = libressl-crypto.pc libressl-ssl.pc libressl-tls.pc libressl-openssl.pc
  
- EXTRA_DIST = README README.windows VERSION config scripts
-Index: libressl/libressl-crypto.pc.in
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-crypto.pc.in	2015-03-23 12:28:12.000000000 +0100
+ EXTRA_DIST = README.md README.windows VERSION config scripts
+ EXTRA_DIST += CMakeLists.txt cmake_uninstall.cmake.in
+--- /dev/null
++++ b/libressl-crypto.pc.in
 @@ -0,0 +1,15 @@
 +#libcrypto pkg-config source file
 +
@@ -30,10 +27,8 @@ Index: libressl/libressl-crypto.pc.in
 +Libs: -L${libdir} -lressl-crypto
 +Libs.private: @LIBS@
 +Cflags: -I${includedir}
-Index: libressl/libressl-openssl.pc.in
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-openssl.pc.in	2015-03-23 12:28:12.000000000 +0100
+--- /dev/null
++++ b/libressl-openssl.pc.in
 @@ -0,0 +1,11 @@
 +#openssl pkg-config source file
 +
@@ -46,10 +41,8 @@ Index: libressl/libressl-openssl.pc.in
 +Description: Secure Sockets Layer and cryptography libraries and tools
 +Version: @VERSION@
 +Requires: libressl-ssl libressl-crypto
-Index: libressl/libressl-ssl.pc.in
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-ssl.pc.in	2015-03-23 12:28:12.000000000 +0100
+--- /dev/null
++++ b/libressl-ssl.pc.in
 @@ -0,0 +1,16 @@
 +#libssl pkg-config source file
 +
@@ -67,10 +60,8 @@ Index: libressl/libressl-ssl.pc.in
 +Libs: -L${libdir} -lressl-ssl
 +Libs.private: @LIBS@ -lressl-crypto
 +Cflags: -I${includedir}
-Index: libressl/openssl.pc.in
-===================================================================
---- libressl.orig/openssl.pc.in	2015-03-05 17:55:16.000000000 +0100
-+++ /dev/null	1970-01-01 00:00:00.000000000 +0000
+--- a/openssl.pc.in
++++ /dev/null
 @@ -1,11 +0,0 @@
 -#openssl pkg-config source file
 -
@@ -83,40 +74,57 @@ Index: libressl/openssl.pc.in
 -Description: Secure Sockets Layer and cryptography libraries and tools
 -Version: @VERSION@
 -Requires: libssl libcrypto
-Index: libressl/crypto/Makefile.am
-===================================================================
---- libressl.orig/crypto/Makefile.am	2015-03-05 17:55:16.000000000 +0100
-+++ libressl/crypto/Makefile.am	2015-03-23 12:28:12.000000000 +0100
-@@ -4,19 +4,19 @@
- AM_CPPFLAGS += -I$(top_srcdir)/crypto/evp
+--- a/crypto/Makefile.am
++++ b/crypto/Makefile.am
+@@ -5,7 +5,7 @@
  AM_CPPFLAGS += -I$(top_srcdir)/crypto/modes
+ AM_CPPFLAGS += -I$(top_srcdir)/crypto
  
 -lib_LTLIBRARIES = libcrypto.la
 +lib_LTLIBRARIES = libressl-crypto.la
  
  EXTRA_DIST = VERSION
+ EXTRA_DIST += CMakeLists.txt
+@@ -13,26 +13,26 @@
+ # needed for a CMake target
+ EXTRA_DIST += compat/strcasecmp.c
  
 -libcrypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@ -no-undefined
--libcrypto_la_LIBADD = libcompat.la libcompatnoopt.la
--libcrypto_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
--libcrypto_la_CFLAGS += -DOPENSSL_NO_HW_PADLOCK
+-libcrypto_la_LIBADD = libcompat.la
 +libressl_crypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@ -no-undefined
-+libressl_crypto_la_LIBADD = libcompat.la libcompatnoopt.la
-+libressl_crypto_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
-+libressl_crypto_la_CFLAGS += -DOPENSSL_NO_HW_PADLOCK
++libressl_crypto_la_LIBADD = libcompat.la
+ if !HAVE_EXPLICIT_BZERO
+-libcrypto_la_LIBADD += libcompatnoopt.la
++libressl_crypto_la_LIBADD += libcompatnoopt.la
+ endif
+-libcrypto_la_CPPFLAGS = $(AM_CPPFLAGS)
+-libcrypto_la_CPPFLAGS += -DLIBRESSL_INTERNAL
+-libcrypto_la_CPPFLAGS += -DOPENSSL_NO_HW_PADLOCK
++libressl_crypto_la_CPPFLAGS = $(AM_CPPFLAGS)
++libressl_crypto_la_CPPFLAGS += -DLIBRESSL_INTERNAL
++libressl_crypto_la_CPPFLAGS += -DOPENSSL_NO_HW_PADLOCK
  if OPENSSL_NO_ASM
--libcrypto_la_CFLAGS += -DOPENSSL_NO_ASM
-+libressl_crypto_la_CFLAGS += -DOPENSSL_NO_ASM
+-libcrypto_la_CPPFLAGS += -DOPENSSL_NO_ASM
++libressl_crypto_la_CPPFLAGS += -DOPENSSL_NO_ASM
  else
  if HOST_WIN
--libcrypto_la_CFLAGS += -DOPENSSL_NO_ASM
-+libressl_crypto_la_CFLAGS += -DOPENSSL_NO_ASM
+-libcrypto_la_CPPFLAGS += -DOPENSSL_NO_ASM
++libressl_crypto_la_CPPFLAGS += -DOPENSSL_NO_ASM
  endif
  endif
  
-@@ -122,717 +122,717 @@
- noinst_HEADERS += compat/arc4random_win.h
- noinst_HEADERS += compat/chacha_private.h
+ if OPENSSLDIR_DEFINED
+-libcrypto_la_CPPFLAGS += -DOPENSSLDIR=\"@OPENSSLDIR@\"
++libressl_crypto_la_CPPFLAGS += -DOPENSSLDIR=\"@OPENSSLDIR@\"
+ else
+-libcrypto_la_CPPFLAGS += -DOPENSSLDIR=\"$(sysconfdir)/ssl\"
++libressl_crypto_la_CPPFLAGS += -DOPENSSLDIR=\"$(sysconfdir)/ssl\"
+ endif
+ 
+ noinst_LTLIBRARIES = libcompat.la
+@@ -101,709 +101,709 @@
+ 
+ include Makefile.am.arc4random
  
 -libcrypto_la_SOURCES =
 -EXTRA_libcrypto_la_SOURCES =
@@ -165,6 +173,7 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += o_init.c
 +libressl_crypto_la_SOURCES += o_str.c
 +libressl_crypto_la_SOURCES += o_time.c
+ noinst_HEADERS += constant_time_locl.h
  noinst_HEADERS += cryptlib.h
  noinst_HEADERS += md32_common.h
  noinst_HEADERS += o_time.h
@@ -194,7 +203,6 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += asn1/a_digest.c
 -libcrypto_la_SOURCES += asn1/a_dup.c
 -libcrypto_la_SOURCES += asn1/a_enum.c
--libcrypto_la_SOURCES += asn1/a_gentm.c
 -libcrypto_la_SOURCES += asn1/a_i2d_fp.c
 -libcrypto_la_SOURCES += asn1/a_int.c
 -libcrypto_la_SOURCES += asn1/a_mbstr.c
@@ -206,8 +214,8 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += asn1/a_strex.c
 -libcrypto_la_SOURCES += asn1/a_strnid.c
 -libcrypto_la_SOURCES += asn1/a_time.c
+-libcrypto_la_SOURCES += asn1/a_time_tm.c
 -libcrypto_la_SOURCES += asn1/a_type.c
--libcrypto_la_SOURCES += asn1/a_utctm.c
 -libcrypto_la_SOURCES += asn1/a_utf8.c
 -libcrypto_la_SOURCES += asn1/a_verify.c
 -libcrypto_la_SOURCES += asn1/ameth_lib.c
@@ -271,7 +279,6 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += asn1/a_digest.c
 +libressl_crypto_la_SOURCES += asn1/a_dup.c
 +libressl_crypto_la_SOURCES += asn1/a_enum.c
-+libressl_crypto_la_SOURCES += asn1/a_gentm.c
 +libressl_crypto_la_SOURCES += asn1/a_i2d_fp.c
 +libressl_crypto_la_SOURCES += asn1/a_int.c
 +libressl_crypto_la_SOURCES += asn1/a_mbstr.c
@@ -283,8 +290,8 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += asn1/a_strex.c
 +libressl_crypto_la_SOURCES += asn1/a_strnid.c
 +libressl_crypto_la_SOURCES += asn1/a_time.c
++libressl_crypto_la_SOURCES += asn1/a_time_tm.c
 +libressl_crypto_la_SOURCES += asn1/a_type.c
-+libressl_crypto_la_SOURCES += asn1/a_utctm.c
 +libressl_crypto_la_SOURCES += asn1/a_utf8.c
 +libressl_crypto_la_SOURCES += asn1/a_verify.c
 +libressl_crypto_la_SOURCES += asn1/ameth_lib.c
@@ -385,10 +392,6 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += bio/bss_dgram.c
 -libcrypto_la_SOURCES += bio/bss_fd.c
 -libcrypto_la_SOURCES += bio/bss_file.c
--libcrypto_la_SOURCES += bio/bss_log.c
--libcrypto_la_SOURCES += bio/bss_mem.c
--libcrypto_la_SOURCES += bio/bss_null.c
--libcrypto_la_SOURCES += bio/bss_sock.c
 +libressl_crypto_la_SOURCES += bio/bf_buff.c
 +libressl_crypto_la_SOURCES += bio/bf_nbio.c
 +libressl_crypto_la_SOURCES += bio/bf_null.c
@@ -401,7 +404,13 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += bio/bss_dgram.c
 +libressl_crypto_la_SOURCES += bio/bss_fd.c
 +libressl_crypto_la_SOURCES += bio/bss_file.c
+ if !HOST_WIN
+-libcrypto_la_SOURCES += bio/bss_log.c
 +libressl_crypto_la_SOURCES += bio/bss_log.c
+ endif
+-libcrypto_la_SOURCES += bio/bss_mem.c
+-libcrypto_la_SOURCES += bio/bss_null.c
+-libcrypto_la_SOURCES += bio/bss_sock.c
 +libressl_crypto_la_SOURCES += bio/bss_mem.c
 +libressl_crypto_la_SOURCES += bio/bss_null.c
 +libressl_crypto_la_SOURCES += bio/bss_sock.c
@@ -701,11 +710,9 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += ecdh/ech_err.c
 -libcrypto_la_SOURCES += ecdh/ech_key.c
 -libcrypto_la_SOURCES += ecdh/ech_lib.c
--libcrypto_la_SOURCES += ecdh/ech_ossl.c
 +libressl_crypto_la_SOURCES += ecdh/ech_err.c
 +libressl_crypto_la_SOURCES += ecdh/ech_key.c
 +libressl_crypto_la_SOURCES += ecdh/ech_lib.c
-+libressl_crypto_la_SOURCES += ecdh/ech_ossl.c
  noinst_HEADERS += ecdh/ech_locl.h
  
  # ecdsa
@@ -735,7 +742,6 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += engine/eng_list.c
 -libcrypto_la_SOURCES += engine/eng_openssl.c
 -libcrypto_la_SOURCES += engine/eng_pkey.c
--libcrypto_la_SOURCES += engine/eng_rsax.c
 -libcrypto_la_SOURCES += engine/eng_table.c
 -libcrypto_la_SOURCES += engine/tb_asnmth.c
 -libcrypto_la_SOURCES += engine/tb_cipher.c
@@ -759,7 +765,6 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += engine/eng_list.c
 +libressl_crypto_la_SOURCES += engine/eng_openssl.c
 +libressl_crypto_la_SOURCES += engine/eng_pkey.c
-+libressl_crypto_la_SOURCES += engine/eng_rsax.c
 +libressl_crypto_la_SOURCES += engine/eng_table.c
 +libressl_crypto_la_SOURCES += engine/tb_asnmth.c
 +libressl_crypto_la_SOURCES += engine/tb_cipher.c
@@ -820,10 +825,8 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += evp/m_gostr341194.c
 -libcrypto_la_SOURCES += evp/m_md4.c
 -libcrypto_la_SOURCES += evp/m_md5.c
--libcrypto_la_SOURCES += evp/m_mdc2.c
 -libcrypto_la_SOURCES += evp/m_null.c
 -libcrypto_la_SOURCES += evp/m_ripemd.c
--libcrypto_la_SOURCES += evp/m_sha.c
 -libcrypto_la_SOURCES += evp/m_sha1.c
 -libcrypto_la_SOURCES += evp/m_sigver.c
 -libcrypto_la_SOURCES += evp/m_streebog.c
@@ -878,10 +881,8 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += evp/m_gostr341194.c
 +libressl_crypto_la_SOURCES += evp/m_md4.c
 +libressl_crypto_la_SOURCES += evp/m_md5.c
-+libressl_crypto_la_SOURCES += evp/m_mdc2.c
 +libressl_crypto_la_SOURCES += evp/m_null.c
 +libressl_crypto_la_SOURCES += evp/m_ripemd.c
-+libressl_crypto_la_SOURCES += evp/m_sha.c
 +libressl_crypto_la_SOURCES += evp/m_sha1.c
 +libressl_crypto_la_SOURCES += evp/m_sigver.c
 +libressl_crypto_la_SOURCES += evp/m_streebog.c
@@ -978,12 +979,6 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += md5/md5_dgst.c
 +libressl_crypto_la_SOURCES += md5/md5_one.c
  noinst_HEADERS += md5/md5_locl.h
- 
- # mdc2
--libcrypto_la_SOURCES += mdc2/mdc2_one.c
--libcrypto_la_SOURCES += mdc2/mdc2dgst.c
-+libressl_crypto_la_SOURCES += mdc2/mdc2_one.c
-+libressl_crypto_la_SOURCES += mdc2/mdc2dgst.c
  
  # modes
 -libcrypto_la_SOURCES += modes/cbc128.c
@@ -1198,14 +1193,10 @@ Index: libressl/crypto/Makefile.am
 -libcrypto_la_SOURCES += sha/sha1dgst.c
 -libcrypto_la_SOURCES += sha/sha256.c
 -libcrypto_la_SOURCES += sha/sha512.c
--libcrypto_la_SOURCES += sha/sha_dgst.c
--libcrypto_la_SOURCES += sha/sha_one.c
 +libressl_crypto_la_SOURCES += sha/sha1_one.c
 +libressl_crypto_la_SOURCES += sha/sha1dgst.c
 +libressl_crypto_la_SOURCES += sha/sha256.c
 +libressl_crypto_la_SOURCES += sha/sha512.c
-+libressl_crypto_la_SOURCES += sha/sha_dgst.c
-+libressl_crypto_la_SOURCES += sha/sha_one.c
  noinst_HEADERS += sha/sha_locl.h
  
  # stack
@@ -1386,24 +1377,21 @@ Index: libressl/crypto/Makefile.am
 +libressl_crypto_la_SOURCES += x509v3/v3err.c
  noinst_HEADERS += x509v3/ext_dat.h
  noinst_HEADERS += x509v3/pcy_int.h
-Index: libressl/ssl/Makefile.am
-===================================================================
---- libressl.orig/ssl/Makefile.am	2015-03-05 17:55:16.000000000 +0100
-+++ libressl/ssl/Makefile.am	2015-03-23 12:28:12.000000000 +0100
-@@ -1,56 +1,56 @@
+--- a/ssl/Makefile.am
++++ b/ssl/Makefile.am
+@@ -1,53 +1,53 @@
  include $(top_srcdir)/Makefile.am.common
  
 -lib_LTLIBRARIES = libssl.la
 +lib_LTLIBRARIES = libressl-ssl.la
  
  EXTRA_DIST = VERSION
+ EXTRA_DIST += CMakeLists.txt
  
 -libssl_la_LDFLAGS = -version-info @LIBSSL_VERSION@ -no-undefined
--libssl_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
--libssl_la_LIBADD = ../crypto/libcrypto.la
+-libssl_la_LIBADD = $(abs_top_builddir)/crypto/libcrypto.la
 +libressl_ssl_la_LDFLAGS = -version-info @LIBSSL_VERSION@ -no-undefined
-+libressl_ssl_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
-+libressl_ssl_la_LIBADD = ../crypto/libressl-crypto.la
++libressl_ssl_la_LIBADD = $(abs_top_builddir)/crypto/libressl-crypto.la
  
 -libssl_la_SOURCES = bio_ssl.c
 -libssl_la_SOURCES += bs_ber.c
@@ -1420,15 +1408,12 @@ Index: libressl/ssl/Makefile.am
 -libssl_la_SOURCES += pqueue.c
 -libssl_la_SOURCES += s23_clnt.c
 -libssl_la_SOURCES += s23_lib.c
--libssl_la_SOURCES += s23_meth.c
 -libssl_la_SOURCES += s23_pkt.c
 -libssl_la_SOURCES += s23_srvr.c
 -libssl_la_SOURCES += s3_both.c
 -libssl_la_SOURCES += s3_cbc.c
 -libssl_la_SOURCES += s3_clnt.c
--libssl_la_SOURCES += s3_enc.c
 -libssl_la_SOURCES += s3_lib.c
--libssl_la_SOURCES += s3_meth.c
 -libssl_la_SOURCES += s3_pkt.c
 -libssl_la_SOURCES += s3_srvr.c
 -libssl_la_SOURCES += ssl_algs.c
@@ -1463,15 +1448,12 @@ Index: libressl/ssl/Makefile.am
 +libressl_ssl_la_SOURCES += pqueue.c
 +libressl_ssl_la_SOURCES += s23_clnt.c
 +libressl_ssl_la_SOURCES += s23_lib.c
-+libressl_ssl_la_SOURCES += s23_meth.c
 +libressl_ssl_la_SOURCES += s23_pkt.c
 +libressl_ssl_la_SOURCES += s23_srvr.c
 +libressl_ssl_la_SOURCES += s3_both.c
 +libressl_ssl_la_SOURCES += s3_cbc.c
 +libressl_ssl_la_SOURCES += s3_clnt.c
-+libressl_ssl_la_SOURCES += s3_enc.c
 +libressl_ssl_la_SOURCES += s3_lib.c
-+libressl_ssl_la_SOURCES += s3_meth.c
 +libressl_ssl_la_SOURCES += s3_pkt.c
 +libressl_ssl_la_SOURCES += s3_srvr.c
 +libressl_ssl_la_SOURCES += ssl_algs.c
@@ -1494,20 +1476,275 @@ Index: libressl/ssl/Makefile.am
  
  noinst_HEADERS = srtp.h
  noinst_HEADERS += ssl_locl.h
-Index: libressl/apps/Makefile.am
-===================================================================
---- libressl.orig/apps/Makefile.am	2015-03-05 17:55:16.000000000 +0100
-+++ libressl/apps/Makefile.am	2015-03-23 12:28:12.000000000 +0100
+--- a/configure.ac
++++ b/configure.ac
+@@ -129,10 +129,10 @@
+ 	apps/openssl/Makefile
+ 	apps/nc/Makefile
+ 	man/Makefile
+-	libcrypto.pc
+-	libssl.pc
+-	libtls.pc
+-	openssl.pc
++	libressl-crypto.pc
++	libressl-ssl.pc
++	libressl-tls.pc
++	libressl-openssl.pc
+ ])
+ 
+ AM_CONDITIONAL([SMALL_TIME_T], [test "$ac_cv_sizeof_time_t" = "4"])
+--- a/tests/Makefile.am
++++ b/tests/Makefile.am
+@@ -7,9 +7,9 @@
+ AM_CPPFLAGS += -I $(top_srcdir)/apps/openssl/compat
+ 
+ LDADD = $(PLATFORM_LDADD) $(PROG_LDADD)
+-LDADD += $(abs_top_builddir)/ssl/libssl.la
+-LDADD += $(abs_top_builddir)/crypto/libcrypto.la
+-LDADD += $(abs_top_builddir)/tls/libtls.la
++LDADD += $(abs_top_builddir)/ssl/libressl-ssl.la
++LDADD += $(abs_top_builddir)/crypto/libressl-crypto.la
++LDADD += $(abs_top_builddir)/tls/libressl-tls.la
+ 
+ TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) $(top_srcdir)/tap-driver.sh
+ 
+--- /dev/null
++++ b/libressl-tls.pc.in
+@@ -0,0 +1,16 @@
++#libtls pkg-config source file
++
++prefix=@prefix@
++exec_prefix=@exec_prefix@
++libdir=@libdir@
++includedir=@includedir@
++
++Name: LibreSSL-libtls
++Description: Secure communications using the TLS socket protocol.
++Version: @LIBTLS_VERSION@
++Requires:
++Requires.private: libressl-crypto libressl-ssl
++Conflicts:
++Libs: -L${libdir} -lressl-tls
++Libs.private: @LIBS@ -lressl-crypto -lressl-ssl
++Cflags: -I${includedir}
+--- a/tests/testssl
++++ b/tests/testssl
+@@ -4,7 +4,7 @@
+ cert="$2"
+ CA="-CAfile $3"
+ ssltest="${4-./ssltest} -key $key -cert $cert -c_key $key -c_cert $cert"
+-openssl=${5-openssl}
++openssl=${5-libressl-openssl}
+ extra="$6"
+ 
+ $openssl version || exit 1
+--- a/crypto/Makefile.am.elf-x86_64
++++ b/crypto/Makefile.am.elf-x86_64
+@@ -22,20 +22,20 @@
+ EXTRA_DIST += $(ASM_X86_64_ELF)
+ 
+ if HOST_ASM_ELF_X86_64
+-libcrypto_la_CPPFLAGS += -DAES_ASM
+-libcrypto_la_CPPFLAGS += -DBSAES_ASM
+-libcrypto_la_CPPFLAGS += -DVPAES_ASM
+-libcrypto_la_CPPFLAGS += -DOPENSSL_IA32_SSE2
+-libcrypto_la_CPPFLAGS += -DOPENSSL_BN_ASM_MONT
+-libcrypto_la_CPPFLAGS += -DOPENSSL_BN_ASM_MONT5
+-libcrypto_la_CPPFLAGS += -DOPENSSL_BN_ASM_GF2m
+-libcrypto_la_CPPFLAGS += -DMD5_ASM
+-libcrypto_la_CPPFLAGS += -DGHASH_ASM
+-libcrypto_la_CPPFLAGS += -DRSA_ASM
+-libcrypto_la_CPPFLAGS += -DSHA1_ASM
+-libcrypto_la_CPPFLAGS += -DSHA256_ASM
+-libcrypto_la_CPPFLAGS += -DSHA512_ASM
+-libcrypto_la_CPPFLAGS += -DWHIRLPOOL_ASM
+-libcrypto_la_CPPFLAGS += -DOPENSSL_CPUID_OBJ
+-libcrypto_la_SOURCES += $(ASM_X86_64_ELF)
++libressl_crypto_la_CPPFLAGS += -DAES_ASM
++libressl_crypto_la_CPPFLAGS += -DBSAES_ASM
++libressl_crypto_la_CPPFLAGS += -DVPAES_ASM
++libressl_crypto_la_CPPFLAGS += -DOPENSSL_IA32_SSE2
++libressl_crypto_la_CPPFLAGS += -DOPENSSL_BN_ASM_MONT
++libressl_crypto_la_CPPFLAGS += -DOPENSSL_BN_ASM_MONT5
++libressl_crypto_la_CPPFLAGS += -DOPENSSL_BN_ASM_GF2m
++libressl_crypto_la_CPPFLAGS += -DMD5_ASM
++libressl_crypto_la_CPPFLAGS += -DGHASH_ASM
++libressl_crypto_la_CPPFLAGS += -DRSA_ASM
++libressl_crypto_la_CPPFLAGS += -DSHA1_ASM
++libressl_crypto_la_CPPFLAGS += -DSHA256_ASM
++libressl_crypto_la_CPPFLAGS += -DSHA512_ASM
++libressl_crypto_la_CPPFLAGS += -DWHIRLPOOL_ASM
++libressl_crypto_la_CPPFLAGS += -DOPENSSL_CPUID_OBJ
++libressl_crypto_la_SOURCES += $(ASM_X86_64_ELF)
+ endif
+--- a/crypto/Makefile.am.macosx-x86_64
++++ b/crypto/Makefile.am.macosx-x86_64
+@@ -22,20 +22,20 @@
+ EXTRA_DIST += $(ASM_X86_64_MACOSX)
+ 
+ if HOST_ASM_MACOSX_X86_64
+-libcrypto_la_CPPFLAGS += -DAES_ASM
+-libcrypto_la_CPPFLAGS += -DBSAES_ASM
+-libcrypto_la_CPPFLAGS += -DVPAES_ASM
+-libcrypto_la_CPPFLAGS += -DOPENSSL_IA32_SSE2
+-libcrypto_la_CPPFLAGS += -DOPENSSL_BN_ASM_MONT
+-libcrypto_la_CPPFLAGS += -DOPENSSL_BN_ASM_MONT5
+-libcrypto_la_CPPFLAGS += -DOPENSSL_BN_ASM_GF2m
+-libcrypto_la_CPPFLAGS += -DMD5_ASM
+-libcrypto_la_CPPFLAGS += -DGHASH_ASM
+-libcrypto_la_CPPFLAGS += -DRSA_ASM
+-libcrypto_la_CPPFLAGS += -DSHA1_ASM
+-libcrypto_la_CPPFLAGS += -DSHA256_ASM
+-libcrypto_la_CPPFLAGS += -DSHA512_ASM
+-libcrypto_la_CPPFLAGS += -DWHIRLPOOL_ASM
+-libcrypto_la_CPPFLAGS += -DOPENSSL_CPUID_OBJ
+-libcrypto_la_SOURCES += $(ASM_X86_64_MACOSX)
++libressl_crypto_la_CPPFLAGS += -DAES_ASM
++libressl_crypto_la_CPPFLAGS += -DBSAES_ASM
++libressl_crypto_la_CPPFLAGS += -DVPAES_ASM
++libressl_crypto_la_CPPFLAGS += -DOPENSSL_IA32_SSE2
++libressl_crypto_la_CPPFLAGS += -DOPENSSL_BN_ASM_MONT
++libressl_crypto_la_CPPFLAGS += -DOPENSSL_BN_ASM_MONT5
++libressl_crypto_la_CPPFLAGS += -DOPENSSL_BN_ASM_GF2m
++libressl_crypto_la_CPPFLAGS += -DMD5_ASM
++libressl_crypto_la_CPPFLAGS += -DGHASH_ASM
++libressl_crypto_la_CPPFLAGS += -DRSA_ASM
++libressl_crypto_la_CPPFLAGS += -DSHA1_ASM
++libressl_crypto_la_CPPFLAGS += -DSHA256_ASM
++libressl_crypto_la_CPPFLAGS += -DSHA512_ASM
++libressl_crypto_la_CPPFLAGS += -DWHIRLPOOL_ASM
++libressl_crypto_la_CPPFLAGS += -DOPENSSL_CPUID_OBJ
++libressl_crypto_la_SOURCES += $(ASM_X86_64_MACOSX)
+ endif
+--- a/tls/Makefile.am
++++ b/tls/Makefile.am
+@@ -1,32 +1,32 @@
+ include $(top_srcdir)/Makefile.am.common
+ 
+-lib_LTLIBRARIES = libtls.la
++lib_LTLIBRARIES = libressl-tls.la
+ 
+ EXTRA_DIST = VERSION
+ EXTRA_DIST += CMakeLists.txt
+ 
+-libtls_la_LDFLAGS = -version-info @LIBTLS_VERSION@ -no-undefined
+-libtls_la_LIBADD = $(abs_top_builddir)/ssl/libssl.la
+-libtls_la_LIBADD += $(abs_top_builddir)/crypto/libcrypto.la
+-libtls_la_LIBADD += $(PLATFORM_LDADD)
++libressl_tls_la_LDFLAGS = -version-info @LIBTLS_VERSION@ -no-undefined
++libressl_tls_la_LIBADD = $(abs_top_builddir)/ssl/libressl-ssl.la
++libressl_tls_la_LIBADD += $(abs_top_builddir)/crypto/libressl-crypto.la
++libressl_tls_la_LIBADD += $(PLATFORM_LDADD)
+ 
+-libtls_la_CPPFLAGS = $(AM_CPPFLAGS)
++libressl_tls_la_CPPFLAGS = $(AM_CPPFLAGS)
+ if OPENSSLDIR_DEFINED
+-libtls_la_CPPFLAGS += -D_PATH_SSL_CA_FILE=\"@OPENSSLDIR@/cert.pem\"
++libressl_tls_la_CPPFLAGS += -D_PATH_SSL_CA_FILE=\"@OPENSSLDIR@/cert.pem\"
+ else
+-libtls_la_CPPFLAGS += -D_PATH_SSL_CA_FILE=\"$(sysconfdir)/ssl/cert.pem\"
++libressl_tls_la_CPPFLAGS += -D_PATH_SSL_CA_FILE=\"$(sysconfdir)/ssl/cert.pem\"
+ endif
+ 
+-libtls_la_SOURCES = tls.c
+-libtls_la_SOURCES += tls_client.c
+-libtls_la_SOURCES += tls_config.c
+-libtls_la_SOURCES += tls_conninfo.c
+-libtls_la_SOURCES += tls_server.c
+-libtls_la_SOURCES += tls_peer.c
+-libtls_la_SOURCES += tls_util.c
+-libtls_la_SOURCES += tls_verify.c
++libressl_tls_la_SOURCES = tls.c
++libressl_tls_la_SOURCES += tls_client.c
++libressl_tls_la_SOURCES += tls_config.c
++libressl_tls_la_SOURCES += tls_conninfo.c
++libressl_tls_la_SOURCES += tls_server.c
++libressl_tls_la_SOURCES += tls_peer.c
++libressl_tls_la_SOURCES += tls_util.c
++libressl_tls_la_SOURCES += tls_verify.c
+ noinst_HEADERS = tls_internal.h
+ 
+ if !HAVE_STRSEP
+-libtls_la_SOURCES += strsep.c
++libressl_tls_la_SOURCES += strsep.c
+ endif
+--- a/apps/nc/Makefile.am
++++ b/apps/nc/Makefile.am
+@@ -3,18 +3,18 @@
+ if BUILD_NC
+ 
+ if ENABLE_NC
+-bin_PROGRAMS = nc
++bin_PROGRAMS = libressl-nc
+ else
+-noinst_PROGRAMS = nc
++noinst_PROGRAMS = libressl-nc
+ endif
+ 
+ EXTRA_DIST = nc.1
+ EXTRA_DIST += CMakeLists.txt
+ 
+-nc_LDADD = $(PLATFORM_LDADD) $(PROG_LDADD)
+-nc_LDADD += $(abs_top_builddir)/crypto/libcrypto.la
+-nc_LDADD += $(abs_top_builddir)/ssl/libssl.la
+-nc_LDADD += $(abs_top_builddir)/tls/libtls.la
++libressl_nc_LDADD = $(PLATFORM_LDADD) $(PROG_LDADD)
++libressl_nc_LDADD += $(abs_top_builddir)/crypto/libressl-crypto.la
++libressl_nc_LDADD += $(abs_top_builddir)/ssl/libressl-ssl.la
++libressl_nc_LDADD += $(abs_top_builddir)/tls/libressl-tls.la
+ 
+ AM_CPPFLAGS += -I$(top_srcdir)/apps/nc/compat
+ if OPENSSLDIR_DEFINED
+@@ -23,28 +23,28 @@
+ AM_CPPFLAGS += -DDEFAULT_CA_FILE=\"$(sysconfdir)/ssl/cert.pem\"
+ endif
+ 
+-nc_SOURCES = atomicio.c
+-nc_SOURCES += netcat.c
+-nc_SOURCES += socks.c
++libressl_nc_SOURCES = atomicio.c
++libressl_nc_SOURCES += netcat.c
++libressl_nc_SOURCES += socks.c
+ noinst_HEADERS = atomicio.h
+ noinst_HEADERS += compat/sys/socket.h
+ 
+-nc_SOURCES += compat/socket.c
++libressl_nc_SOURCES += compat/socket.c
+ 
+ if !HAVE_B64_NTOP
+-nc_SOURCES += compat/base64.c
++libressl_nc_SOURCES += compat/base64.c
+ endif
+ 
+ if !HAVE_ACCEPT4
+-nc_SOURCES += compat/accept4.c
++libressl_nc_SOURCES += compat/accept4.c
+ endif
+ 
+ if !HAVE_READPASSPHRASE
+-nc_SOURCES += compat/readpassphrase.c
++libressl_nc_SOURCES += compat/readpassphrase.c
+ endif
+ 
+ if !HAVE_STRTONUM
+-nc_SOURCES += compat/strtonum.c
++libressl_nc_SOURCES += compat/strtonum.c
+ endif
+ 
+ endif
+--- a/apps/openssl/Makefile.am
++++ b/apps/openssl/Makefile.am
 @@ -1,82 +1,82 @@
  include $(top_srcdir)/Makefile.am.common
  
 -bin_PROGRAMS = openssl
 +bin_PROGRAMS = libressl-openssl
  
--openssl_CFLAGS = $(USER_CFLAGS)
+ dist_man_MANS = openssl.1
+ 
 -openssl_LDADD = $(PLATFORM_LDADD) $(PROG_LDADD)
--openssl_LDADD += $(top_builddir)/ssl/libssl.la
--openssl_LDADD += $(top_builddir)/crypto/libcrypto.la
+-openssl_LDADD += $(abs_top_builddir)/ssl/libssl.la
+-openssl_LDADD += $(abs_top_builddir)/crypto/libcrypto.la
 -
 -openssl_SOURCES = apps.c
 -openssl_SOURCES += asn1pars.c
@@ -1524,7 +1761,6 @@ Index: libressl/apps/Makefile.am
 -openssl_SOURCES += ec.c
 -openssl_SOURCES += ecparam.c
 -openssl_SOURCES += enc.c
--openssl_SOURCES += engine.c
 -openssl_SOURCES += errstr.c
 -openssl_SOURCES += gendh.c
 -openssl_SOURCES += gendsa.c
@@ -1558,10 +1794,9 @@ Index: libressl/apps/Makefile.am
 -openssl_SOURCES += verify.c
 -openssl_SOURCES += version.c
 -openssl_SOURCES += x509.c
-+libressl_openssl_CFLAGS = $(USER_CFLAGS)
 +libressl_openssl_LDADD = $(PLATFORM_LDADD) $(PROG_LDADD)
-+libressl_openssl_LDADD += $(top_builddir)/ssl/libressl-ssl.la
-+libressl_openssl_LDADD += $(top_builddir)/crypto/libressl-crypto.la
++libressl_openssl_LDADD += $(abs_top_builddir)/ssl/libressl-ssl.la
++libressl_openssl_LDADD += $(abs_top_builddir)/crypto/libressl-crypto.la
 +
 +libressl_openssl_SOURCES = apps.c
 +libressl_openssl_SOURCES += asn1pars.c
@@ -1578,7 +1813,6 @@ Index: libressl/apps/Makefile.am
 +libressl_openssl_SOURCES += ec.c
 +libressl_openssl_SOURCES += ecparam.c
 +libressl_openssl_SOURCES += enc.c
-+libressl_openssl_SOURCES += engine.c
 +libressl_openssl_SOURCES += errstr.c
 +libressl_openssl_SOURCES += gendh.c
 +libressl_openssl_SOURCES += gendsa.c
@@ -1617,8 +1851,8 @@ Index: libressl/apps/Makefile.am
 -openssl_SOURCES += certhash.c
 +libressl_openssl_SOURCES += certhash.c
  else
--openssl_SOURCES += certhash_disabled.c
-+libressl_openssl_SOURCES += certhash_disabled.c
+-openssl_SOURCES += certhash_win.c
++libressl_openssl_SOURCES += certhash_win.c
  endif
  
  if HOST_WIN
@@ -1631,208 +1865,19 @@ Index: libressl/apps/Makefile.am
  
  if !HAVE_POLL
  if HOST_WIN
--openssl_SOURCES += poll_win.c
-+libressl_openssl_SOURCES += poll_win.c
+-openssl_SOURCES += compat/poll_win.c
++libressl_openssl_SOURCES += compat/poll_win.c
  endif
  endif
  
  if !HAVE_STRTONUM
--openssl_SOURCES += strtonum.c
-+libressl_openssl_SOURCES += strtonum.c
+-openssl_SOURCES += compat/strtonum.c
++libressl_openssl_SOURCES += compat/strtonum.c
  endif
  
  noinst_HEADERS = apps.h
-Index: libressl/configure.ac
-===================================================================
---- libressl.orig/configure.ac	2015-03-23 12:27:20.000000000 +0100
-+++ libressl/configure.ac	2015-03-23 12:29:02.000000000 +0100
-@@ -322,10 +322,10 @@
- 	tests/Makefile
- 	apps/Makefile
- 	man/Makefile
--	libcrypto.pc
--	libssl.pc
--	libtls.pc
--	openssl.pc
-+	libressl-crypto.pc
-+	libressl-ssl.pc
-+	libressl-tls.pc
-+	libressl-openssl.pc
- ])
- 
- AC_OUTPUT
-Index: libressl/tests/Makefile.am
-===================================================================
---- libressl.orig/tests/Makefile.am	2015-03-05 17:55:16.000000000 +0100
-+++ libressl/tests/Makefile.am	2015-03-23 12:28:12.000000000 +0100
-@@ -5,8 +5,8 @@
- AM_CPPFLAGS += -I $(top_srcdir)/ssl
- 
- LDADD = $(PLATFORM_LDADD) $(PROG_LDADD)
--LDADD += $(top_builddir)/ssl/libssl.la
--LDADD += $(top_builddir)/crypto/libcrypto.la
-+LDADD += $(top_builddir)/ssl/libressl-ssl.la
-+LDADD += $(top_builddir)/crypto/libressl-crypto.la
- 
- TESTS =
- check_PROGRAMS =
-Index: libressl/libressl-tls.pc.in
-===================================================================
---- /dev/null	1970-01-01 00:00:00.000000000 +0000
-+++ libressl/libressl-tls.pc.in	2015-03-23 12:28:12.000000000 +0100
-@@ -0,0 +1,16 @@
-+#libtls pkg-config source file
-+
-+prefix=@prefix@
-+exec_prefix=@exec_prefix@
-+libdir=@libdir@
-+includedir=@includedir@
-+
-+Name: LibreSSL-libtls
-+Description: Secure communications using the TLS socket protocol.
-+Version: @LIBTLS_VERSION@
-+Requires:
-+Requires.private: libressl-crypto libressl-ssl
-+Conflicts:
-+Libs: -L${libdir} -lressl-tls
-+Libs.private: @LIBS@ -lressl-crypto -lressl-ssl
-+Cflags: -I${includedir}
-Index: libressl/tests/testssl
-===================================================================
---- libressl.orig/tests/testssl	2015-03-05 17:55:16.000000000 +0100
-+++ libressl/tests/testssl	2015-03-23 12:28:12.000000000 +0100
-@@ -4,7 +4,7 @@
- cert="$2"
- CA="-CAfile $3"
- ssltest="${4-./ssltest} -key $key -cert $cert -c_key $key -c_cert $cert"
--openssl=${5-openssl}
-+openssl=${5-libressl-openssl}
- extra="$6"
- 
- if $openssl x509 -in $cert -text -noout | fgrep 'DSA Public Key' >/dev/null; then
-Index: libressl/crypto/Makefile.am.elf-x86_64
-===================================================================
---- libressl.orig/crypto/Makefile.am.elf-x86_64	2015-03-05 17:55:16.000000000 +0100
-+++ libressl/crypto/Makefile.am.elf-x86_64	2015-03-23 12:28:12.000000000 +0100
-@@ -22,20 +22,20 @@
- EXTRA_DIST += $(ASM_X86_64_ELF)
- 
- if HOST_ASM_ELF_X86_64
--libcrypto_la_CFLAGS += -DAES_ASM
--libcrypto_la_CFLAGS += -DBSAES_ASM
--libcrypto_la_CFLAGS += -DVPAES_ASM
--libcrypto_la_CFLAGS += -DOPENSSL_IA32_SSE2
--libcrypto_la_CFLAGS += -DOPENSSL_BN_ASM_MONT
--libcrypto_la_CFLAGS += -DOPENSSL_BN_ASM_MONT5
--libcrypto_la_CFLAGS += -DOPENSSL_BN_ASM_GF2m
--libcrypto_la_CFLAGS += -DMD5_ASM
--libcrypto_la_CFLAGS += -DGHASH_ASM
--libcrypto_la_CFLAGS += -DRSA_ASM
--libcrypto_la_CFLAGS += -DSHA1_ASM
--libcrypto_la_CFLAGS += -DSHA256_ASM
--libcrypto_la_CFLAGS += -DSHA512_ASM
--libcrypto_la_CFLAGS += -DWHIRLPOOL_ASM
--libcrypto_la_CFLAGS += -DOPENSSL_CPUID_OBJ
--libcrypto_la_SOURCES += $(ASM_X86_64_ELF)
-+libressl_crypto_la_CFLAGS += -DAES_ASM
-+libressl_crypto_la_CFLAGS += -DBSAES_ASM
-+libressl_crypto_la_CFLAGS += -DVPAES_ASM
-+libressl_crypto_la_CFLAGS += -DOPENSSL_IA32_SSE2
-+libressl_crypto_la_CFLAGS += -DOPENSSL_BN_ASM_MONT
-+libressl_crypto_la_CFLAGS += -DOPENSSL_BN_ASM_MONT5
-+libressl_crypto_la_CFLAGS += -DOPENSSL_BN_ASM_GF2m
-+libressl_crypto_la_CFLAGS += -DMD5_ASM
-+libressl_crypto_la_CFLAGS += -DGHASH_ASM
-+libressl_crypto_la_CFLAGS += -DRSA_ASM
-+libressl_crypto_la_CFLAGS += -DSHA1_ASM
-+libressl_crypto_la_CFLAGS += -DSHA256_ASM
-+libressl_crypto_la_CFLAGS += -DSHA512_ASM
-+libressl_crypto_la_CFLAGS += -DWHIRLPOOL_ASM
-+libressl_crypto_la_CFLAGS += -DOPENSSL_CPUID_OBJ
-+libressl_crypto_la_SOURCES += $(ASM_X86_64_ELF)
- endif
-Index: libressl/crypto/Makefile.am.macosx-x86_64
-===================================================================
---- libressl.orig/crypto/Makefile.am.macosx-x86_64	2015-03-05 17:55:16.000000000 +0100
-+++ libressl/crypto/Makefile.am.macosx-x86_64	2015-03-23 12:28:12.000000000 +0100
-@@ -22,20 +22,20 @@
- EXTRA_DIST += $(ASM_X86_64_MACOSX)
- 
- if HOST_ASM_MACOSX_X86_64
--libcrypto_la_CFLAGS += -DAES_ASM
--libcrypto_la_CFLAGS += -DBSAES_ASM
--libcrypto_la_CFLAGS += -DVPAES_ASM
--libcrypto_la_CFLAGS += -DOPENSSL_IA32_SSE2
--libcrypto_la_CFLAGS += -DOPENSSL_BN_ASM_MONT
--libcrypto_la_CFLAGS += -DOPENSSL_BN_ASM_MONT5
--libcrypto_la_CFLAGS += -DOPENSSL_BN_ASM_GF2m
--libcrypto_la_CFLAGS += -DMD5_ASM
--libcrypto_la_CFLAGS += -DGHASH_ASM
--libcrypto_la_CFLAGS += -DRSA_ASM
--libcrypto_la_CFLAGS += -DSHA1_ASM
--libcrypto_la_CFLAGS += -DSHA256_ASM
--libcrypto_la_CFLAGS += -DSHA512_ASM
--libcrypto_la_CFLAGS += -DWHIRLPOOL_ASM
--libcrypto_la_CFLAGS += -DOPENSSL_CPUID_OBJ
--libcrypto_la_SOURCES += $(ASM_X86_64_MACOSX)
-+libressl_crypto_la_CFLAGS += -DAES_ASM
-+libressl_crypto_la_CFLAGS += -DBSAES_ASM
-+libressl_crypto_la_CFLAGS += -DVPAES_ASM
-+libressl_crypto_la_CFLAGS += -DOPENSSL_IA32_SSE2
-+libressl_crypto_la_CFLAGS += -DOPENSSL_BN_ASM_MONT
-+libressl_crypto_la_CFLAGS += -DOPENSSL_BN_ASM_MONT5
-+libressl_crypto_la_CFLAGS += -DOPENSSL_BN_ASM_GF2m
-+libressl_crypto_la_CFLAGS += -DMD5_ASM
-+libressl_crypto_la_CFLAGS += -DGHASH_ASM
-+libressl_crypto_la_CFLAGS += -DRSA_ASM
-+libressl_crypto_la_CFLAGS += -DSHA1_ASM
-+libressl_crypto_la_CFLAGS += -DSHA256_ASM
-+libressl_crypto_la_CFLAGS += -DSHA512_ASM
-+libressl_crypto_la_CFLAGS += -DWHIRLPOOL_ASM
-+libressl_crypto_la_CFLAGS += -DOPENSSL_CPUID_OBJ
-+libressl_crypto_la_SOURCES += $(ASM_X86_64_MACOSX)
- endif
-Index: libressl/tls/Makefile.am
-===================================================================
---- libressl.orig/tls/Makefile.am	2015-03-23 12:27:20.000000000 +0100
-+++ libressl/tls/Makefile.am	2015-03-23 12:31:05.000000000 +0100
-@@ -1,21 +1,21 @@
- include $(top_srcdir)/Makefile.am.common
- 
--lib_LTLIBRARIES = libtls.la
-+lib_LTLIBRARIES = libressl-tls.la
- 
- EXTRA_DIST = VERSION
- 
--libtls_la_LDFLAGS = -version-info @LIBTLS_VERSION@ -no-undefined
--libtls_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
--libtls_la_LIBADD = ../crypto/libcrypto.la ../ssl/libssl.la $(PLATFORM_LDADD)
-+libressl_tls_la_LDFLAGS = -version-info @LIBTLS_VERSION@ -no-undefined
-+libressl_tls_la_CFLAGS = $(CFLAGS) $(USER_CFLAGS)
-+libressl_tls_la_LIBADD = ../crypto/libressl-crypto.la ../ssl/libressl-ssl.la $(PLATFORM_LDADD)
- 
--libtls_la_SOURCES = tls.c
--libtls_la_SOURCES += tls_client.c
--libtls_la_SOURCES += tls_config.c
--libtls_la_SOURCES += tls_server.c
--libtls_la_SOURCES += tls_util.c
--libtls_la_SOURCES += tls_verify.c
-+libressl_tls_la_SOURCES = tls.c
-+libressl_tls_la_SOURCES += tls_client.c
-+libressl_tls_la_SOURCES += tls_config.c
-+libressl_tls_la_SOURCES += tls_server.c
-+libressl_tls_la_SOURCES += tls_util.c
-+libressl_tls_la_SOURCES += tls_verify.c
- noinst_HEADERS = tls_internal.h
- 
- if !HAVE_STRSEP
--libtls_la_SOURCES += strsep.c
-+libressl_tls_la_SOURCES += strsep.c
- endif
-Index: libressl/libcrypto.pc.in
-===================================================================
---- libressl.orig/libcrypto.pc.in	2015-03-05 17:55:16.000000000 +0100
-+++ /dev/null	1970-01-01 00:00:00.000000000 +0000
+--- a/libcrypto.pc.in
++++ /dev/null
 @@ -1,15 +0,0 @@
 -#libcrypto pkg-config source file
 -
@@ -1843,16 +1888,14 @@ Index: libressl/libcrypto.pc.in
 -
 -Name: LibreSSL-libssl
 -Description: Secure Sockets Layer and cryptography libraries
--Version: @LIBCRYPTO_VERSION@
+-Version: @VERSION@
 -Requires:
 -Conflicts:
 -Libs: -L${libdir} -lcrypto
--Libs.private: @LIBS@
+-Libs.private: @LIBS@ @PLATFORM_LDADD@
 -Cflags: -I${includedir}
-Index: libressl/libssl.pc.in
-===================================================================
---- libressl.orig/libssl.pc.in	2015-03-05 17:55:16.000000000 +0100
-+++ /dev/null	1970-01-01 00:00:00.000000000 +0000
+--- a/libssl.pc.in
++++ /dev/null
 @@ -1,16 +0,0 @@
 -#libssl pkg-config source file
 -
@@ -1863,17 +1906,15 @@ Index: libressl/libssl.pc.in
 -
 -Name: LibreSSL-libssl
 -Description: Secure Sockets Layer and cryptography libraries
--Version: @LIBSSL_VERSION@
+-Version: @VERSION@
 -Requires:
 -Requires.private: libcrypto
 -Conflicts:
 -Libs: -L${libdir} -lssl
--Libs.private: @LIBS@ -lcrypto
+-Libs.private: @LIBS@ -lcrypto @PLATFORM_LDADD@
 -Cflags: -I${includedir}
-Index: libressl/libtls.pc.in
-===================================================================
---- libressl.orig/libtls.pc.in	2015-03-05 17:55:16.000000000 +0100
-+++ /dev/null	1970-01-01 00:00:00.000000000 +0000
+--- a/libtls.pc.in
++++ /dev/null
 @@ -1,16 +0,0 @@
 -#libtls pkg-config source file
 -
@@ -1884,10 +1925,54 @@ Index: libressl/libtls.pc.in
 -
 -Name: LibreSSL-libtls
 -Description: Secure communications using the TLS socket protocol.
--Version: @LIBTLS_VERSION@
+-Version: @VERSION@
 -Requires:
 -Requires.private: libcrypto libssl
 -Conflicts:
 -Libs: -L${libdir} -ltls
--Libs.private: @LIBS@ -lcrypto -lssl
+-Libs.private: @LIBS@ -lcrypto -lssl @PLATFORM_LDADD@
 -Cflags: -I${includedir}
+--- a/tests/ssltest.sh
++++ b/tests/ssltest.sh
+@@ -7,7 +7,7 @@
+ fi
+ 
+ if [ -d ../apps/openssl ]; then
+-	openssl_bin=../apps/openssl/openssl
++	openssl_bin=../apps/openssl/libressl-openssl
+ 	if [ -e ../apps/openssl/openssl.exe ]; then
+ 		openssl_bin=../apps/openssl/openssl.exe
+ 	fi
+--- a/tests/testdsa.sh
++++ b/tests/testdsa.sh
+@@ -5,7 +5,7 @@
+ #Test DSA certificate generation of openssl
+ 
+ if [ -d ../apps/openssl ]; then
+-	cmd=../apps/openssl/openssl
++	cmd=../apps/openssl/libressl-openssl
+ 	if [ -e ../apps/openssl/openssl.exe ]; then
+ 		cmd=../apps/openssl/openssl.exe
+ 	fi
+--- a/tests/testenc.sh
++++ b/tests/testenc.sh
+@@ -3,7 +3,7 @@
+ 
+ test=p
+ if [ -d ../apps/openssl ]; then
+-	cmd=../apps/openssl/openssl
++	cmd=../apps/openssl/libressl-openssl
+ 	if [ -e ../apps/openssl/openssl.exe ]; then
+ 		cmd=../apps/openssl/openssl.exe
+ 	fi
+--- a/tests/testrsa.sh
++++ b/tests/testrsa.sh
+@@ -5,7 +5,7 @@
+ #Test RSA certificate generation of openssl
+ 
+ if [ -d ../apps/openssl ]; then
+-	cmd=../apps/openssl/openssl
++	cmd=../apps/openssl/libressl-openssl
+ 	if [ -e ../apps/openssl/openssl.exe ]; then
+ 		cmd=../apps/openssl/openssl.exe
+ 	fi

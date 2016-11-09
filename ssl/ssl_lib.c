@@ -1,4 +1,4 @@
-/* $OpenBSD: ssl_lib.c,v 1.100 2015/02/22 15:29:39 jsing Exp $ */
+/* $OpenBSD: ssl_lib.c,v 1.116 2015/10/25 15:52:49 doug Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -155,6 +155,8 @@
 #include <openssl/engine.h>
 #endif
 
+#include "bytestring.h"
+
 const char *SSL_version_str = OPENSSL_VERSION_TEXT;
 
 SSL3_ENC_METHOD ssl3_undef_enc_method = {
@@ -188,8 +190,7 @@ int
 SSL_clear(SSL *s)
 {
 	if (s->method == NULL) {
-		SSLerr(SSL_F_SSL_CLEAR,
-		    SSL_R_NO_METHOD_SPECIFIED);
+		SSLerr(SSL_F_SSL_CLEAR, SSL_R_NO_METHOD_SPECIFIED);
 		return (0);
 	}
 
@@ -203,8 +204,7 @@ SSL_clear(SSL *s)
 	s->shutdown = 0;
 
 	if (s->renegotiate) {
-		SSLerr(SSL_F_SSL_CLEAR,
-		    ERR_R_INTERNAL_ERROR);
+		SSLerr(SSL_F_SSL_CLEAR, ERR_R_INTERNAL_ERROR);
 		return (0);
 	}
 
@@ -217,10 +217,8 @@ SSL_clear(SSL *s)
 	s->rwstate = SSL_NOTHING;
 	s->rstate = SSL_ST_READ_HEADER;
 
-	if (s->init_buf != NULL) {
-		BUF_MEM_free(s->init_buf);
-		s->init_buf = NULL;
-	}
+	BUF_MEM_free(s->init_buf);
+	s->init_buf = NULL;
 
 	ssl_clear_cipher_ctx(s);
 	ssl_clear_hash_ctx(&s->read_hash);
@@ -240,6 +238,7 @@ SSL_clear(SSL *s)
 			return (0);
 	} else
 		s->method->ssl_clear(s);
+
 	return (1);
 }
 
@@ -267,13 +266,11 @@ SSL_new(SSL_CTX *ctx)
 	SSL	*s;
 
 	if (ctx == NULL) {
-		SSLerr(SSL_F_SSL_NEW,
-		    SSL_R_NULL_SSL_CTX);
+		SSLerr(SSL_F_SSL_NEW, SSL_R_NULL_SSL_CTX);
 		return (NULL);
 	}
 	if (ctx->method == NULL) {
-		SSLerr(SSL_F_SSL_NEW,
-		    SSL_R_SSL_CTX_HAS_NO_DEFAULT_SSL_VERSION);
+		SSLerr(SSL_F_SSL_NEW, SSL_R_SSL_CTX_HAS_NO_DEFAULT_SSL_VERSION);
 		return (NULL);
 	}
 
@@ -362,17 +359,11 @@ SSL_new(SSL_CTX *ctx)
 
 	CRYPTO_new_ex_data(CRYPTO_EX_INDEX_SSL, s, &s->ex_data);
 
-
 	return (s);
+
 err:
-	if (s != NULL) {
-		if (s->cert != NULL)
-			ssl_cert_free(s->cert);
-		SSL_CTX_free(s->ctx); /* decrement reference count */
-		free(s);
-	}
-	SSLerr(SSL_F_SSL_NEW,
-	    ERR_R_MALLOC_FAILURE);
+	SSL_free(s);
+	SSLerr(SSL_F_SSL_NEW, ERR_R_MALLOC_FAILURE);
 	return (NULL);
 }
 
@@ -511,10 +502,10 @@ SSL_free(SSL *s)
 		BIO_free(s->bbio);
 		s->bbio = NULL;
 	}
-	if (s->rbio != NULL)
+
+	if (s->rbio != s->wbio)
 		BIO_free_all(s->rbio);
-	if ((s->wbio != NULL) && (s->wbio != s->rbio))
-		BIO_free_all(s->wbio);
+	BIO_free_all(s->wbio);
 
 	if (s->init_buf != NULL)
 		BUF_MEM_free(s->init_buf);
@@ -580,9 +571,10 @@ SSL_set_bio(SSL *s, BIO *rbio, BIO *wbio)
 			s->bbio->next_bio = NULL;
 		}
 	}
-	if ((s->rbio != NULL) && (s->rbio != rbio))
+
+	if (s->rbio != rbio && s->rbio != s->wbio)
 		BIO_free_all(s->rbio);
-	if ((s->wbio != NULL) && (s->wbio != wbio) && (s->rbio != s->wbio))
+	if (s->wbio != wbio)
 		BIO_free_all(s->wbio);
 	s->rbio = rbio;
 	s->wbio = wbio;
@@ -641,8 +633,7 @@ SSL_set_fd(SSL *s, int fd)
 	bio = BIO_new(BIO_s_socket());
 
 	if (bio == NULL) {
-		SSLerr(SSL_F_SSL_SET_FD,
-		    ERR_R_BUF_LIB);
+		SSLerr(SSL_F_SSL_SET_FD, ERR_R_BUF_LIB);
 		goto err;
 	}
 	BIO_set_fd(bio, fd, BIO_NOCLOSE);
@@ -663,8 +654,7 @@ SSL_set_wfd(SSL *s, int fd)
 		bio = BIO_new(BIO_s_socket());
 
 		if (bio == NULL) {
-			SSLerr(SSL_F_SSL_SET_WFD,
-			    ERR_R_BUF_LIB);
+			SSLerr(SSL_F_SSL_SET_WFD, ERR_R_BUF_LIB);
 			goto err;
 		}
 		BIO_set_fd(bio, fd, BIO_NOCLOSE);
@@ -687,8 +677,7 @@ SSL_set_rfd(SSL *s, int fd)
 		bio = BIO_new(BIO_s_socket());
 
 		if (bio == NULL) {
-			SSLerr(SSL_F_SSL_SET_RFD,
-			    ERR_R_BUF_LIB);
+			SSLerr(SSL_F_SSL_SET_RFD, ERR_R_BUF_LIB);
 			goto err;
 		}
 		BIO_set_fd(bio, fd, BIO_NOCLOSE);
@@ -928,7 +917,7 @@ SSL_check_private_key(const SSL *ssl)
 int
 SSL_accept(SSL *s)
 {
-	if (s->handshake_func == 0)
+	if (s->handshake_func == NULL)
 		SSL_set_accept_state(s); /* Not properly initialized yet */
 
 	return (s->method->ssl_accept(s));
@@ -937,7 +926,7 @@ SSL_accept(SSL *s)
 int
 SSL_connect(SSL *s)
 {
-	if (s->handshake_func == 0)
+	if (s->handshake_func == NULL)
 		SSL_set_connect_state(s); /* Not properly initialized yet */
 
 	return (s->method->ssl_connect(s));
@@ -952,9 +941,8 @@ SSL_get_default_timeout(const SSL *s)
 int
 SSL_read(SSL *s, void *buf, int num)
 {
-	if (s->handshake_func == 0) {
-		SSLerr(SSL_F_SSL_READ,
-		    SSL_R_UNINITIALIZED);
+	if (s->handshake_func == NULL) {
+		SSLerr(SSL_F_SSL_READ, SSL_R_UNINITIALIZED);
 		return (-1);
 	}
 
@@ -968,9 +956,8 @@ SSL_read(SSL *s, void *buf, int num)
 int
 SSL_peek(SSL *s, void *buf, int num)
 {
-	if (s->handshake_func == 0) {
-		SSLerr(SSL_F_SSL_PEEK,
-		    SSL_R_UNINITIALIZED);
+	if (s->handshake_func == NULL) {
+		SSLerr(SSL_F_SSL_PEEK, SSL_R_UNINITIALIZED);
 		return (-1);
 	}
 
@@ -983,16 +970,14 @@ SSL_peek(SSL *s, void *buf, int num)
 int
 SSL_write(SSL *s, const void *buf, int num)
 {
-	if (s->handshake_func == 0) {
-		SSLerr(SSL_F_SSL_WRITE,
-		    SSL_R_UNINITIALIZED);
+	if (s->handshake_func == NULL) {
+		SSLerr(SSL_F_SSL_WRITE, SSL_R_UNINITIALIZED);
 		return (-1);
 	}
 
 	if (s->shutdown & SSL_SENT_SHUTDOWN) {
 		s->rwstate = SSL_NOTHING;
-		SSLerr(SSL_F_SSL_WRITE,
-		    SSL_R_PROTOCOL_IS_SHUTDOWN);
+		SSLerr(SSL_F_SSL_WRITE, SSL_R_PROTOCOL_IS_SHUTDOWN);
 		return (-1);
 	}
 	return (s->method->ssl_write(s, buf, num));
@@ -1008,9 +993,8 @@ SSL_shutdown(SSL *s)
 	 * even if blocking I/O is used (see ssl3_shutdown).
 	 */
 
-	if (s->handshake_func == 0) {
-		SSLerr(SSL_F_SSL_SHUTDOWN,
-		    SSL_R_UNINITIALIZED);
+	if (s->handshake_func == NULL) {
+		SSLerr(SSL_F_SSL_SHUTDOWN, SSL_R_UNINITIALIZED);
 		return (-1);
 	}
 
@@ -1320,8 +1304,7 @@ SSL_CTX_set_cipher_list(SSL_CTX *ctx, const char *str)
 	if (sk == NULL)
 		return (0);
 	else if (sk_SSL_CIPHER_num(sk) == 0) {
-		SSLerr(SSL_F_SSL_CTX_SET_CIPHER_LIST,
-		    SSL_R_NO_CIPHER_MATCH);
+		SSLerr(SSL_F_SSL_CTX_SET_CIPHER_LIST, SSL_R_NO_CIPHER_MATCH);
 		return (0);
 	}
 	return (1);
@@ -1339,8 +1322,7 @@ SSL_set_cipher_list(SSL *s, const char *str)
 	if (sk == NULL)
 		return (0);
 	else if (sk_SSL_CIPHER_num(sk) == 0) {
-		SSLerr(SSL_F_SSL_SET_CIPHER_LIST,
-		    SSL_R_NO_CIPHER_MATCH);
+		SSLerr(SSL_F_SSL_SET_CIPHER_LIST, SSL_R_NO_CIPHER_MATCH);
 		return (0);
 	}
 	return (1);
@@ -1413,35 +1395,39 @@ ssl_cipher_list_to_bytes(SSL *s, STACK_OF(SSL_CIPHER) *sk, unsigned char *p)
 }
 
 STACK_OF(SSL_CIPHER) *
-ssl_bytes_to_cipher_list(SSL *s, unsigned char *p, int num,
-    STACK_OF(SSL_CIPHER) **skp)
+ssl_bytes_to_cipher_list(SSL *s, const unsigned char *p, int num)
 {
+	CBS			 cbs;
 	const SSL_CIPHER	*c;
-	STACK_OF(SSL_CIPHER)	*sk;
-	int			 i;
+	STACK_OF(SSL_CIPHER)	*sk = NULL;
 	unsigned long		 cipher_id;
-	uint16_t		 cipher_value;
-	uint16_t		 max_version;
+	uint16_t		 cipher_value, max_version;
 
 	if (s->s3)
 		s->s3->send_connection_binding = 0;
 
-	if ((num % SSL3_CIPHER_VALUE_SIZE) != 0) {
+	/*
+	 * RFC 5246 section 7.4.1.2 defines the interval as [2,2^16-2].
+	 */
+	if (num < 2 || num > 0x10000 - 2) {
 		SSLerr(SSL_F_SSL_BYTES_TO_CIPHER_LIST,
 		    SSL_R_ERROR_IN_RECEIVED_CIPHER_LIST);
 		return (NULL);
 	}
-	if (skp == NULL || *skp == NULL) {
-		sk = sk_SSL_CIPHER_new_null(); /* change perhaps later */
-		if (sk == NULL)
-			goto err;
-	} else {
-		sk = *skp;
-		sk_SSL_CIPHER_zero(sk);
+
+	if ((sk = sk_SSL_CIPHER_new_null()) == NULL) {
+		SSLerr(SSL_F_SSL_BYTES_TO_CIPHER_LIST, ERR_R_MALLOC_FAILURE);
+		goto err;
 	}
 
-	for (i = 0; i < num; i += SSL3_CIPHER_VALUE_SIZE) {
-		n2s(p, cipher_value);
+	CBS_init(&cbs, p, num);
+	while (CBS_len(&cbs) > 0) {
+		if (!CBS_get_u16(&cbs, &cipher_value)) {
+			SSLerr(SSL_F_SSL_BYTES_TO_CIPHER_LIST,
+			    SSL_R_ERROR_IN_RECEIVED_CIPHER_LIST);
+			goto err;
+		}
+
 		cipher_id = SSL3_CK_ID | cipher_value;
 
 		if (s->s3 != NULL && cipher_id == SSL3_CK_SCSV) {
@@ -1489,13 +1475,11 @@ ssl_bytes_to_cipher_list(SSL *s, unsigned char *p, int num,
 		}
 	}
 
-	if (skp != NULL)
-		*skp = sk;
 	return (sk);
 
 err:
-	if (skp == NULL || *skp == NULL)
-		sk_SSL_CIPHER_free(sk);
+	sk_SSL_CIPHER_free(sk);
+
 	return (NULL);
 }
 
@@ -1730,9 +1714,6 @@ SSL_export_keying_material(SSL *s, unsigned char *out, size_t olen,
     const char *label, size_t llen, const unsigned char *p, size_t plen,
     int use_context)
 {
-	if (s->version < TLS1_VERSION)
-		return (-1);
-
 	return (s->method->ssl3_enc->export_keying_material(s, out, olen,
 	    label, llen, p, plen, use_context));
 }
@@ -1786,8 +1767,7 @@ SSL_CTX_new(const SSL_METHOD *meth)
 	SSL_CTX	*ret = NULL;
 
 	if (meth == NULL) {
-		SSLerr(SSL_F_SSL_CTX_NEW,
-		    SSL_R_NULL_SSL_METHOD_PASSED);
+		SSLerr(SSL_F_SSL_CTX_NEW, SSL_R_NULL_SSL_METHOD_PASSED);
 		return (NULL);
 	}
 
@@ -1853,8 +1833,7 @@ SSL_CTX_new(const SSL_METHOD *meth)
 	    &ret->cipher_list_by_id, SSL_DEFAULT_CIPHER_LIST);
 	if (ret->cipher_list == NULL ||
 	    sk_SSL_CIPHER_num(ret->cipher_list) <= 0) {
-		SSLerr(SSL_F_SSL_CTX_NEW,
-		    SSL_R_LIBRARY_HAS_NO_CIPHERS);
+		SSLerr(SSL_F_SSL_CTX_NEW, SSL_R_LIBRARY_HAS_NO_CIPHERS);
 		goto err2;
 	}
 
@@ -1921,13 +1900,9 @@ SSL_CTX_new(const SSL_METHOD *meth)
 	 */
 	ret->options |= SSL_OP_LEGACY_SERVER_CONNECT;
 
-	/* Disable SSLv3 by default. */
-	ret->options |= SSL_OP_NO_SSLv3;
-
 	return (ret);
 err:
-	SSLerr(SSL_F_SSL_CTX_NEW,
-	    ERR_R_MALLOC_FAILURE);
+	SSLerr(SSL_F_SSL_CTX_NEW, ERR_R_MALLOC_FAILURE);
 err2:
 	SSL_CTX_free(ret);
 	return (NULL);
@@ -2465,8 +2440,7 @@ SSL_do_handshake(SSL *s)
 	int	ret = 1;
 
 	if (s->handshake_func == NULL) {
-		SSLerr(SSL_F_SSL_DO_HANDSHAKE,
-		    SSL_R_CONNECTION_TYPE_NOT_SET);
+		SSLerr(SSL_F_SSL_DO_HANDSHAKE, SSL_R_CONNECTION_TYPE_NOT_SET);
 		return (-1);
 	}
 
@@ -2532,24 +2506,12 @@ ssl_undefined_const_function(const SSL *s)
 	return (0);
 }
 
-SSL_METHOD *
-ssl_bad_method(int ver)
-{
-	SSLerr(SSL_F_SSL_BAD_METHOD,
-	    ERR_R_SHOULD_NOT_HAVE_BEEN_CALLED);
-	return (NULL);
-}
-
 const char *
 ssl_version_string(int ver)
 {
 	switch (ver) {
-	case DTLS1_BAD_VER:
-		return (SSL_TXT_DTLS1_BAD);
 	case DTLS1_VERSION:
 		return (SSL_TXT_DTLS1);
-	case SSL3_VERSION:
-		return (SSL_TXT_SSLV3);
 	case TLS1_VERSION:
 		return (SSL_TXT_TLSV1);
 	case TLS1_1_VERSION:
@@ -2590,9 +2552,6 @@ ssl_max_server_version(SSL *s)
 	if ((s->options & SSL_OP_NO_TLSv1) == 0 &&
 	    max_version >= TLS1_VERSION)
 		return (TLS1_VERSION);
-	if ((s->options & SSL_OP_NO_SSLv3) == 0 &&
-	    max_version >= SSL3_VERSION)
-		return (SSL3_VERSION);
 
 	return (0);
 }
@@ -2807,8 +2766,7 @@ ssl_init_wbio_buffer(SSL *s, int push)
 	(void)BIO_reset(bbio);
 /*	if (!BIO_set_write_buffer_size(bbio,16*1024)) */
 	if (!BIO_set_read_buffer_size(bbio, 1)) {
-		SSLerr(SSL_F_SSL_INIT_WBIO_BUFFER,
-		    ERR_R_BUF_LIB);
+		SSLerr(SSL_F_SSL_INIT_WBIO_BUFFER, ERR_R_BUF_LIB);
 		return (0);
 	}
 	if (push) {
@@ -2824,6 +2782,9 @@ ssl_init_wbio_buffer(SSL *s, int push)
 void
 ssl_free_wbio_buffer(SSL *s)
 {
+	if (s == NULL)
+		return;
+
 	if (s->bbio == NULL)
 		return;
 
@@ -2886,13 +2847,20 @@ SSL_get_SSL_CTX(const SSL *ssl)
 SSL_CTX *
 SSL_set_SSL_CTX(SSL *ssl, SSL_CTX* ctx)
 {
+	CERT *ocert = ssl->cert;
+
 	if (ssl->ctx == ctx)
 		return (ssl->ctx);
 	if (ctx == NULL)
 		ctx = ssl->initial_ctx;
-	if (ssl->cert != NULL)
-		ssl_cert_free(ssl->cert);
 	ssl->cert = ssl_cert_dup(ctx->cert);
+	if (ocert != NULL) {
+		int i;
+		/* Copy negotiated digests from original certificate. */
+		for (i = 0; i < SSL_PKEY_NUM; i++)
+			ssl->cert->pkeys[i].digest = ocert->pkeys[i].digest;
+		ssl_cert_free(ocert);
+	}
 	CRYPTO_add(&ctx->references, 1, CRYPTO_LOCK_SSL_CTX);
 	SSL_CTX_free(ssl->ctx); /* decrement reference count */
 	ssl->ctx = ctx;
@@ -3076,26 +3044,6 @@ SSL_set_msg_callback(SSL *ssl, void (*cb)(int write_p, int version,
     int content_type, const void *buf, size_t len, SSL *ssl, void *arg))
 {
 	SSL_callback_ctrl(ssl, SSL_CTRL_SET_MSG_CALLBACK, (void (*)(void))cb);
-}
-
-/*
- * Allocates new EVP_MD_CTX and sets pointer to it into given pointer
- * variable, freeing EVP_MD_CTX previously stored in that variable, if
- * any. If EVP_MD pointer is passed, initializes ctx with this md
- * Returns newly allocated ctx;
- */
-EVP_MD_CTX *
-ssl_replace_hash(EVP_MD_CTX **hash, const EVP_MD *md)
-{
-	ssl_clear_hash_ctx(hash);
-	*hash = EVP_MD_CTX_create();
-	if (*hash != NULL && md != NULL) {
-		if (!EVP_DigestInit_ex(*hash, md, NULL)) {
-			ssl_clear_hash_ctx(hash);
-			return (NULL);
-		}
-	}
-	return (*hash);
 }
 
 void

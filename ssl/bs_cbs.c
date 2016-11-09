@@ -1,4 +1,4 @@
-/*	$OpenBSD: bs_cbs.c,v 1.1 2015/02/06 09:36:16 doug Exp $	*/
+/*	$OpenBSD: bs_cbs.c,v 1.16 2015/06/23 05:58:28 doug Exp $	*/
 /*
  * Copyright (c) 2014, Google Inc.
  *
@@ -28,7 +28,15 @@ void
 CBS_init(CBS *cbs, const uint8_t *data, size_t len)
 {
 	cbs->data = data;
+	cbs->initial_len = len;
 	cbs->len = len;
+}
+
+void
+CBS_dup(const CBS *cbs, CBS *out)
+{
+	CBS_init(out, CBS_data(cbs), CBS_len(cbs));
+	out->initial_len = cbs->initial_len;
 }
 
 static int
@@ -41,6 +49,12 @@ cbs_get(CBS *cbs, const uint8_t **p, size_t n)
 	cbs->data += n;
 	cbs->len -= n;
 	return 1;
+}
+
+size_t
+CBS_offset(const CBS *cbs)
+{
+	return cbs->initial_len - cbs->len;
 }
 
 int
@@ -65,18 +79,17 @@ CBS_len(const CBS *cbs)
 int
 CBS_stow(const CBS *cbs, uint8_t **out_ptr, size_t *out_len)
 {
-	if (*out_ptr != NULL) {
-		free(*out_ptr);
-		*out_ptr = NULL;
-	}
+	free(*out_ptr);
+	*out_ptr = NULL;
 	*out_len = 0;
 
 	if (cbs->len == 0)
 		return 1;
 
-	*out_ptr = BUF_memdup(cbs->data, cbs->len);
-	if (*out_ptr == NULL)
+	if ((*out_ptr = malloc(cbs->len)) == NULL)
 		return 0;
+
+	memcpy(*out_ptr, cbs->data, cbs->len);
 
 	*out_len = cbs->len;
 	return 1;
@@ -85,11 +98,23 @@ CBS_stow(const CBS *cbs, uint8_t **out_ptr, size_t *out_len)
 int
 CBS_strdup(const CBS *cbs, char **out_ptr)
 {
-	if (*out_ptr != NULL)
-		free(*out_ptr);
-
-	*out_ptr = strndup((const char*)cbs->data, cbs->len);
+	free(*out_ptr);
+	*out_ptr = strndup((const char *)cbs->data, cbs->len);
 	return (*out_ptr != NULL);
+}
+
+int
+CBS_write_bytes(const CBS *cbs, uint8_t *dst, size_t dst_len, size_t *copied)
+{
+	if (dst_len < cbs->len)
+		return 0;
+
+	memmove(dst, cbs->data, cbs->len);
+
+	if (copied != NULL)
+		*copied = cbs->len;
+
+	return 1;
 }
 
 int
@@ -104,7 +129,7 @@ CBS_mem_equal(const CBS *cbs, const uint8_t *data, size_t len)
 	if (len != cbs->len)
 		return 0;
 
-	return CRYPTO_memcmp(cbs->data, data, len) == 0;
+	return timingsafe_memcmp(cbs->data, data, len) == 0;
 }
 
 static int
@@ -113,6 +138,9 @@ cbs_get_u(CBS *cbs, uint32_t *out, size_t len)
 	uint32_t result = 0;
 	size_t i;
 	const uint8_t *data;
+
+	if (len < 1 || len > 4)
+		return 0;
 
 	if (!cbs_get(cbs, &data, len))
 		return 0;
@@ -203,27 +231,48 @@ CBS_get_u24_length_prefixed(CBS *cbs, CBS *out)
 }
 
 int
-CBS_get_any_asn1_element(CBS *cbs, CBS *out, unsigned *out_tag,
+CBS_get_any_asn1_element(CBS *cbs, CBS *out, unsigned int *out_tag,
     size_t *out_header_len)
+{
+	return cbs_get_any_asn1_element_internal(cbs, out, out_tag,
+	    out_header_len, 1);
+}
+
+/*
+ * Review X.690 for details on ASN.1 DER encoding.
+ *
+ * If non-strict mode is enabled, then DER rules are relaxed
+ * for indefinite constructs (violates DER but a little closer to BER).
+ * Non-strict mode should only be used by bs_ber.c
+ *
+ * Sections 8, 10 and 11 for DER encoding
+ */
+int
+cbs_get_any_asn1_element_internal(CBS *cbs, CBS *out, unsigned int *out_tag,
+    size_t *out_header_len, int strict)
 {
 	uint8_t tag, length_byte;
 	CBS header = *cbs;
 	CBS throwaway;
+	size_t len;
 
 	if (out == NULL)
 		out = &throwaway;
 
+	/*
+	 * Get identifier octet and length octet.  Only 1 octet for each
+	 * is a CBS limitation.
+	 */
 	if (!CBS_get_u8(&header, &tag) || !CBS_get_u8(&header, &length_byte))
 		return 0;
 
+	/* CBS limitation: long form tags are not supported. */
 	if ((tag & 0x1f) == 0x1f)
-		/* Long form tags are not supported. */
 		return 0;
 
 	if (out_tag != NULL)
 		*out_tag = tag;
 
-	size_t len;
 	if ((length_byte & 0x80) == 0) {
 		/* Short form length. */
 		len = ((size_t) length_byte) + 2;
@@ -235,23 +284,39 @@ CBS_get_any_asn1_element(CBS *cbs, CBS *out, unsigned *out_tag,
 		const size_t num_bytes = length_byte & 0x7f;
 		uint32_t len32;
 
-		if ((tag & CBS_ASN1_CONSTRUCTED) != 0 && num_bytes == 0) {
-			/* indefinite length */
-			*out_header_len = 2;
+		/* ASN.1 reserved value for future extensions */
+		if (num_bytes == 0x7f)
+			return 0;
+
+		/* Handle indefinite form length */
+		if (num_bytes == 0) {
+			/* DER encoding doesn't allow for indefinite form. */
+			if (strict)
+				return 0;
+
+			/* Primitive cannot use indefinite in BER or DER. */
+			if ((tag & CBS_ASN1_CONSTRUCTED) == 0)
+				return 0;
+
+			/* Constructed, indefinite length allowed in BER. */
+			if (out_header_len != NULL)
+				*out_header_len = 2;
 			return CBS_get_bytes(cbs, out, 2);
 		}
 
-		if (num_bytes == 0 || num_bytes > 4)
+		/* CBS limitation. */
+		if (num_bytes > 4)
 			return 0;
 
 		if (!cbs_get_u(&header, &len32, num_bytes))
 			return 0;
 
+		/* DER has a minimum length octet requirement. */
 		if (len32 < 128)
-			/* Length should have used short-form encoding. */
+			/* Should have used short form instead */
 			return 0;
 
-		if ((len32 >> ((num_bytes-1)*8)) == 0)
+		if ((len32 >> ((num_bytes - 1) * 8)) == 0)
 			/* Length should have been at least one byte shorter. */
 			return 0;
 
@@ -269,23 +334,17 @@ CBS_get_any_asn1_element(CBS *cbs, CBS *out, unsigned *out_tag,
 }
 
 static int
-cbs_get_asn1(CBS *cbs, CBS *out, unsigned tag_value, int skip_header)
+cbs_get_asn1(CBS *cbs, CBS *out, unsigned int tag_value, int skip_header)
 {
 	size_t header_len;
-	unsigned tag;
+	unsigned int tag;
 	CBS throwaway;
 
 	if (out == NULL)
 		out = &throwaway;
 
 	if (!CBS_get_any_asn1_element(cbs, out, &tag, &header_len) ||
-	    tag != tag_value || (header_len > 0 &&
-	    /*
-	     * This ensures that the tag is either zero length or
-	     * indefinite-length.
-	     */
-	    CBS_len(out) == header_len &&
-	    CBS_data(out)[header_len - 1] == 0x80))
+	    tag != tag_value)
 		return 0;
 
 	if (skip_header && !CBS_skip(out, header_len)) {
@@ -297,26 +356,34 @@ cbs_get_asn1(CBS *cbs, CBS *out, unsigned tag_value, int skip_header)
 }
 
 int
-CBS_get_asn1(CBS *cbs, CBS *out, unsigned tag_value)
+CBS_get_asn1(CBS *cbs, CBS *out, unsigned int tag_value)
 {
 	return cbs_get_asn1(cbs, out, tag_value, 1 /* skip header */);
 }
 
 int
-CBS_get_asn1_element(CBS *cbs, CBS *out, unsigned tag_value)
+CBS_get_asn1_element(CBS *cbs, CBS *out, unsigned int tag_value)
 {
 	return cbs_get_asn1(cbs, out, tag_value, 0 /* include header */);
 }
 
 int
-CBS_peek_asn1_tag(const CBS *cbs, unsigned tag_value)
+CBS_peek_asn1_tag(const CBS *cbs, unsigned int tag_value)
 {
 	if (CBS_len(cbs) < 1)
+		return 0;
+
+	/*
+	 * Tag number 31 indicates the start of a long form number.
+	 * This is valid in ASN.1, but CBS only supports short form.
+	 */
+	if ((tag_value & 0x1f) == 0x1f)
 		return 0;
 
 	return CBS_data(cbs)[0] == tag_value;
 }
 
+/* Encoding details are in ASN.1: X.690 section 8.3 */
 int
 CBS_get_asn1_uint64(CBS *cbs, uint64_t *out)
 {
@@ -332,11 +399,15 @@ CBS_get_asn1_uint64(CBS *cbs, uint64_t *out)
 	len = CBS_len(&bytes);
 
 	if (len == 0)
-		/* An INTEGER is encoded with at least one octet. */
+		/* An INTEGER is encoded with at least one content octet. */
 		return 0;
 
 	if ((data[0] & 0x80) != 0)
-		/* negative number */
+		/* Negative number. */
+		return 0;
+
+	if (data[0] == 0 && len > 1 && (data[1] & 0x80) == 0)
+		/* Violates smallest encoding rule: excessive leading zeros. */
 		return 0;
 
 	for (i = 0; i < len; i++) {
@@ -352,7 +423,7 @@ CBS_get_asn1_uint64(CBS *cbs, uint64_t *out)
 }
 
 int
-CBS_get_optional_asn1(CBS *cbs, CBS *out, int *out_present, unsigned tag)
+CBS_get_optional_asn1(CBS *cbs, CBS *out, int *out_present, unsigned int tag)
 {
 	if (CBS_peek_asn1_tag(cbs, tag)) {
 		if (!CBS_get_asn1(cbs, out, tag))
@@ -367,7 +438,7 @@ CBS_get_optional_asn1(CBS *cbs, CBS *out, int *out_present, unsigned tag)
 
 int
 CBS_get_optional_asn1_octet_string(CBS *cbs, CBS *out, int *out_present,
-    unsigned tag)
+    unsigned int tag)
 {
 	CBS child;
 	int present;
@@ -389,7 +460,7 @@ CBS_get_optional_asn1_octet_string(CBS *cbs, CBS *out, int *out_present,
 }
 
 int
-CBS_get_optional_asn1_uint64(CBS *cbs, uint64_t *out, unsigned tag,
+CBS_get_optional_asn1_uint64(CBS *cbs, uint64_t *out, unsigned int tag,
     uint64_t default_value)
 {
 	CBS child;
@@ -409,7 +480,8 @@ CBS_get_optional_asn1_uint64(CBS *cbs, uint64_t *out, unsigned tag,
 }
 
 int
-CBS_get_optional_asn1_bool(CBS *cbs, int *out, unsigned tag, int default_value)
+CBS_get_optional_asn1_bool(CBS *cbs, int *out, unsigned int tag,
+    int default_value)
 {
 	CBS child, child2;
 	int present;

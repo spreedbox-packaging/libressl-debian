@@ -1,4 +1,4 @@
-/*	$OpenBSD: getentropy_linux.c,v 1.35 2014/08/28 01:00:57 bcook Exp $	*/
+/*	$OpenBSD: getentropy_linux.c,v 1.41 2015/09/11 11:52:55 deraadt Exp $	*/
 
 /*
  * Copyright (c) 2014 Theo de Raadt <deraadt@openbsd.org>
@@ -27,8 +27,8 @@
 #include <sys/ioctl.h>
 #include <sys/resource.h>
 #include <sys/syscall.h>
-#ifdef HAVE_SYS_SYSCTL_H
-#include <sys/sysctl.h>
+#ifdef SYS__sysctl
+#include <linux/sysctl.h>
 #endif
 #include <sys/statvfs.h>
 #include <sys/socket.h>
@@ -51,7 +51,6 @@
 
 #include <linux/types.h>
 #include <linux/random.h>
-#include <linux/sysctl.h>
 #ifdef HAVE_GETAUXVAL
 #include <sys/auxv.h>
 #endif
@@ -92,7 +91,7 @@ getentropy(void *buf, size_t len)
 
 	if (len > 256) {
 		errno = EIO;
-		return -1;
+		return (-1);
 	}
 
 #ifdef SYS_getrandom
@@ -121,7 +120,7 @@ getentropy(void *buf, size_t len)
 	 * Try to use sysctl CTL_KERN, KERN_RANDOM, RANDOM_UUID.
 	 * sysctl is a failsafe API, so it guarantees a result.  This
 	 * should work inside a chroot, or when file descriptors are
-	 * exhuasted.
+	 * exhausted.
 	 *
 	 * However this can fail if the Linux kernel removes support
 	 * for sysctl.  Starting in 2007, there have been efforts to
@@ -187,8 +186,8 @@ gotdata(char *buf, size_t len)
 	for (i = 0; i < len; ++i)
 		any_set |= buf[i];
 	if (any_set == 0)
-		return -1;
-	return 0;
+		return (-1);
+	return (0);
 }
 
 #ifdef SYS_getrandom
@@ -261,11 +260,11 @@ start:
 	close(fd);
 	if (gotdata(buf, len) == 0) {
 		errno = save_errno;
-		return 0;		/* satisfied */
+		return (0);		/* satisfied */
 	}
 nodevrandom:
 	errno = EIO;
-	return -1;
+	return (-1);
 }
 
 #ifdef SYS__sysctl
@@ -296,11 +295,11 @@ getentropy_sysctl(void *buf, size_t len)
 	}
 sysctlfailed:
 	errno = EIO;
-	return -1;
+	return (-1);
 }
 #endif /* SYS__sysctl */
 
-static int cl[] = {
+static const int cl[] = {
 	CLOCK_REALTIME,
 #ifdef CLOCK_MONOTONIC
 	CLOCK_MONOTONIC,
@@ -331,7 +330,7 @@ getentropy_phdr(struct dl_phdr_info *info, size_t size, void *data)
 	SHA512_CTX *ctx = data;
 
 	SHA512_Update(ctx, &info->dlpi_addr, sizeof (info->dlpi_addr));
-	return 0;
+	return (0);
 }
 
 static int
@@ -541,8 +540,8 @@ getentropy_fallback(void *buf, size_t len)
 	explicit_bzero(results, sizeof results);
 	if (gotdata(buf, len) == 0) {
 		errno = save_errno;
-		return 0;		/* satisfied */
+		return (0);		/* satisfied */
 	}
 	errno = EIO;
-	return -1;
+	return (-1);
 }

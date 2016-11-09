@@ -1,4 +1,4 @@
-/* $OpenBSD: t1_lib.c,v 1.74 2014/12/14 14:34:43 jsing Exp $ */
+/* $OpenBSD: t1_lib.c,v 1.91 2016/10/02 21:05:44 guenther Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -117,6 +117,7 @@
 #include <openssl/ocsp.h>
 
 #include "ssl_locl.h"
+#include "bytestring.h"
 
 static int tls_decrypt_ticket(SSL *s, const unsigned char *tick, int ticklen,
     const unsigned char *sess_id, int sesslen,
@@ -197,6 +198,9 @@ tls1_new(SSL *s)
 void
 tls1_free(SSL *s)
 {
+	if (s == NULL)
+		return;
+
 	free(s->tlsext_session_ticket);
 	ssl3_free(s);
 }
@@ -403,15 +407,20 @@ tls1_get_curvelist(SSL *s, int client_curves, const uint16_t **pcurves,
 int
 tls1_check_curve(SSL *s, const unsigned char *p, size_t len)
 {
+	CBS cbs;
 	const uint16_t *curves;
 	size_t curveslen, i;
+	uint8_t type;
 	uint16_t cid;
 
-	/* Only named curves are supported. */
-	if (len != 3 || p[0] != NAMED_CURVE_TYPE)
-		return (0);
+	CBS_init(&cbs, p, len);
 
-	cid = (p[1] << 8) | p[2];
+	/* Only named curves are supported. */
+	if (CBS_len(&cbs) != 3 ||
+	    !CBS_get_u8(&cbs, &type) ||
+	    type != NAMED_CURVE_TYPE ||
+	    !CBS_get_u16(&cbs, &cid))
+		return (0);
 
 	tls1_get_curvelist(s, 0, &curves, &curveslen);
 
@@ -650,11 +659,6 @@ ssl_add_clienthello_tlsext(SSL *s, unsigned char *p, unsigned char *limit)
 		}
 	}
 
-	/* don't add extensions for SSLv3 unless doing secure renegotiation */
-	if (s->client_version == SSL3_VERSION &&
-	    !s->s3->send_connection_binding)
-		return p;
-
 	ret += 2;
 
 	if (ret >= limit)
@@ -770,7 +774,7 @@ ssl_add_clienthello_tlsext(SSL *s, unsigned char *p, unsigned char *limit)
 
 		/* NB: draft-ietf-tls-ecc-12.txt uses a one-byte prefix for
 		 * elliptic_curve_list, but the examples use two bytes.
-		 * http://www1.ietf.org/mail-archive/web/tls/current/msg00538.html
+		 * https://www1.ietf.org/mail-archive/web/tls/current/msg00538.html
 		 * resolves this to two bytes.
 		 */
 		s2n(curveslen * 2, ret);
@@ -964,10 +968,6 @@ ssl_add_serverhello_tlsext(SSL *s, unsigned char *p, unsigned char *limit)
 	    alg_a & SSL_aECDSA) &&
 	    s->session->tlsext_ecpointformatlist != NULL;
 
-	/* don't add extensions for SSLv3, unless doing secure renegotiation */
-	if (s->version == SSL3_VERSION && !s->s3->send_connection_binding)
-		return p;
-
 	ret += 2;
 	if (ret >= limit)
 		return NULL; /* this really never occurs, but ... */
@@ -1147,10 +1147,9 @@ static int
 tls1_alpn_handle_client_hello(SSL *s, const unsigned char *data,
     unsigned int data_len, int *al)
 {
+	CBS cbs, proto_name_list, alpn;
 	const unsigned char *selected;
 	unsigned char selected_len;
-	unsigned int proto_len;
-	unsigned int i;
 	int r;
 
 	if (s->ctx->alpn_select_cb == NULL)
@@ -1159,34 +1158,29 @@ tls1_alpn_handle_client_hello(SSL *s, const unsigned char *data,
 	if (data_len < 2)
 		goto parse_error;
 
+	CBS_init(&cbs, data, data_len);
+
 	/*
 	 * data should contain a uint16 length followed by a series of 8-bit,
 	 * length-prefixed strings.
 	 */
-	i = ((unsigned int)data[0]) << 8 | ((unsigned int)data[1]);
-	data_len -= 2;
-	data += 2;
-	if (data_len != i)
+	if (!CBS_get_u16_length_prefixed(&cbs, &alpn) ||
+	    CBS_len(&alpn) < 2 ||
+	    CBS_len(&cbs) != 0)
 		goto parse_error;
 
-	if (data_len < 2)
-		goto parse_error;
+	/* Validate data before sending to callback. */
+	CBS_dup(&alpn, &proto_name_list);
+	while (CBS_len(&proto_name_list) > 0) {
+		CBS proto_name;
 
-	for (i = 0; i < data_len; ) {
-		proto_len = data[i];
-		i++;
-
-		if (proto_len == 0)
+		if (!CBS_get_u8_length_prefixed(&proto_name_list, &proto_name) ||
+		    CBS_len(&proto_name) == 0)
 			goto parse_error;
-
-		if (i + proto_len < i || i + proto_len > data_len)
-			goto parse_error;
-
-		i += proto_len;
 	}
 
 	r = s->ctx->alpn_select_cb(s, &selected, &selected_len,
-	    data, data_len, s->ctx->alpn_select_cb_arg);
+	    CBS_data(&alpn), CBS_len(&alpn), s->ctx->alpn_select_cb_arg);
 	if (r == SSL_TLSEXT_ERR_OK) {
 		free(s->s3->alpn_selected);
 		if ((s->s3->alpn_selected = malloc(selected_len)) == NULL) {
@@ -1202,87 +1196,6 @@ tls1_alpn_handle_client_hello(SSL *s, const unsigned char *data,
 parse_error:
 	*al = SSL_AD_DECODE_ERROR;
 	return (0);
-}
-
-/* ssl_check_for_safari attempts to fingerprint Safari using OS X
- * SecureTransport using the TLS extension block in |d|, of length |n|.
- * Safari, since 10.6, sends exactly these extensions, in this order:
- *   SNI,
- *   elliptic_curves
- *   ec_point_formats
- *
- * We wish to fingerprint Safari because they broke ECDHE-ECDSA support in 10.8,
- * but they advertise support. So enabling ECDHE-ECDSA ciphers breaks them.
- * Sadly we cannot differentiate 10.6, 10.7 and 10.8.4 (which work), from
- * 10.8..10.8.3 (which don't work).
- */
-static void
-ssl_check_for_safari(SSL *s, const unsigned char *data, const unsigned char *d,
-    int n)
-{
-	unsigned short type, size;
-	static const unsigned char kSafariExtensionsBlock[] = {
-		0x00, 0x0a,  /* elliptic_curves extension */
-		0x00, 0x08,  /* 8 bytes */
-		0x00, 0x06,  /* 6 bytes of curve ids */
-		0x00, 0x17,  /* P-256 */
-		0x00, 0x18,  /* P-384 */
-		0x00, 0x19,  /* P-521 */
-
-		0x00, 0x0b,  /* ec_point_formats */
-		0x00, 0x02,  /* 2 bytes */
-		0x01,        /* 1 point format */
-		0x00,        /* uncompressed */
-	};
-
-	/* The following is only present in TLS 1.2 */
-	static const unsigned char kSafariTLS12ExtensionsBlock[] = {
-		0x00, 0x0d,  /* signature_algorithms */
-		0x00, 0x0c,  /* 12 bytes */
-		0x00, 0x0a,  /* 10 bytes */
-		0x05, 0x01,  /* SHA-384/RSA */
-		0x04, 0x01,  /* SHA-256/RSA */
-		0x02, 0x01,  /* SHA-1/RSA */
-		0x04, 0x03,  /* SHA-256/ECDSA */
-		0x02, 0x03,  /* SHA-1/ECDSA */
-	};
-
-	if (data >= (d + n - 2))
-		return;
-	data += 2;
-
-	if (data > (d + n - 4))
-		return;
-	n2s(data, type);
-	n2s(data, size);
-
-	if (type != TLSEXT_TYPE_server_name)
-		return;
-
-	if (data + size > d + n)
-		return;
-	data += size;
-
-	if (TLS1_get_client_version(s) >= TLS1_2_VERSION) {
-		const size_t len1 = sizeof(kSafariExtensionsBlock);
-		const size_t len2 = sizeof(kSafariTLS12ExtensionsBlock);
-
-		if (data + len1 + len2 != d + n)
-			return;
-		if (memcmp(data, kSafariExtensionsBlock, len1) != 0)
-			return;
-		if (memcmp(data + len1, kSafariTLS12ExtensionsBlock, len2) != 0)
-			return;
-	} else {
-		const size_t len = sizeof(kSafariExtensionsBlock);
-
-		if (data + len != d + n)
-			return;
-		if (memcmp(data, kSafariExtensionsBlock, len) != 0)
-			return;
-	}
-
-	s->s3->is_probably_safari = 1;
 }
 
 int
@@ -1301,9 +1214,6 @@ ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d,
 	s->s3->next_proto_neg_seen = 0;
 	free(s->s3->alpn_selected);
 	s->s3->alpn_selected = NULL;
-
-	if (s->options & SSL_OP_SAFARI_ECDHE_ECDSA_BUG)
-		ssl_check_for_safari(s, data, d, n);
 
 	if (data >= (d + n - 2))
 		goto ri_check;
@@ -1528,10 +1438,28 @@ ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d,
 				/* Read in responder_id_list */
 				n2s(data, dsize);
 				size -= 2;
-				if (dsize > size  ) {
+				if (dsize > size) {
 					*al = SSL_AD_DECODE_ERROR;
 					return 0;
 				}
+
+				/*
+				 * We remove any OCSP_RESPIDs from a
+				 * previous handshake to prevent
+				 * unbounded memory growth.
+				 */
+				sk_OCSP_RESPID_pop_free(s->tlsext_ocsp_ids,
+				    OCSP_RESPID_free);
+				s->tlsext_ocsp_ids = NULL;
+				if (dsize > 0) {
+					s->tlsext_ocsp_ids =
+					    sk_OCSP_RESPID_new_null();
+					if (s->tlsext_ocsp_ids == NULL) {
+						*al = SSL_AD_INTERNAL_ERROR;
+						return 0;
+					}
+				}
+
 				while (dsize > 0) {
 					OCSP_RESPID *id;
 					int idsize;
@@ -1557,13 +1485,6 @@ ssl_parse_clienthello_tlsext(SSL *s, unsigned char **p, unsigned char *d,
 					if (data != sdata) {
 						OCSP_RESPID_free(id);
 						*al = SSL_AD_DECODE_ERROR;
-						return 0;
-					}
-					if (!s->tlsext_ocsp_ids &&
-					    !(s->tlsext_ocsp_ids =
-					    sk_OCSP_RESPID_new_null())) {
-						OCSP_RESPID_free(id);
-						*al = SSL_AD_INTERNAL_ERROR;
 						return 0;
 					}
 					if (!sk_OCSP_RESPID_push(
@@ -1666,22 +1587,23 @@ ri_check:
 	return 1;
 }
 
-/* ssl_next_proto_validate validates a Next Protocol Negotiation block. No
+/*
+ * ssl_next_proto_validate validates a Next Protocol Negotiation block. No
  * elements of zero length are allowed and the set of elements must exactly fill
- * the length of the block. */
+ * the length of the block.
+ */
 static char
-ssl_next_proto_validate(unsigned char *d, unsigned len)
+ssl_next_proto_validate(const unsigned char *d, unsigned int len)
 {
-	unsigned int off = 0;
+	CBS npn, value;
 
-	while (off < len) {
-		if (d[off] == 0)
+	CBS_init(&npn, d, len);
+	while (CBS_len(&npn) > 0) {
+		if (!CBS_get_u8_length_prefixed(&npn, &value) ||
+		    CBS_len(&value) == 0)
 			return 0;
-		off += d[off];
-		off++;
 	}
-
-	return off == len;
+	return 1;
 }
 
 int
@@ -1910,18 +1832,6 @@ ri_check:
 }
 
 int
-ssl_prepare_clienthello_tlsext(SSL *s)
-{
-	return 1;
-}
-
-int
-ssl_prepare_serverhello_tlsext(SSL *s)
-{
-	return 1;
-}
-
-int
 ssl_check_clienthello_tlsext_early(SSL *s)
 {
 	int ret = SSL_TLSEXT_ERR_NOACK;
@@ -2126,12 +2036,11 @@ ssl_check_serverhello_tlsext(SSL *s)
  *   Otherwise, s->tlsext_ticket_expected is set to 0.
  */
 int
-tls1_process_ticket(SSL *s, unsigned char *session_id, int len,
+tls1_process_ticket(SSL *s, const unsigned char *session, int session_len,
     const unsigned char *limit, SSL_SESSION **ret)
 {
 	/* Point after session ID in client hello */
-	const unsigned char *p = session_id + len;
-	unsigned short i;
+	CBS session_id, cookie, cipher_list, compress_algo, extensions;
 
 	*ret = NULL;
 	s->tlsext_ticket_expected = 0;
@@ -2141,40 +2050,49 @@ tls1_process_ticket(SSL *s, unsigned char *session_id, int len,
 	 */
 	if (SSL_get_options(s) & SSL_OP_NO_TICKET)
 		return 0;
-	if ((s->version <= SSL3_VERSION) || !limit)
+	if (!limit)
 		return 0;
-	if (p >= limit)
+
+	if (limit < session)
 		return -1;
+
+	CBS_init(&session_id, session, limit - session);
+
+	/* Skip past the session id */
+	if (!CBS_skip(&session_id, session_len))
+		return -1;
+
 	/* Skip past DTLS cookie */
 	if (SSL_IS_DTLS(s)) {
-		i = *(p++);
-		p += i;
-		if (p >= limit)
+		if (!CBS_get_u8_length_prefixed(&session_id, &cookie))
 			return -1;
 	}
+
 	/* Skip past cipher list */
-	n2s(p, i);
-	p += i;
-	if (p >= limit)
+	if (!CBS_get_u16_length_prefixed(&session_id, &cipher_list))
 		return -1;
+
 	/* Skip past compression algorithm list */
-	i = *(p++);
-	p += i;
-	if (p > limit)
+	if (!CBS_get_u8_length_prefixed(&session_id, &compress_algo))
 		return -1;
+
 	/* Now at start of extensions */
-	if ((p + 2) >= limit)
+	if (CBS_len(&session_id) == 0)
 		return 0;
-	n2s(p, i);
-	while ((p + 4) <= limit) {
-		unsigned short type, size;
-		n2s(p, type);
-		n2s(p, size);
-		if (p + size > limit)
-			return 0;
-		if (type == TLSEXT_TYPE_session_ticket) {
+	if (!CBS_get_u16_length_prefixed(&session_id, &extensions))
+		return -1;
+
+	while (CBS_len(&extensions) > 0) {
+		CBS ext_data;
+		uint16_t ext_type;
+
+		if (!CBS_get_u16(&extensions, &ext_type) ||
+		    !CBS_get_u16_length_prefixed(&extensions, &ext_data))
+			return -1;
+
+		if (ext_type == TLSEXT_TYPE_session_ticket) {
 			int r;
-			if (size == 0) {
+			if (CBS_len(&ext_data) == 0) {
 				/* The client will accept a ticket but doesn't
 				 * currently have one. */
 				s->tlsext_ticket_expected = 1;
@@ -2188,7 +2106,10 @@ tls1_process_ticket(SSL *s, unsigned char *session_id, int len,
 				 * calculate the master secret later. */
 				return 2;
 			}
-			r = tls_decrypt_ticket(s, p, size, session_id, len, ret);
+
+			r = tls_decrypt_ticket(s, CBS_data(&ext_data),
+			    CBS_len(&ext_data), session, session_len, ret);
+
 			switch (r) {
 			case 2: /* ticket couldn't be decrypted */
 				s->tlsext_ticket_expected = 1;
@@ -2202,7 +2123,6 @@ tls1_process_ticket(SSL *s, unsigned char *session_id, int len,
 				return -1;
 			}
 		}
-		p += size;
 	}
 	return 0;
 }
@@ -2234,9 +2154,16 @@ tls_decrypt_ticket(SSL *s, const unsigned char *etick, int eticklen,
 	HMAC_CTX hctx;
 	EVP_CIPHER_CTX ctx;
 	SSL_CTX *tctx = s->initial_ctx;
-	/* Need at least keyname + iv + some encrypted data */
-	if (eticklen < 48)
+
+	/*
+	 * The API guarantees EVP_MAX_IV_LENGTH bytes of space for
+	 * the iv to tlsext_ticket_key_cb().  Since the total space
+	 * required for a session cookie is never less than this,
+	 * this check isn't too strict.  The exact check comes later.
+	 */
+	if (eticklen < 16 + EVP_MAX_IV_LENGTH)
 		return 2;
+
 	/* Initialize session ticket encryption and HMAC contexts */
 	HMAC_CTX_init(&hctx);
 	EVP_CIPHER_CTX_init(&ctx);
@@ -2245,10 +2172,12 @@ tls_decrypt_ticket(SSL *s, const unsigned char *etick, int eticklen,
 		int rv = tctx->tlsext_ticket_key_cb(s, nctick, nctick + 16,
 		    &ctx, &hctx, 0);
 		if (rv < 0) {
+			HMAC_CTX_cleanup(&hctx);
 			EVP_CIPHER_CTX_cleanup(&ctx);
 			return -1;
 		}
 		if (rv == 0) {
+			HMAC_CTX_cleanup(&hctx);
 			EVP_CIPHER_CTX_cleanup(&ctx);
 			return 2;
 		}
@@ -2263,34 +2192,52 @@ tls_decrypt_ticket(SSL *s, const unsigned char *etick, int eticklen,
 		EVP_DecryptInit_ex(&ctx, EVP_aes_128_cbc(), NULL,
 		    tctx->tlsext_tick_aes_key, etick + 16);
 	}
-	/* Attempt to process session ticket, first conduct sanity and
+
+	/*
+	 * Attempt to process session ticket, first conduct sanity and
 	 * integrity checks on ticket.
 	 */
 	mlen = HMAC_size(&hctx);
 	if (mlen < 0) {
+		HMAC_CTX_cleanup(&hctx);
 		EVP_CIPHER_CTX_cleanup(&ctx);
 		return -1;
 	}
+
+	/* Sanity check ticket length: must exceed keyname + IV + HMAC */
+	if (eticklen <= 16 + EVP_CIPHER_CTX_iv_length(&ctx) + mlen) {
+		HMAC_CTX_cleanup(&hctx);
+		EVP_CIPHER_CTX_cleanup(&ctx);
+		return 2;
+	}
 	eticklen -= mlen;
+
 	/* Check HMAC of encrypted ticket */
-	HMAC_Update(&hctx, etick, eticklen);
-	HMAC_Final(&hctx, tick_hmac, NULL);
+	if (HMAC_Update(&hctx, etick, eticklen) <= 0 ||
+	    HMAC_Final(&hctx, tick_hmac, NULL) <= 0) {
+		HMAC_CTX_cleanup(&hctx);
+		EVP_CIPHER_CTX_cleanup(&ctx);
+		return -1;
+	}
+
 	HMAC_CTX_cleanup(&hctx);
 	if (timingsafe_memcmp(tick_hmac, etick + eticklen, mlen)) {
 		EVP_CIPHER_CTX_cleanup(&ctx);
 		return 2;
 	}
+
 	/* Attempt to decrypt session data */
 	/* Move p after IV to start of encrypted ticket, update length */
 	p = etick + 16 + EVP_CIPHER_CTX_iv_length(&ctx);
 	eticklen -= 16 + EVP_CIPHER_CTX_iv_length(&ctx);
 	sdec = malloc(eticklen);
-	if (!sdec) {
+	if (sdec == NULL ||
+	    EVP_DecryptUpdate(&ctx, sdec, &slen, p, eticklen) <= 0) {
+		free(sdec);
 		EVP_CIPHER_CTX_cleanup(&ctx);
 		return -1;
 	}
-	EVP_DecryptUpdate(&ctx, sdec, &slen, p, eticklen);
-	if (EVP_DecryptFinal(&ctx, sdec + slen, &mlen) <= 0) {
+	if (EVP_DecryptFinal_ex(&ctx, sdec + slen, &mlen) <= 0) {
 		free(sdec);
 		EVP_CIPHER_CTX_cleanup(&ctx);
 		return 2;
@@ -2416,17 +2363,20 @@ tls12_get_hash(unsigned char hash_alg)
 int
 tls1_process_sigalgs(SSL *s, const unsigned char *data, int dsize)
 {
-	int i, idx;
+	int idx;
 	const EVP_MD *md;
 	CERT *c = s->cert;
+	CBS cbs;
 
 	/* Extension ignored for inappropriate versions */
 	if (!SSL_USE_SIGALGS(s))
 		return 1;
 
 	/* Should never happen */
-	if (!c)
+	if (!c || dsize < 0)
 		return 0;
+
+	CBS_init(&cbs, data, dsize);
 
 	c->pkeys[SSL_PKEY_DSA_SIGN].digest = NULL;
 	c->pkeys[SSL_PKEY_RSA_SIGN].digest = NULL;
@@ -2434,8 +2384,14 @@ tls1_process_sigalgs(SSL *s, const unsigned char *data, int dsize)
 	c->pkeys[SSL_PKEY_ECC].digest = NULL;
 	c->pkeys[SSL_PKEY_GOST01].digest = NULL;
 
-	for (i = 0; i < dsize; i += 2) {
-		unsigned char hash_alg = data[i], sig_alg = data[i + 1];
+	while (CBS_len(&cbs) > 0) {
+		uint8_t hash_alg, sig_alg;
+
+		if (!CBS_get_u8(&cbs, &hash_alg) ||
+		    !CBS_get_u8(&cbs, &sig_alg)) {
+			/* Should never happen */
+			return 0;
+		}
 
 		switch (sig_alg) {
 		case TLSEXT_signature_rsa:

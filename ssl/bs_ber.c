@@ -1,4 +1,4 @@
-/*	$OpenBSD: bs_ber.c,v 1.1 2015/02/06 09:36:16 doug Exp $	*/
+/*	$OpenBSD: bs_ber.c,v 1.7 2015/06/17 07:20:39 doug Exp $	*/
 /*
  * Copyright (c) 2014, Google Inc.
  *
@@ -25,16 +25,27 @@
  * of the input being processes always decreases. None the less, a very large
  * input could otherwise cause the stack to overflow.
  */
-static const unsigned kMaxDepth = 2048;
+static const unsigned int kMaxDepth = 2048;
+
+/* Non-strict version that allows a relaxed DER with indefinite form. */
+static int
+cbs_nonstrict_get_any_asn1_element(CBS *cbs, CBS *out, unsigned int *out_tag,
+    size_t *out_header_len)
+{
+	return cbs_get_any_asn1_element_internal(cbs, out,
+	    out_tag, out_header_len, 0);
+}
 
 /*
- * cbs_find_ber walks an ASN.1 structure in |orig_in| and sets |*ber_found|
- * depending on whether an indefinite length element was found. The value of
- * |in| is not changed. It returns one on success (i.e. |*ber_found| was set)
- * and zero on error.
+ * cbs_find_indefinite walks an ASN.1 structure in |orig_in| and sets
+ * |*indefinite_found| depending on whether an indefinite length element was
+ * found. The value of |orig_in| is not modified.
+ *
+ * Returns one on success (i.e. |*indefinite_found| was set) and zero on error.
  */
 static int
-cbs_find_ber(CBS *orig_in, char *ber_found, unsigned depth)
+cbs_find_indefinite(const CBS *orig_in, char *indefinite_found,
+    unsigned int depth)
 {
 	CBS in;
 
@@ -42,29 +53,31 @@ cbs_find_ber(CBS *orig_in, char *ber_found, unsigned depth)
 		return 0;
 
 	CBS_init(&in, CBS_data(orig_in), CBS_len(orig_in));
-	*ber_found = 0;
 
 	while (CBS_len(&in) > 0) {
 		CBS contents;
-		unsigned tag;
+		unsigned int tag;
 		size_t header_len;
 
-		if (!CBS_get_any_asn1_element(&in, &contents, &tag,
+		if (!cbs_nonstrict_get_any_asn1_element(&in, &contents, &tag,
 		    &header_len))
 			return 0;
 
+		/* Indefinite form not allowed by DER. */
 		if (CBS_len(&contents) == header_len && header_len > 0 &&
-		    CBS_data(&contents)[header_len-1] == 0x80) {
-			*ber_found = 1;
+		    CBS_data(&contents)[header_len - 1] == 0x80) {
+			*indefinite_found = 1;
 			return 1;
 		}
 		if (tag & CBS_ASN1_CONSTRUCTED) {
 			if (!CBS_skip(&contents, header_len) ||
-			    !cbs_find_ber(&contents, ber_found, depth + 1))
+			    !cbs_find_indefinite(&contents, indefinite_found,
+			    depth + 1))
 				return 0;
 		}
 	}
 
+	*indefinite_found = 0;
 	return 1;
 }
 
@@ -75,7 +88,7 @@ cbs_find_ber(CBS *orig_in, char *ber_found, unsigned depth)
  * length.
  */
 static char
-is_primitive_type(unsigned tag)
+is_primitive_type(unsigned int tag)
 {
 	return (tag & 0xc0) == 0 &&
 	    (tag & 0x1f) != (CBS_ASN1_SEQUENCE & 0x1f) &&
@@ -84,17 +97,18 @@ is_primitive_type(unsigned tag)
 
 /*
  * is_eoc returns true if |header_len| and |contents|, as returned by
- * |CBS_get_any_asn1_element|, indicate an "end of contents" (EOC) value.
+ * |cbs_nonstrict_get_any_asn1_element|, indicate an "end of contents" (EOC)
+ * value.
  */
 static char
 is_eoc(size_t header_len, CBS *contents)
 {
-	return header_len == 2 && CBS_len(contents) == 2 &&
-	    memcmp(CBS_data(contents), "\x00\x00", 2) == 0;
+	return header_len == 2 && CBS_mem_equal(contents, "\x00\x00", 2);
 }
 
 /*
- * cbs_convert_ber reads BER data from |in| and writes DER data to |out|. If
+ * cbs_convert_indefinite reads data with DER encoding (but relaxed to allow
+ * indefinite form) from |in| and writes definite form DER data to |out|. If
  * |squash_header| is set then the top-level of elements from |in| will not
  * have their headers written. This is used when concatenating the fragments of
  * an indefinite length, primitive value. If |looking_for_eoc| is set then any
@@ -102,19 +116,20 @@ is_eoc(size_t header_len, CBS *contents)
  * It returns one on success and zero on error.
  */
 static int
-cbs_convert_ber(CBS *in, CBB *out, char squash_header, char looking_for_eoc,
-    unsigned depth)
+cbs_convert_indefinite(CBS *in, CBB *out, char squash_header,
+    char looking_for_eoc, unsigned int depth)
 {
 	if (depth > kMaxDepth)
 		return 0;
 
 	while (CBS_len(in) > 0) {
 		CBS contents;
-		unsigned tag;
+		unsigned int tag;
 		size_t header_len;
 		CBB *out_contents, out_contents_storage;
 
-		if (!CBS_get_any_asn1_element(in, &contents, &tag, &header_len))
+		if (!cbs_nonstrict_get_any_asn1_element(in, &contents, &tag,
+		    &header_len))
 			return 0;
 
 		out_contents = out;
@@ -132,7 +147,7 @@ cbs_convert_ber(CBS *in, CBB *out, char squash_header, char looking_for_eoc,
 				 * with a concrete length prefix.
 				 *
 				 * If it's a something else then the contents
-				 * will be a series of BER elements of the same
+				 * will be a series of DER elements of the same
 				 * type which need to be concatenated.
 				 */
 				const char context_specific = (tag & 0xc0)
@@ -152,14 +167,14 @@ cbs_convert_ber(CBS *in, CBB *out, char squash_header, char looking_for_eoc,
 				if (context_specific &&
 				    (tag & CBS_ASN1_CONSTRUCTED)) {
 					CBS in_copy, inner_contents;
-					unsigned inner_tag;
+					unsigned int inner_tag;
 					size_t inner_header_len;
 
 					CBS_init(&in_copy, CBS_data(in),
 					    CBS_len(in));
-					if (!CBS_get_any_asn1_element(&in_copy,
-					    &inner_contents, &inner_tag,
-					    &inner_header_len))
+					if (!cbs_nonstrict_get_any_asn1_element(
+					    &in_copy, &inner_contents,
+					    &inner_tag, &inner_header_len))
 						return 0;
 
 					if (CBS_len(&inner_contents) >
@@ -169,7 +184,7 @@ cbs_convert_ber(CBS *in, CBB *out, char squash_header, char looking_for_eoc,
 				}
 
 				if (!squash_header) {
-					unsigned out_tag = tag;
+					unsigned int out_tag = tag;
 
 					if (squash_child_headers)
 						out_tag &=
@@ -182,7 +197,7 @@ cbs_convert_ber(CBS *in, CBB *out, char squash_header, char looking_for_eoc,
 					out_contents = &out_contents_storage;
 				}
 
-				if (!cbs_convert_ber(in, out_contents,
+				if (!cbs_convert_indefinite(in, out_contents,
 				    squash_child_headers,
 				    1 /* looking for eoc */, depth + 1))
 					return 0;
@@ -205,7 +220,7 @@ cbs_convert_ber(CBS *in, CBB *out, char squash_header, char looking_for_eoc,
 			return 0;
 
 		if (tag & CBS_ASN1_CONSTRUCTED) {
-			if (!cbs_convert_ber(&contents, out_contents,
+			if (!cbs_convert_indefinite(&contents, out_contents,
 			    0 /* don't squash header */,
 			    0 /* not looking for eoc */, depth + 1))
 				return 0;
@@ -223,7 +238,7 @@ cbs_convert_ber(CBS *in, CBB *out, char squash_header, char looking_for_eoc,
 }
 
 int
-CBS_asn1_ber_to_der(CBS *in, uint8_t **out, size_t *out_len)
+CBS_asn1_indefinite_to_definite(CBS *in, uint8_t **out, size_t *out_len)
 {
 	CBB cbb;
 
@@ -233,7 +248,7 @@ CBS_asn1_ber_to_der(CBS *in, uint8_t **out, size_t *out_len)
 	 * return.
 	 */
 	char conversion_needed;
-	if (!cbs_find_ber(in, &conversion_needed, 0))
+	if (!cbs_find_indefinite(in, &conversion_needed, 0))
 		return 0;
 
 	if (!conversion_needed) {
@@ -242,8 +257,9 @@ CBS_asn1_ber_to_der(CBS *in, uint8_t **out, size_t *out_len)
 		return 1;
 	}
 
-	CBB_init(&cbb, CBS_len(in));
-	if (!cbs_convert_ber(in, &cbb, 0, 0, 0)) {
+	if (!CBB_init(&cbb, CBS_len(in)))
+		return 0;
+	if (!cbs_convert_indefinite(in, &cbb, 0, 0, 0)) {
 		CBB_cleanup(&cbb);
 		return 0;
 	}

@@ -1,4 +1,4 @@
-/* $OpenBSD: evp_enc.c,v 1.25 2014/10/22 13:02:04 jsing Exp $ */
+/* $OpenBSD: evp_enc.c,v 1.31 2016/05/30 13:42:54 beck Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -264,9 +264,9 @@ int
 EVP_CipherFinal(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl)
 {
 	if (ctx->encrypt)
-		return EVP_EncryptFinal(ctx, out, outl);
+		return EVP_EncryptFinal_ex(ctx, out, outl);
 	else
-		return EVP_DecryptFinal(ctx, out, outl);
+		return EVP_DecryptFinal_ex(ctx, out, outl);
 }
 
 int
@@ -334,7 +334,7 @@ EVP_EncryptUpdate(EVP_CIPHER_CTX *ctx, unsigned char *out, int *outl,
 		return 0;
 	}
 	if (i != 0) {
-		if (i + inl < bl) {
+		if (bl - i > inl) {
 			memcpy(&(ctx->buf[i]), in, inl);
 			ctx->buf_len += inl;
 			*outl = 0;
@@ -562,7 +562,7 @@ EVP_CIPHER_CTX_cleanup(EVP_CIPHER_CTX *c)
 			return 0;
 		/* Cleanse cipher context data */
 		if (c->cipher_data)
-			OPENSSL_cleanse(c->cipher_data, c->cipher->ctx_size);
+			explicit_bzero(c->cipher_data, c->cipher->ctx_size);
 	}
 	free(c->cipher_data);
 #ifndef OPENSSL_NO_ENGINE
@@ -571,7 +571,7 @@ EVP_CIPHER_CTX_cleanup(EVP_CIPHER_CTX *c)
 		 * functional reference we held for this reason. */
 		ENGINE_finish(c->engine);
 #endif
-	memset(c, 0, sizeof(EVP_CIPHER_CTX));
+	explicit_bzero(c, sizeof(EVP_CIPHER_CTX));
 	return 1;
 }
 

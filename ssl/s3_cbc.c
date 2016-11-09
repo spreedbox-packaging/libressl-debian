@@ -1,4 +1,4 @@
-/* $OpenBSD: s3_cbc.c,v 1.8 2014/07/10 08:51:14 tedu Exp $ */
+/* $OpenBSD: s3_cbc.c,v 1.11 2015/09/11 17:17:44 jsing Exp $ */
 /* ====================================================================
  * Copyright (c) 2012 The OpenSSL Project.  All rights reserved.
  *
@@ -101,36 +101,6 @@ constant_time_eq_8(unsigned a, unsigned b)
 	return DUPLICATE_MSB_TO_ALL_8(c);
 }
 
-/* ssl3_cbc_remove_padding removes padding from the decrypted, SSLv3, CBC
- * record in |rec| by updating |rec->length| in constant time.
- *
- * block_size: the block size of the cipher used to encrypt the record.
- * returns:
- *   0: (in non-constant time) if the record is publicly invalid.
- *   1: if the padding was valid
- *  -1: otherwise. */
-int
-ssl3_cbc_remove_padding(const SSL* s, SSL3_RECORD *rec, unsigned block_size,
-    unsigned mac_size)
-{
-	unsigned padding_length, good;
-	const unsigned overhead = 1 /* padding length byte */ + mac_size;
-
-	/* These lengths are all public so we can test them in non-constant
-	 * time. */
-	if (overhead > rec->length)
-		return 0;
-
-	padding_length = rec->data[rec->length - 1];
-	good = constant_time_ge(rec->length, padding_length + overhead);
-	/* SSLv3 requires that the padding is minimal. */
-	good &= constant_time_ge(block_size, padding_length + 1);
-	padding_length = good & (padding_length + 1);
-	rec->length -= padding_length;
-	rec->type |= padding_length << 8; /* kludge: pass padding length */
-	return (int)((good & 1) | (~good & -1));
-}
-
 /* tls1_cbc_remove_padding removes the CBC padding from the decrypted, TLS, CBC
  * record in |rec| in constant time and returns 1 if the padding is valid and
  * -1 otherwise. It also removes any explicit IV from the start of the record
@@ -164,24 +134,6 @@ tls1_cbc_remove_padding(const SSL* s, SSL3_RECORD *rec, unsigned block_size,
 		return 0;
 
 	padding_length = rec->data[rec->length - 1];
-
-	/* NB: if compression is in operation the first packet may not be of
-	 * even length so the padding bug check cannot be performed. This bug
-	 * workaround has been around since SSLeay so hopefully it is either
-	 * fixed now or no buggy implementation supports compression [steve]
-	 * (We don't support compression either, so it's not in operation.)
-	 */
-	if ((s->options & SSL_OP_TLS_BLOCK_PADDING_BUG)) {
-		/* First packet is even in size, so check */
-		if ((memcmp(s->s3->read_sequence, "\0\0\0\0\0\0\0\0",
-		    SSL3_SEQUENCE_SIZE) == 0) && !(padding_length & 1)) {
-			s->s3->flags|=TLS1_FLAGS_TLS_PADDING_BUG;
-		}
-		if ((s->s3->flags & TLS1_FLAGS_TLS_PADDING_BUG) &&
-		    padding_length > 0) {
-			padding_length--;
-		}
-	}
 
 	if (EVP_CIPHER_flags(s->enc_read_ctx->cipher) & EVP_CIPH_FLAG_AEAD_CIPHER) {
 		/* padding is already verified */
@@ -649,7 +601,7 @@ ssl3_cbc_digest_record(const EVP_MD_CTX *ctx, unsigned char* md_out,
 			 * application data, and we are at the offset for the
 			 * 0x80 value, then overwrite b with 0x80. */
 			b = (b&~is_past_c) | (0x80&is_past_c);
-			/* If this the the block containing the end of the
+			/* If this is the block containing the end of the
 			 * application data and we're past the 0x80 value then
 			 * just write zero. */
 			b = b&~is_past_cp1;

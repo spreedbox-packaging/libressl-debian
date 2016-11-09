@@ -1,4 +1,4 @@
-/* $OpenBSD: s23_srvr.c,v 1.37 2014/12/10 15:43:31 jsing Exp $ */
+/* $OpenBSD: s23_srvr.c,v 1.46 2015/10/25 15:49:04 doug Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -117,60 +117,7 @@
 #include <openssl/evp.h>
 #include <openssl/objects.h>
 
-static const SSL_METHOD *ssl23_get_server_method(int ver);
 int ssl23_get_client_hello(SSL *s);
-
-const SSL_METHOD SSLv23_server_method_data = {
-	.version = TLS1_2_VERSION,
-	.ssl_new = tls1_new,
-	.ssl_clear = tls1_clear,
-	.ssl_free = tls1_free,
-	.ssl_accept = ssl23_accept,
-	.ssl_connect = ssl_undefined_function,
-	.ssl_read = ssl23_read,
-	.ssl_peek = ssl23_peek,
-	.ssl_write = ssl23_write,
-	.ssl_shutdown = ssl_undefined_function,
-	.ssl_renegotiate = ssl_undefined_function,
-	.ssl_renegotiate_check = ssl_ok,
-	.ssl_get_message = ssl3_get_message,
-	.ssl_read_bytes = ssl3_read_bytes,
-	.ssl_write_bytes = ssl3_write_bytes,
-	.ssl_dispatch_alert = ssl3_dispatch_alert,
-	.ssl_ctrl = ssl3_ctrl,
-	.ssl_ctx_ctrl = ssl3_ctx_ctrl,
-	.get_cipher_by_char = ssl3_get_cipher_by_char,
-	.put_cipher_by_char = ssl3_put_cipher_by_char,
-	.ssl_pending = ssl_undefined_const_function,
-	.num_ciphers = ssl3_num_ciphers,
-	.get_cipher = ssl3_get_cipher,
-	.get_ssl_method = ssl23_get_server_method,
-	.get_timeout = ssl23_default_timeout,
-	.ssl3_enc = &ssl3_undef_enc_method,
-	.ssl_version = ssl_undefined_void_function,
-	.ssl_callback_ctrl = ssl3_callback_ctrl,
-	.ssl_ctx_callback_ctrl = ssl3_ctx_callback_ctrl,
-};
-
-const SSL_METHOD *
-SSLv23_server_method(void)
-{
-	return &SSLv23_server_method_data;
-}
-
-static const SSL_METHOD *
-ssl23_get_server_method(int ver)
-{
-	if (ver == SSL3_VERSION)
-		return (SSLv3_server_method());
-	if (ver == TLS1_VERSION)
-		return (TLSv1_server_method());
-	if (ver == TLS1_1_VERSION)
-		return (TLSv1_1_server_method());
-	if (ver == TLS1_2_VERSION)
-		return (TLSv1_2_server_method());
-	return (NULL);
-}
 
 int
 ssl23_accept(SSL *s)
@@ -207,21 +154,11 @@ ssl23_accept(SSL *s)
 			/* s->version=SSL3_VERSION; */
 			s->type = SSL_ST_ACCEPT;
 
-			if (s->init_buf == NULL) {
-				BUF_MEM *buf;
-				if ((buf = BUF_MEM_new()) == NULL) {
-					ret = -1;
-					goto end;
-				}
-				if (!BUF_MEM_grow(buf, SSL3_RT_MAX_PLAIN_LENGTH)) {
-					BUF_MEM_free(buf);
-					ret = -1;
-					goto end;
-				}
-				s->init_buf = buf;
+			if (!ssl3_setup_init_buffer(s)) {
+				ret = -1;
+				goto end;
 			}
-
-			if (!ssl3_init_finished_mac(s)) {
+			if (!tls1_init_finished_mac(s)) {
 				ret = -1;
 				goto end;
 			}
@@ -255,10 +192,12 @@ ssl23_accept(SSL *s)
 			s->state = new_state;
 		}
 	}
+
 end:
 	s->in_handshake--;
 	if (cb != NULL)
 		cb(s, SSL_CB_ACCEPT_EXIT, ret);
+
 	return (ret);
 }
 
@@ -308,15 +247,14 @@ ssl23_get_client_hello(SSL *s)
 			 * SSLv2 header
 			 */
 			if ((p[3] == 0x00) && (p[4] == 0x02)) {
-				v[0] = p[3];
-				v[1] = p[4];
-				/* SSLv2 */
-				if (!(s->options & SSL_OP_NO_SSLv2))
-					type = 1;
+				/* SSLv2 support has been removed */
+				goto unsupported;
+
 			} else if (p[3] == SSL3_VERSION_MAJOR) {
 				v[0] = p[3];
 				v[1] = p[4];
-				/* SSLv3/TLSv1 */
+				/* SSLv3/TLS */
+
 				if (p[4] >= TLS1_VERSION_MINOR) {
 					if (p[4] >= TLS1_2_VERSION_MINOR &&
 					    !(s->options & SSL_OP_NO_TLSv1_2)) {
@@ -331,20 +269,13 @@ ssl23_get_client_hello(SSL *s)
 						s->version = TLS1_VERSION;
 						/* type=2; */ /* done later to survive restarts */
 						s->state = SSL23_ST_SR_CLNT_HELLO_B;
-					} else if (!(s->options & SSL_OP_NO_SSLv3)) {
-						s->version = SSL3_VERSION;
-						/* type=2; */
-						s->state = SSL23_ST_SR_CLNT_HELLO_B;
-					} else if (!(s->options & SSL_OP_NO_SSLv2)) {
-						type = 1;
+					} else {
+						goto unsupported;
 					}
-				} else if (!(s->options & SSL_OP_NO_SSLv3)) {
-					s->version = SSL3_VERSION;
-					/* type=2; */
-					s->state = SSL23_ST_SR_CLNT_HELLO_B;
-				} else if (!(s->options & SSL_OP_NO_SSLv2))
-					type = 1;
-
+				} else {
+					/* SSLv3 support has been removed */
+					goto unsupported;
+				}
 			}
 		} else if ((p[0] == SSL3_RT_HANDSHAKE) &&
 		    (p[1] == SSL3_VERSION_MAJOR) &&
@@ -390,20 +321,18 @@ ssl23_get_client_hello(SSL *s)
 				} else if (!(s->options & SSL_OP_NO_TLSv1)) {
 					s->version = TLS1_VERSION;
 					type = 3;
-				} else if (!(s->options & SSL_OP_NO_SSLv3)) {
-					s->version = SSL3_VERSION;
-					type = 3;
+				} else {
+					goto unsupported;
 				}
 			} else {
-				/* client requests SSL 3.0 */
-				if (!(s->options & SSL_OP_NO_SSLv3)) {
-					s->version = SSL3_VERSION;
-					type = 3;
-				} else if (!(s->options & SSL_OP_NO_TLSv1)) {
+				/* SSLv3 */
+				if (!(s->options & SSL_OP_NO_TLSv1)) {
 					/* we won't be able to use TLS of course,
 					 * but this will send an appropriate alert */
 					s->version = TLS1_VERSION;
 					type = 3;
+				} else {
+					goto unsupported;
 				}
 			}
 		}
@@ -422,6 +351,14 @@ ssl23_get_client_hello(SSL *s)
 	if (s->state == SSL23_ST_SR_CLNT_HELLO_B) {
 		/* we have SSLv3/TLSv1 in an SSLv2 header
 		 * (other cases skip this state) */
+
+		/*
+		 * Limit the support of "backward compatible" headers
+		 * only to "backward" versions of TLS. If we have moved
+		 * on to modernity, just say no.
+		 */
+		if (s->options & SSL_OP_NO_TLSv1)
+			goto unsupported;
 
 		type = 2;
 		p = s->packet;
@@ -455,7 +392,7 @@ ssl23_get_client_hello(SSL *s)
 		if (j != n + 2)
 			return -1;
 
-		ssl3_finish_mac(s, s->packet + 2, s->packet_length - 2);
+		tls1_finish_mac(s, s->packet + 2, s->packet_length - 2);
 		if (s->msg_callback)
 			s->msg_callback(0, SSL2_VERSION, 0, s->packet + 2,
 			    s->packet_length - 2, s, s->msg_callback_arg);
@@ -526,12 +463,7 @@ ssl23_get_client_hello(SSL *s)
 	/* imaginary new state (for program structure): */
 	/* s->state = SSL23_SR_CLNT_HELLO_C */
 
-	if (type == 1) {
-		SSLerr(SSL_F_SSL23_GET_CLIENT_HELLO, SSL_R_UNSUPPORTED_PROTOCOL);
-		return -1;
-	}
-
-	if ((type == 2) || (type == 3)) {
+	if (type == 2 || type == 3) {
 		/* we have SSLv3/TLSv1 (type 2: SSL2 style, type 3: SSL3/TLS style) */
 
 		if (!ssl_init_wbio_buffer(s, 1))
@@ -565,11 +497,9 @@ ssl23_get_client_hello(SSL *s)
 		else if (s->version == TLS1_VERSION)
 			s->method = TLSv1_server_method();
 		else
-			s->method = SSLv3_server_method();
+			goto unsupported;
 		s->handshake_func = s->method->ssl_accept;
-	}
-
-	if ((type < 1) || (type > 3)) {
+	} else {
 		/* bad, very bad */
 		SSLerr(SSL_F_SSL23_GET_CLIENT_HELLO, SSL_R_UNKNOWN_PROTOCOL);
 		return -1;
@@ -577,4 +507,8 @@ ssl23_get_client_hello(SSL *s)
 	s->init_num = 0;
 
 	return (SSL_accept(s));
+
+ unsupported:
+	SSLerr(SSL_F_SSL23_GET_CLIENT_HELLO, SSL_R_UNSUPPORTED_PROTOCOL);
+	return -1;
 }

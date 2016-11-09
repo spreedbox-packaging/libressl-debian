@@ -1,4 +1,4 @@
-/* $OpenBSD: d1_lib.c,v 1.27 2015/02/09 10:53:28 jsing Exp $ */
+/* $OpenBSD: d1_lib.c,v 1.32 2015/10/07 13:20:48 bcook Exp $ */
 /*
  * DTLS implementation written by Nagendra Modadugu
  * (nagendra@cs.stanford.edu) for the OpenSSL project 2005.
@@ -59,6 +59,7 @@
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/time.h>
 
 #include <netinet/in.h>
 
@@ -124,16 +125,11 @@ dtls1_new(SSL *s)
 	if (!d1->unprocessed_rcds.q || !d1->processed_rcds.q ||
 	    !d1->buffered_messages || !d1->sent_messages ||
 	    !d1->buffered_app_data.q) {
-		if (d1->unprocessed_rcds.q)
-			pqueue_free(d1->unprocessed_rcds.q);
-		if (d1->processed_rcds.q)
-			pqueue_free(d1->processed_rcds.q);
-		if (d1->buffered_messages)
-			pqueue_free(d1->buffered_messages);
-		if (d1->sent_messages)
-			pqueue_free(d1->sent_messages);
-		if (d1->buffered_app_data.q)
-			pqueue_free(d1->buffered_app_data.q);
+		pqueue_free(d1->unprocessed_rcds.q);
+		pqueue_free(d1->processed_rcds.q);
+		pqueue_free(d1->buffered_messages);
+		pqueue_free(d1->sent_messages);
+		pqueue_free(d1->buffered_app_data.q);
 		free(d1);
 		ssl3_free(s);
 		return (0);
@@ -190,6 +186,9 @@ dtls1_clear_queues(SSL *s)
 void
 dtls1_free(SSL *s)
 {
+	if (s == NULL)
+		return;
+
 	ssl3_free(s);
 
 	dtls1_clear_queues(s);
@@ -200,7 +199,7 @@ dtls1_free(SSL *s)
 	pqueue_free(s->d1->sent_messages);
 	pqueue_free(s->d1->buffered_app_data.q);
 
-	OPENSSL_cleanse(s->d1, sizeof *s->d1);
+	explicit_bzero(s->d1, sizeof *s->d1);
 	free(s->d1);
 	s->d1 = NULL;
 }
@@ -243,10 +242,8 @@ dtls1_clear(SSL *s)
 	}
 
 	ssl3_clear(s);
-	if (s->options & SSL_OP_CISCO_ANYCONNECT)
-		s->version = DTLS1_BAD_VER;
-	else
-		s->version = DTLS1_VERSION;
+
+	s->version = DTLS1_VERSION;
 }
 
 long

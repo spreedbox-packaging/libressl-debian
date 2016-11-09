@@ -1,4 +1,4 @@
-/* $OpenBSD: sha_locl.h,v 1.18 2014/08/18 19:11:48 bcook Exp $ */
+/* $OpenBSD: sha_locl.h,v 1.20 2015/09/13 21:09:56 doug Exp $ */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
  * All rights reserved.
  *
@@ -76,19 +76,6 @@
 	ll=(c)->h4; HOST_l2c(ll,(s));	\
 	} while (0)
 
-#if defined(SHA_0)
-
-# define HASH_UPDATE             	SHA_Update
-# define HASH_TRANSFORM          	SHA_Transform
-# define HASH_FINAL              	SHA_Final
-# define HASH_INIT			SHA_Init
-# define HASH_BLOCK_DATA_ORDER   	sha_block_data_order
-# define Xupdate(a,ix,ia,ib,ic,id)	(ix=(a)=(ia^ib^ic^id))
-
-static void sha_block_data_order (SHA_CTX *c, const void *p,size_t num);
-
-#elif defined(SHA_1)
-
 # define HASH_UPDATE             	SHA1_Update
 # define HASH_TRANSFORM          	SHA1_Transform
 # define HASH_FINAL              	SHA1_Final
@@ -103,10 +90,6 @@ static
 #endif
 void sha1_block_data_order (SHA_CTX *c, const void *p,size_t num);
 
-#else
-# error "Either SHA_0 or SHA_1 must be defined."
-#endif
-
 #include "md32_common.h"
 
 #define INIT_DATA_h0 0x67452301UL
@@ -115,11 +98,7 @@ void sha1_block_data_order (SHA_CTX *c, const void *p,size_t num);
 #define INIT_DATA_h3 0x10325476UL
 #define INIT_DATA_h4 0xc3d2e1f0UL
 
-#ifdef SHA_0
-int SHA_Init(SHA_CTX *c)
-#else
 int SHA1_Init(SHA_CTX *c)
-#endif
 	{
 	memset (c,0,sizeof(*c));
 	c->h0=INIT_DATA_h0;
@@ -184,7 +163,7 @@ int SHA1_Init(SHA_CTX *c)
 #ifndef MD32_XARRAY
   /*
    * Originally X was an array. As it's automatic it's natural
-   * to expect RISC compiler to accomodate at least part of it in
+   * to expect RISC compiler to accommodate at least part of it in
    * the register bank, isn't it? Unfortunately not all compilers
    * "find" this expectation reasonable:-( On order to make such
    * compilers generate better code I replace X[] with a bunch of
@@ -201,7 +180,7 @@ int SHA1_Init(SHA_CTX *c)
 # define X(i)	XX[i]
 #endif
 
-#if !defined(SHA_1) || !defined(SHA1_ASM)
+#if !defined(SHA1_ASM)
 #include <machine/endian.h>
 static void HASH_BLOCK_DATA_ORDER (SHA_CTX *c, const void *p, size_t num)
 	{
@@ -387,7 +366,7 @@ static void HASH_BLOCK_DATA_ORDER (SHA_CTX *c, const void *p, size_t num)
 	E=D, D=C, C=ROTATE(B,30), B=A;	\
 	A=ROTATE(A,5)+T+xa;	    } while(0)
 
-#if !defined(SHA_1) || !defined(SHA1_ASM)
+#if !defined(SHA1_ASM)
 static void HASH_BLOCK_DATA_ORDER (SHA_CTX *c, const void *p, size_t num)
 	{
 	const unsigned char *data=p;
