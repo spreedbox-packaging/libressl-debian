@@ -17,9 +17,6 @@ SUBSTVARS = \
 %:
 	dh $@ --with autoreconf --parallel
 
-override_dh_auto_configure:
-	dh_auto_configure -- --enable-libtls
-
 override_dh_gencontrol:
 	dh_gencontrol -- $(SUBSTVARS)
 
