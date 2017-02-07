@@ -1,3 +1,13 @@
+libressl (2.5.1-1ppa1~trusty1) trusty; urgency=medium
+
+  * Upgrade to 2.5.x release line.
+  * Imported Upstream version 2.5.1
+  * Updated patches for new upsteam version.
+  * No longer need to enable building of "libtls", always included.
+  * Updated library names to match ABI version.
+
+ -- Joachim Bauch <bauch@struktur.de>  Tue, 07 Feb 2017 16:58:27 +0100
+
 libressl (2.4.5-1ppa1~trusty1) trusty; urgency=medium
 
   * Imported Upstream version 2.4.5
