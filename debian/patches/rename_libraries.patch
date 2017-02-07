@@ -8,7 +8,7 @@
 +pkgconfig_DATA = libressl-crypto.pc libressl-ssl.pc libressl-tls.pc libressl-openssl.pc
  
  EXTRA_DIST = README.md README.windows VERSION config scripts
- EXTRA_DIST += CMakeLists.txt cmake_uninstall.cmake.in
+ EXTRA_DIST += CMakeLists.txt cmake_export_symbol.cmake cmake_uninstall.cmake.in
 --- /dev/null
 +++ b/libressl-crypto.pc.in
 @@ -0,0 +1,15 @@
@@ -76,7 +76,7 @@
 -Requires: libssl libcrypto
 --- a/crypto/Makefile.am
 +++ b/crypto/Makefile.am
-@@ -5,7 +5,7 @@
+@@ -6,7 +6,7 @@
  AM_CPPFLAGS += -I$(top_srcdir)/crypto/modes
  AM_CPPFLAGS += -I$(top_srcdir)/crypto
  
@@ -85,13 +85,13 @@
  
  EXTRA_DIST = VERSION
  EXTRA_DIST += CMakeLists.txt
-@@ -13,26 +13,26 @@
+@@ -15,26 +15,26 @@
  # needed for a CMake target
  EXTRA_DIST += compat/strcasecmp.c
  
--libcrypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@ -no-undefined
+-libcrypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@ -no-undefined -export-symbols $(top_srcdir)/crypto/crypto_portable.sym
 -libcrypto_la_LIBADD = libcompat.la
-+libressl_crypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@ -no-undefined
++libressl_crypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@ -no-undefined -export-symbols $(top_srcdir)/crypto/crypto_portable.sym
 +libressl_crypto_la_LIBADD = libcompat.la
  if !HAVE_EXPLICIT_BZERO
 -libcrypto_la_LIBADD += libcompatnoopt.la
@@ -122,7 +122,7 @@
  endif
  
  noinst_LTLIBRARIES = libcompat.la
-@@ -101,709 +101,709 @@
+@@ -107,34 +107,34 @@
  
  include Makefile.am.arc4random
  
@@ -176,7 +176,8 @@
  noinst_HEADERS += constant_time_locl.h
  noinst_HEADERS += cryptlib.h
  noinst_HEADERS += md32_common.h
- noinst_HEADERS += o_time.h
+@@ -142,683 +142,683 @@
+ noinst_HEADERS += x86_arch.h
  
  # aes
 -libcrypto_la_SOURCES += aes/aes_cfb.c
@@ -552,6 +553,14 @@
 +libressl_crypto_la_SOURCES += conf/conf_sap.c
  noinst_HEADERS += conf/conf_def.h
  
+ # curve25519
+-libcrypto_la_SOURCES += curve25519/curve25519-generic.c
+-libcrypto_la_SOURCES += curve25519/curve25519.c
++libressl_crypto_la_SOURCES += curve25519/curve25519-generic.c
++libressl_crypto_la_SOURCES += curve25519/curve25519.c
+ noinst_HEADERS += curve25519/curve25519_internal.h
+ 
+ 
  # des
 -libcrypto_la_SOURCES += des/cbc_cksm.c
 -libcrypto_la_SOURCES += des/cbc_enc.c
@@ -682,6 +691,10 @@
 -libcrypto_la_SOURCES += ec/eck_prn.c
 -libcrypto_la_SOURCES += ec/ecp_mont.c
 -libcrypto_la_SOURCES += ec/ecp_nist.c
+-libcrypto_la_SOURCES += ec/ecp_nistp224.c
+-libcrypto_la_SOURCES += ec/ecp_nistp256.c
+-libcrypto_la_SOURCES += ec/ecp_nistp521.c
+-libcrypto_la_SOURCES += ec/ecp_nistputil.c
 -libcrypto_la_SOURCES += ec/ecp_oct.c
 -libcrypto_la_SOURCES += ec/ecp_smpl.c
 +libressl_crypto_la_SOURCES += ec/ec2_mult.c
@@ -702,6 +715,10 @@
 +libressl_crypto_la_SOURCES += ec/eck_prn.c
 +libressl_crypto_la_SOURCES += ec/ecp_mont.c
 +libressl_crypto_la_SOURCES += ec/ecp_nist.c
++libressl_crypto_la_SOURCES += ec/ecp_nistp224.c
++libressl_crypto_la_SOURCES += ec/ecp_nistp256.c
++libressl_crypto_la_SOURCES += ec/ecp_nistp521.c
++libressl_crypto_la_SOURCES += ec/ecp_nistputil.c
 +libressl_crypto_la_SOURCES += ec/ecp_oct.c
 +libressl_crypto_la_SOURCES += ec/ecp_smpl.c
  noinst_HEADERS += ec/ec_lcl.h
@@ -955,10 +972,6 @@
 +libressl_crypto_la_SOURCES += idea/i_ofb64.c
 +libressl_crypto_la_SOURCES += idea/i_skey.c
  noinst_HEADERS += idea/idea_lcl.h
- 
- # krb5
--libcrypto_la_SOURCES += krb5/krb5_asn.c
-+libressl_crypto_la_SOURCES += krb5/krb5_asn.c
  
  # lhash
 -libcrypto_la_SOURCES += lhash/lh_stats.c
@@ -1305,6 +1318,7 @@
 +libressl_crypto_la_SOURCES += x509/x509type.c
 +libressl_crypto_la_SOURCES += x509/x_all.c
  noinst_HEADERS += x509/x509_lcl.h
+ noinst_HEADERS += x509/vpm_int.h
  
  # x509v3
 -libcrypto_la_SOURCES += x509v3/pcy_cache.c
@@ -1379,7 +1393,7 @@
  noinst_HEADERS += x509v3/pcy_int.h
 --- a/ssl/Makefile.am
 +++ b/ssl/Makefile.am
-@@ -1,53 +1,53 @@
+@@ -1,51 +1,51 @@
  include $(top_srcdir)/Makefile.am.common
  
 -lib_LTLIBRARIES = libssl.la
@@ -1387,10 +1401,11 @@
  
  EXTRA_DIST = VERSION
  EXTRA_DIST += CMakeLists.txt
+ EXTRA_DIST += ssl.sym
  
--libssl_la_LDFLAGS = -version-info @LIBSSL_VERSION@ -no-undefined
+-libssl_la_LDFLAGS = -version-info @LIBSSL_VERSION@ -no-undefined -export-symbols $(top_srcdir)/ssl/ssl.sym
 -libssl_la_LIBADD = $(abs_top_builddir)/crypto/libcrypto.la
-+libressl_ssl_la_LDFLAGS = -version-info @LIBSSL_VERSION@ -no-undefined
++libressl_ssl_la_LDFLAGS = -version-info @LIBSSL_VERSION@ -no-undefined -export-symbols $(top_srcdir)/ssl/ssl.sym
 +libressl_ssl_la_LIBADD = $(abs_top_builddir)/crypto/libressl-crypto.la
  
 -libssl_la_SOURCES = bio_ssl.c
@@ -1406,27 +1421,24 @@
 -libssl_la_SOURCES += d1_srtp.c
 -libssl_la_SOURCES += d1_srvr.c
 -libssl_la_SOURCES += pqueue.c
--libssl_la_SOURCES += s23_clnt.c
--libssl_la_SOURCES += s23_lib.c
--libssl_la_SOURCES += s23_pkt.c
--libssl_la_SOURCES += s23_srvr.c
--libssl_la_SOURCES += s3_both.c
 -libssl_la_SOURCES += s3_cbc.c
--libssl_la_SOURCES += s3_clnt.c
 -libssl_la_SOURCES += s3_lib.c
--libssl_la_SOURCES += s3_pkt.c
--libssl_la_SOURCES += s3_srvr.c
 -libssl_la_SOURCES += ssl_algs.c
 -libssl_la_SOURCES += ssl_asn1.c
+-libssl_la_SOURCES += ssl_both.c
 -libssl_la_SOURCES += ssl_cert.c
 -libssl_la_SOURCES += ssl_ciph.c
+-libssl_la_SOURCES += ssl_clnt.c
 -libssl_la_SOURCES += ssl_err.c
--libssl_la_SOURCES += ssl_err2.c
 -libssl_la_SOURCES += ssl_lib.c
+-libssl_la_SOURCES += ssl_packet.c
+-libssl_la_SOURCES += ssl_pkt.c
 -libssl_la_SOURCES += ssl_rsa.c
 -libssl_la_SOURCES += ssl_sess.c
+-libssl_la_SOURCES += ssl_srvr.c
 -libssl_la_SOURCES += ssl_stat.c
 -libssl_la_SOURCES += ssl_txt.c
+-libssl_la_SOURCES += ssl_versions.c
 -libssl_la_SOURCES += t1_clnt.c
 -libssl_la_SOURCES += t1_enc.c
 -libssl_la_SOURCES += t1_lib.c
@@ -1446,27 +1458,24 @@
 +libressl_ssl_la_SOURCES += d1_srtp.c
 +libressl_ssl_la_SOURCES += d1_srvr.c
 +libressl_ssl_la_SOURCES += pqueue.c
-+libressl_ssl_la_SOURCES += s23_clnt.c
-+libressl_ssl_la_SOURCES += s23_lib.c
-+libressl_ssl_la_SOURCES += s23_pkt.c
-+libressl_ssl_la_SOURCES += s23_srvr.c
-+libressl_ssl_la_SOURCES += s3_both.c
 +libressl_ssl_la_SOURCES += s3_cbc.c
-+libressl_ssl_la_SOURCES += s3_clnt.c
 +libressl_ssl_la_SOURCES += s3_lib.c
-+libressl_ssl_la_SOURCES += s3_pkt.c
-+libressl_ssl_la_SOURCES += s3_srvr.c
 +libressl_ssl_la_SOURCES += ssl_algs.c
 +libressl_ssl_la_SOURCES += ssl_asn1.c
++libressl_ssl_la_SOURCES += ssl_both.c
 +libressl_ssl_la_SOURCES += ssl_cert.c
 +libressl_ssl_la_SOURCES += ssl_ciph.c
++libressl_ssl_la_SOURCES += ssl_clnt.c
 +libressl_ssl_la_SOURCES += ssl_err.c
-+libressl_ssl_la_SOURCES += ssl_err2.c
 +libressl_ssl_la_SOURCES += ssl_lib.c
++libressl_ssl_la_SOURCES += ssl_packet.c
++libressl_ssl_la_SOURCES += ssl_pkt.c
 +libressl_ssl_la_SOURCES += ssl_rsa.c
 +libressl_ssl_la_SOURCES += ssl_sess.c
++libressl_ssl_la_SOURCES += ssl_srvr.c
 +libressl_ssl_la_SOURCES += ssl_stat.c
 +libressl_ssl_la_SOURCES += ssl_txt.c
++libressl_ssl_la_SOURCES += ssl_versions.c
 +libressl_ssl_la_SOURCES += t1_clnt.c
 +libressl_ssl_la_SOURCES += t1_enc.c
 +libressl_ssl_la_SOURCES += t1_lib.c
@@ -1478,7 +1487,7 @@
  noinst_HEADERS += ssl_locl.h
 --- a/configure.ac
 +++ b/configure.ac
-@@ -129,10 +129,10 @@
+@@ -132,10 +132,10 @@
  	apps/openssl/Makefile
  	apps/nc/Makefile
  	man/Makefile
@@ -1495,19 +1504,23 @@
  AM_CONDITIONAL([SMALL_TIME_T], [test "$ac_cv_sizeof_time_t" = "4"])
 --- a/tests/Makefile.am
 +++ b/tests/Makefile.am
-@@ -7,9 +7,9 @@
+@@ -7,12 +7,12 @@
  AM_CPPFLAGS += -I $(top_srcdir)/apps/openssl/compat
+ AM_CPPFLAGS += -D_PATH_SSL_CA_FILE=\"$(top_srcdir)/apps/openssl/cert.pem\"
  
- LDADD = $(PLATFORM_LDADD) $(PROG_LDADD)
--LDADD += $(abs_top_builddir)/ssl/libssl.la
--LDADD += $(abs_top_builddir)/crypto/libcrypto.la
--LDADD += $(abs_top_builddir)/tls/libtls.la
-+LDADD += $(abs_top_builddir)/ssl/libressl-ssl.la
-+LDADD += $(abs_top_builddir)/crypto/libressl-crypto.la
-+LDADD += $(abs_top_builddir)/tls/libressl-tls.la
+-LDADD = $(abs_top_builddir)/tls/.libs/libtls.a
+-LDADD += $(abs_top_builddir)/ssl/.libs/libssl.a
+-LDADD += $(abs_top_builddir)/crypto/.libs/libcrypto.a
++LDADD = $(abs_top_builddir)/tls/.libs/libressl-tls.a
++LDADD += $(abs_top_builddir)/ssl/.libs/libressl-ssl.a
++LDADD += $(abs_top_builddir)/crypto/.libs/libressl-crypto.a
+ LDADD += $(PLATFORM_LDADD) $(PROG_LDADD)
+ if HOST_ASM_MACOSX_X86_64
+-LDADD += $(abs_top_builddir)/crypto/.libs/libcrypto_la-cpuid-macosx-x86_64.o
++LDADD += $(abs_top_builddir)/crypto/.libs/libressl-crypto_la-cpuid-macosx-x86_64.o
+ endif
  
  TEST_LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) $(top_srcdir)/tap-driver.sh
- 
 --- /dev/null
 +++ b/libressl-tls.pc.in
 @@ -0,0 +1,16 @@
@@ -1618,7 +1631,7 @@
  endif
 --- a/tls/Makefile.am
 +++ b/tls/Makefile.am
-@@ -1,32 +1,32 @@
+@@ -1,31 +1,31 @@
  include $(top_srcdir)/Makefile.am.common
  
 -lib_LTLIBRARIES = libtls.la
@@ -1626,12 +1639,13 @@
  
  EXTRA_DIST = VERSION
  EXTRA_DIST += CMakeLists.txt
+ EXTRA_DIST += tls.sym
  
--libtls_la_LDFLAGS = -version-info @LIBTLS_VERSION@ -no-undefined
+-libtls_la_LDFLAGS = -version-info @LIBTLS_VERSION@ -no-undefined -export-symbols $(top_srcdir)/tls/tls.sym
 -libtls_la_LIBADD = $(abs_top_builddir)/ssl/libssl.la
 -libtls_la_LIBADD += $(abs_top_builddir)/crypto/libcrypto.la
 -libtls_la_LIBADD += $(PLATFORM_LDADD)
-+libressl_tls_la_LDFLAGS = -version-info @LIBTLS_VERSION@ -no-undefined
++libressl_tls_la_LDFLAGS = -version-info @LIBTLS_VERSION@ -no-undefined -export-symbols $(top_srcdir)/tls/tls.sym
 +libressl_tls_la_LIBADD = $(abs_top_builddir)/ssl/libressl-ssl.la
 +libressl_tls_la_LIBADD += $(abs_top_builddir)/crypto/libressl-crypto.la
 +libressl_tls_la_LIBADD += $(PLATFORM_LDADD)
@@ -1648,29 +1662,28 @@
  
 -libtls_la_SOURCES = tls.c
 -libtls_la_SOURCES += tls_client.c
+-libtls_la_SOURCES += tls_bio_cb.c
 -libtls_la_SOURCES += tls_config.c
 -libtls_la_SOURCES += tls_conninfo.c
 -libtls_la_SOURCES += tls_server.c
+-libtls_la_SOURCES += tls_ocsp.c
 -libtls_la_SOURCES += tls_peer.c
 -libtls_la_SOURCES += tls_util.c
 -libtls_la_SOURCES += tls_verify.c
 +libressl_tls_la_SOURCES = tls.c
 +libressl_tls_la_SOURCES += tls_client.c
++libressl_tls_la_SOURCES += tls_bio_cb.c
 +libressl_tls_la_SOURCES += tls_config.c
 +libressl_tls_la_SOURCES += tls_conninfo.c
 +libressl_tls_la_SOURCES += tls_server.c
++libressl_tls_la_SOURCES += tls_ocsp.c
 +libressl_tls_la_SOURCES += tls_peer.c
 +libressl_tls_la_SOURCES += tls_util.c
 +libressl_tls_la_SOURCES += tls_verify.c
  noinst_HEADERS = tls_internal.h
- 
- if !HAVE_STRSEP
--libtls_la_SOURCES += strsep.c
-+libressl_tls_la_SOURCES += strsep.c
- endif
 --- a/apps/nc/Makefile.am
 +++ b/apps/nc/Makefile.am
-@@ -3,18 +3,18 @@
+@@ -3,43 +3,43 @@
  if BUILD_NC
  
  if ENABLE_NC
@@ -1684,20 +1697,16 @@
  EXTRA_DIST = nc.1
  EXTRA_DIST += CMakeLists.txt
  
--nc_LDADD = $(PLATFORM_LDADD) $(PROG_LDADD)
--nc_LDADD += $(abs_top_builddir)/crypto/libcrypto.la
+-nc_LDADD = $(abs_top_builddir)/crypto/libcrypto.la
 -nc_LDADD += $(abs_top_builddir)/ssl/libssl.la
 -nc_LDADD += $(abs_top_builddir)/tls/libtls.la
-+libressl_nc_LDADD = $(PLATFORM_LDADD) $(PROG_LDADD)
-+libressl_nc_LDADD += $(abs_top_builddir)/crypto/libressl-crypto.la
+-nc_LDADD += $(PLATFORM_LDADD) $(PROG_LDADD)
++libressl_nc_LDADD = $(abs_top_builddir)/crypto/libressl-crypto.la
 +libressl_nc_LDADD += $(abs_top_builddir)/ssl/libressl-ssl.la
 +libressl_nc_LDADD += $(abs_top_builddir)/tls/libressl-tls.la
++libressl_nc_LDADD += $(PLATFORM_LDADD) $(PROG_LDADD)
  
  AM_CPPFLAGS += -I$(top_srcdir)/apps/nc/compat
- if OPENSSLDIR_DEFINED
-@@ -23,28 +23,28 @@
- AM_CPPFLAGS += -DDEFAULT_CA_FILE=\"$(sysconfdir)/ssl/cert.pem\"
- endif
  
 -nc_SOURCES = atomicio.c
 -nc_SOURCES += netcat.c
@@ -1734,7 +1743,7 @@
  endif
 --- a/apps/openssl/Makefile.am
 +++ b/apps/openssl/Makefile.am
-@@ -1,82 +1,82 @@
+@@ -1,81 +1,81 @@
  include $(top_srcdir)/Makefile.am.common
  
 -bin_PROGRAMS = openssl
@@ -1742,15 +1751,14 @@
  
  dist_man_MANS = openssl.1
  
--openssl_LDADD = $(PLATFORM_LDADD) $(PROG_LDADD)
--openssl_LDADD += $(abs_top_builddir)/ssl/libssl.la
+-openssl_LDADD = $(abs_top_builddir)/ssl/libssl.la
 -openssl_LDADD += $(abs_top_builddir)/crypto/libcrypto.la
+-openssl_LDADD += $(PLATFORM_LDADD) $(PROG_LDADD)
 -
 -openssl_SOURCES = apps.c
 -openssl_SOURCES += asn1pars.c
 -openssl_SOURCES += ca.c
 -openssl_SOURCES += ciphers.c
--openssl_SOURCES += cms.c
 -openssl_SOURCES += crl.c
 -openssl_SOURCES += crl2p7.c
 -openssl_SOURCES += dgst.c
@@ -1794,15 +1802,14 @@
 -openssl_SOURCES += verify.c
 -openssl_SOURCES += version.c
 -openssl_SOURCES += x509.c
-+libressl_openssl_LDADD = $(PLATFORM_LDADD) $(PROG_LDADD)
-+libressl_openssl_LDADD += $(abs_top_builddir)/ssl/libressl-ssl.la
++libressl_openssl_LDADD = $(abs_top_builddir)/ssl/libressl-ssl.la
 +libressl_openssl_LDADD += $(abs_top_builddir)/crypto/libressl-crypto.la
++libressl_openssl_LDADD += $(PLATFORM_LDADD) $(PROG_LDADD)
 +
 +libressl_openssl_SOURCES = apps.c
 +libressl_openssl_SOURCES += asn1pars.c
 +libressl_openssl_SOURCES += ca.c
 +libressl_openssl_SOURCES += ciphers.c
-+libressl_openssl_SOURCES += cms.c
 +libressl_openssl_SOURCES += crl.c
 +libressl_openssl_SOURCES += crl2p7.c
 +libressl_openssl_SOURCES += dgst.c
@@ -1976,3 +1983,38 @@
  	if [ -e ../apps/openssl/openssl.exe ]; then
  		cmd=../apps/openssl/openssl.exe
  	fi
+--- a/apps/ocspcheck/Makefile.am
++++ b/apps/ocspcheck/Makefile.am
+@@ -1,23 +1,23 @@
+ include $(top_srcdir)/Makefile.am.common
+ 
+-bin_PROGRAMS = ocspcheck
++bin_PROGRAMS = libressl-ocspcheck
+ 
+ EXTRA_DIST = ocspcheck.8
+ EXTRA_DIST += CMakeLists.txt
+ 
+-ocspcheck_LDADD = $(abs_top_builddir)/crypto/libcrypto.la
+-ocspcheck_LDADD += $(abs_top_builddir)/ssl/libssl.la
+-ocspcheck_LDADD += $(abs_top_builddir)/tls/libtls.la
+-ocspcheck_LDADD += $(PLATFORM_LDADD) $(PROG_LDADD)
++libressl_ocspcheck_LDADD = $(abs_top_builddir)/crypto/libressl-crypto.la
++libressl_ocspcheck_LDADD += $(abs_top_builddir)/ssl/libressl-ssl.la
++libressl_ocspcheck_LDADD += $(abs_top_builddir)/tls/libressl-tls.la
++libressl_ocspcheck_LDADD += $(PLATFORM_LDADD) $(PROG_LDADD)
+ 
+-ocspcheck_SOURCES = http.c
+-ocspcheck_SOURCES += ocspcheck.c
++libressl_ocspcheck_SOURCES = http.c
++libressl_ocspcheck_SOURCES += ocspcheck.c
+ noinst_HEADERS = http.h
+ 
+ if !HAVE_INET_NTOP
+-ocspcheck_SOURCES += compat/inet_ntop.c
++libressl_ocspcheck_SOURCES += compat/inet_ntop.c
+ endif
+ 
+ if !HAVE_MEMMEM
+-ocspcheck_SOURCES += compat/memmem.c
++libressl_ocspcheck_SOURCES += compat/memmem.c
+ endif

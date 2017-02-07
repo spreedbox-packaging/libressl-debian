@@ -2,11 +2,9 @@ Description: Add ARM optimizations from BoringSSL.
  This patch adds various ARM optimizations from BoringSSL upstream commit
  29e5cf7209292ba9d979a2d9bb6822a2114492b0.
 Author: Joachim Bauch <bauch@struktur.de>
-Index: libressl-debian/configure.ac
-===================================================================
---- libressl-debian.orig/configure.ac
-+++ libressl-debian/configure.ac
-@@ -85,6 +85,7 @@ case $host_cpu in
+--- a/configure.ac
++++ b/configure.ac
+@@ -87,6 +87,7 @@
  	*arm*)
  		AS_IF([test "x$BSWAP4" = "xyes"],,
  		    CPPFLAGS="$CPPFLAGS -D__STRICT_ALIGNMENT")
@@ -14,7 +12,7 @@ Index: libressl-debian/configure.ac
  		;;
  	*amd64*)
  		host_cpu=x86_64
-@@ -109,6 +110,8 @@ AC_ARG_ENABLE([asm],
+@@ -111,6 +112,8 @@
  AM_CONDITIONAL([OPENSSL_NO_ASM], [test "x$enable_asm" = "xno"])
  
  # Conditionally enable assembly by default
@@ -23,11 +21,9 @@ Index: libressl-debian/configure.ac
  AM_CONDITIONAL([HOST_ASM_ELF_X86_64],
      [test "x$HOST_ABI" = "xelf" -a "$host_cpu" = "x86_64" -a "x$enable_asm" != "xno"])
  AM_CONDITIONAL([HOST_ASM_MACOSX_X86_64],
-Index: libressl-debian/crypto/Makefile.am
-===================================================================
---- libressl-debian.orig/crypto/Makefile.am
-+++ libressl-debian/crypto/Makefile.am
-@@ -104,6 +104,7 @@ include Makefile.am.arc4random
+--- a/crypto/Makefile.am
++++ b/crypto/Makefile.am
+@@ -110,6 +110,7 @@
  libressl_crypto_la_SOURCES =
  EXTRA_libressl_crypto_la_SOURCES =
  
@@ -35,10 +31,8 @@ Index: libressl-debian/crypto/Makefile.am
  include Makefile.am.elf-x86_64
  include Makefile.am.macosx-x86_64
  
-Index: libressl-debian/crypto/Makefile.am.elf-arm
-===================================================================
 --- /dev/null
-+++ libressl-debian/crypto/Makefile.am.elf-arm
++++ b/crypto/Makefile.am.elf-arm
 @@ -0,0 +1,22 @@
 +.pl.S:
 +	perl $< > $@
@@ -62,10 +56,8 @@ Index: libressl-debian/crypto/Makefile.am.elf-arm
 +libressl_crypto_la_CPPFLAGS += -DSHA512_ASM
 +libressl_crypto_la_SOURCES += $(ASM_ARM_ELF)
 +endif
-Index: libressl-debian/crypto/aes/aes_core.c
-===================================================================
---- libressl-debian.orig/crypto/aes/aes_core.c
-+++ libressl-debian/crypto/aes/aes_core.c
+--- a/crypto/aes/aes_core.c
++++ b/crypto/aes/aes_core.c
 @@ -39,6 +39,7 @@
  #include "aes_locl.h"
  
@@ -74,7 +66,7 @@ Index: libressl-debian/crypto/aes/aes_core.c
  /*
  Te0[x] = S [x].[02, 01, 01, 03];
  Te1[x] = S [x].[03, 02, 01, 01];
-@@ -1163,6 +1164,35 @@ AES_decrypt(const unsigned char *in, uns
+@@ -1163,6 +1164,35 @@
  
  #else /* AES_ASM */
  
@@ -110,17 +102,15 @@ Index: libressl-debian/crypto/aes/aes_core.c
  static const u8 Te4[256] = {
  	0x63U, 0x7cU, 0x77U, 0x7bU, 0xf2U, 0x6bU, 0x6fU, 0xc5U,
  	0x30U, 0x01U, 0x67U, 0x2bU, 0xfeU, 0xd7U, 0xabU, 0x76U,
-@@ -1371,4 +1401,6 @@ AES_set_decrypt_key(const unsigned char
+@@ -1371,4 +1401,6 @@
  	return 0;
  }
  
 +#endif
 +
  #endif /* AES_ASM */
-Index: libressl-debian/include/openssl/arm_arch.h
-===================================================================
 --- /dev/null
-+++ libressl-debian/include/openssl/arm_arch.h
++++ b/include/openssl/arm_arch.h
 @@ -0,0 +1,120 @@
 +/* ====================================================================
 + * Copyright (c) 1998-2011 The OpenSSL Project.  All rights reserved.
@@ -242,10 +232,8 @@ Index: libressl-debian/include/openssl/arm_arch.h
 +#define ARMV8_PMULL (1 << 5)
 +
 +#endif  /* OPENSSL_HEADER_ARM_ARCH_H */
-Index: libressl-debian/crypto/boringssl/aes/asm/aes-armv4.pl
-===================================================================
 --- /dev/null
-+++ libressl-debian/crypto/boringssl/aes/asm/aes-armv4.pl
++++ b/crypto/boringssl/aes/asm/aes-armv4.pl
 @@ -0,0 +1,1244 @@
 +#!/usr/bin/env perl
 +
@@ -1491,10 +1479,8 @@ Index: libressl-debian/crypto/boringssl/aes/asm/aes-armv4.pl
 +
 +print $code;
 +close STDOUT;	# enforce flush
-Index: libressl-debian/crypto/boringssl/aes/asm/bsaes-armv7.pl
-===================================================================
 --- /dev/null
-+++ libressl-debian/crypto/boringssl/aes/asm/bsaes-armv7.pl
++++ b/crypto/boringssl/aes/asm/bsaes-armv7.pl
 @@ -0,0 +1,2487 @@
 +#!/usr/bin/env perl
 +
@@ -3983,10 +3969,8 @@ Index: libressl-debian/crypto/boringssl/aes/asm/bsaes-armv7.pl
 +print $code;
 +
 +close STDOUT;
-Index: libressl-debian/crypto/boringssl/bn/asm/armv4-mont.pl
-===================================================================
 --- /dev/null
-+++ libressl-debian/crypto/boringssl/bn/asm/armv4-mont.pl
++++ b/crypto/boringssl/bn/asm/armv4-mont.pl
 @@ -0,0 +1,693 @@
 +#!/usr/bin/env perl
 +
@@ -4681,10 +4665,8 @@ Index: libressl-debian/crypto/boringssl/bn/asm/armv4-mont.pl
 +$code =~ s/\bret\b/bx	lr/gm;
 +print $code;
 +close STDOUT;
-Index: libressl-debian/crypto/boringssl/sha/asm/sha1-armv4-large.pl
-===================================================================
 --- /dev/null
-+++ libressl-debian/crypto/boringssl/sha/asm/sha1-armv4-large.pl
++++ b/crypto/boringssl/sha/asm/sha1-armv4-large.pl
 @@ -0,0 +1,701 @@
 +#!/usr/bin/env perl
 +
@@ -5387,10 +5369,8 @@ Index: libressl-debian/crypto/boringssl/sha/asm/sha1-armv4-large.pl
 +}
 +
 +close STDOUT; # enforce flush
-Index: libressl-debian/crypto/boringssl/sha/asm/sha256-armv4.pl
-===================================================================
 --- /dev/null
-+++ libressl-debian/crypto/boringssl/sha/asm/sha256-armv4.pl
++++ b/crypto/boringssl/sha/asm/sha256-armv4.pl
 @@ -0,0 +1,735 @@
 +#!/usr/bin/env perl
 +
@@ -6127,10 +6107,8 @@ Index: libressl-debian/crypto/boringssl/sha/asm/sha256-armv4.pl
 +}
 +
 +close STDOUT; # enforce flush
-Index: libressl-debian/crypto/boringssl/sha/asm/sha512-armv4.pl
-===================================================================
 --- /dev/null
-+++ libressl-debian/crypto/boringssl/sha/asm/sha512-armv4.pl
++++ b/crypto/boringssl/sha/asm/sha512-armv4.pl
 @@ -0,0 +1,666 @@
 +#!/usr/bin/env perl
 +
