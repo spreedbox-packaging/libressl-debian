@@ -1,3 +1,9 @@
+libressl (2.5.1-1ppa1~xenial1) xenial; urgency=medium
+
+  * Rebuild for Ubuntu 16.04
+
+ -- Simon Eisenmann <simon@struktur.de>  Tue, 14 Feb 2017 16:53:34 +0100
+
 libressl (2.5.1-1ppa1~trusty1) trusty; urgency=medium
 
   * Upgrade to 2.5.x release line.
