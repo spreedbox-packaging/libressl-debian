@@ -1,3 +1,13 @@
+libressl (2.5.1-1ppa2~precise1) precise; urgency=medium
+
+  [ Joachim Bauch ]
+  * Upgrade to 2.5.x release line.
+
+  [ Simon Eisenmann ]
+  * Backport SSLv2 challenge conversion fix
+
+ -- Simon Eisenmann <simon@struktur.de>  Tue, 21 Mar 2017 12:14:20 +0100
+
 libressl (2.5.1-1ppa1~precise1) precise; urgency=medium
 
   * Imported Upstream version 2.5.1
