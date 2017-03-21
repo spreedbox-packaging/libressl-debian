@@ -1,3 +1,9 @@
+libressl (2.5.1-1ppa2~xenial1) xenial; urgency=medium
+
+  * Backport SSLv2 challenge conversion fix
+
+ -- Simon Eisenmann <simon@struktur.de>  Tue, 21 Mar 2017 12:16:40 +0100
+
 libressl (2.5.1-1ppa1~xenial1) xenial; urgency=medium
 
   * Rebuild for Ubuntu 16.04
