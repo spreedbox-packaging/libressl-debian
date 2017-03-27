@@ -122,7 +122,7 @@
  endif
  
  noinst_LTLIBRARIES = libcompat.la
-@@ -107,34 +107,34 @@
+@@ -115,34 +115,34 @@
  
  include Makefile.am.arc4random
  
@@ -176,7 +176,7 @@
  noinst_HEADERS += constant_time_locl.h
  noinst_HEADERS += cryptlib.h
  noinst_HEADERS += md32_common.h
-@@ -142,683 +142,683 @@
+@@ -150,684 +150,684 @@
  noinst_HEADERS += x86_arch.h
  
  # aes
@@ -842,6 +842,7 @@
 -libcrypto_la_SOURCES += evp/m_gostr341194.c
 -libcrypto_la_SOURCES += evp/m_md4.c
 -libcrypto_la_SOURCES += evp/m_md5.c
+-libcrypto_la_SOURCES += evp/m_md5_sha1.c
 -libcrypto_la_SOURCES += evp/m_null.c
 -libcrypto_la_SOURCES += evp/m_ripemd.c
 -libcrypto_la_SOURCES += evp/m_sha1.c
@@ -898,6 +899,7 @@
 +libressl_crypto_la_SOURCES += evp/m_gostr341194.c
 +libressl_crypto_la_SOURCES += evp/m_md4.c
 +libressl_crypto_la_SOURCES += evp/m_md5.c
++libressl_crypto_la_SOURCES += evp/m_md5_sha1.c
 +libressl_crypto_la_SOURCES += evp/m_null.c
 +libressl_crypto_la_SOURCES += evp/m_ripemd.c
 +libressl_crypto_la_SOURCES += evp/m_sha1.c
@@ -1393,7 +1395,7 @@
  noinst_HEADERS += x509v3/pcy_int.h
 --- a/ssl/Makefile.am
 +++ b/ssl/Makefile.am
-@@ -1,51 +1,51 @@
+@@ -1,52 +1,52 @@
  include $(top_srcdir)/Makefile.am.common
  
 -lib_LTLIBRARIES = libssl.la
@@ -1441,6 +1443,7 @@
 -libssl_la_SOURCES += ssl_versions.c
 -libssl_la_SOURCES += t1_clnt.c
 -libssl_la_SOURCES += t1_enc.c
+-libssl_la_SOURCES += t1_hash.c
 -libssl_la_SOURCES += t1_lib.c
 -libssl_la_SOURCES += t1_meth.c
 -libssl_la_SOURCES += t1_reneg.c
@@ -1478,6 +1481,7 @@
 +libressl_ssl_la_SOURCES += ssl_versions.c
 +libressl_ssl_la_SOURCES += t1_clnt.c
 +libressl_ssl_la_SOURCES += t1_enc.c
++libressl_ssl_la_SOURCES += t1_hash.c
 +libressl_ssl_la_SOURCES += t1_lib.c
 +libressl_ssl_la_SOURCES += t1_meth.c
 +libressl_ssl_la_SOURCES += t1_reneg.c
