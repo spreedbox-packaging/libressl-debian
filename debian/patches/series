@@ -3,4 +3,3 @@ change_include_path.patch
 rng_improvements.patch
 arm_optimizations.patch
 arm64_optimizations.patch
-fix_sslv2_challenge.patch
