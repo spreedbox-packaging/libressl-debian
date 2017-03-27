@@ -1,3 +1,11 @@
+libressl (2.5.2-1ppa1~trusty1) trusty; urgency=medium
+
+  * Imported Upstream version 2.5.2
+  * Backported SSLv2 challenge fix is no longer required (now in upstream).
+  * Update patches for new upstream version.
+
+ -- Joachim Bauch <bauch@struktur.de>  Mon, 27 Mar 2017 08:38:41 +0200
+
 libressl (2.5.1-1ppa2~trusty1) trusty; urgency=medium
 
   * Backport SSLv2 challenge conversion fix
