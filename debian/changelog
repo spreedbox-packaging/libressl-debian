@@ -1,3 +1,9 @@
+libressl (2.5.3-1ppa1~xenial1) xenial; urgency=medium
+
+  * Imported Upstream version 2.5.3
+
+ -- Joachim Bauch <bauch@struktur.de>  Wed, 12 Apr 2017 08:35:34 +0200
+
 libressl (2.5.2-1ppa1~xenial1) xenial; urgency=medium
 
   * Imported Upstream version 2.5.2
