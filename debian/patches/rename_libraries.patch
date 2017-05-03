@@ -19,8 +19,8 @@
 +libdir=@libdir@
 +includedir=@includedir@
 +
-+Name: LibreSSL-libssl
-+Description: Secure Sockets Layer and cryptography libraries
++Name: LibreSSL-libcrypto
++Description: LibreSSL cryptography library
 +Version: @LIBCRYPTO_VERSION@
 +Requires:
 +Conflicts:
@@ -85,13 +85,13 @@
  
  EXTRA_DIST = VERSION
  EXTRA_DIST += CMakeLists.txt
-@@ -15,26 +15,26 @@
- # needed for a CMake target
- EXTRA_DIST += compat/strcasecmp.c
+@@ -18,26 +18,26 @@
+ BUILT_SOURCES = crypto_portable.sym
+ CLEANFILES = crypto_portable.sym
  
--libcrypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@ -no-undefined -export-symbols $(top_srcdir)/crypto/crypto_portable.sym
+-libcrypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@ -no-undefined -export-symbols crypto_portable.sym
 -libcrypto_la_LIBADD = libcompat.la
-+libressl_crypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@ -no-undefined -export-symbols $(top_srcdir)/crypto/crypto_portable.sym
++libressl_crypto_la_LDFLAGS = -version-info @LIBCRYPTO_VERSION@ -no-undefined -export-symbols crypto_portable.sym
 +libressl_crypto_la_LIBADD = libcompat.la
  if !HAVE_EXPLICIT_BZERO
 -libcrypto_la_LIBADD += libcompatnoopt.la
@@ -122,7 +122,7 @@
  endif
  
  noinst_LTLIBRARIES = libcompat.la
-@@ -115,34 +115,34 @@
+@@ -118,34 +118,34 @@
  
  include Makefile.am.arc4random
  
@@ -176,7 +176,7 @@
  noinst_HEADERS += constant_time_locl.h
  noinst_HEADERS += cryptlib.h
  noinst_HEADERS += md32_common.h
-@@ -150,684 +150,684 @@
+@@ -153,684 +153,684 @@
  noinst_HEADERS += x86_arch.h
  
  # aes
@@ -1687,12 +1687,13 @@
  noinst_HEADERS = tls_internal.h
 --- a/apps/nc/Makefile.am
 +++ b/apps/nc/Makefile.am
-@@ -3,43 +3,43 @@
+@@ -3,44 +3,44 @@
  if BUILD_NC
  
  if ENABLE_NC
 -bin_PROGRAMS = nc
 +bin_PROGRAMS = libressl-nc
+ dist_man_MANS = nc.1
  else
 -noinst_PROGRAMS = nc
 +noinst_PROGRAMS = libressl-nc
@@ -1897,8 +1898,8 @@
 -libdir=@libdir@
 -includedir=@includedir@
 -
--Name: LibreSSL-libssl
--Description: Secure Sockets Layer and cryptography libraries
+-Name: LibreSSL-libcrypto
+-Description: LibreSSL cryptography library
 -Version: @VERSION@
 -Requires:
 -Conflicts:
