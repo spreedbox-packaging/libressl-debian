@@ -21,7 +21,7 @@
  AM_CONDITIONAL([HOST_ASM_MACOSX_X86_64],
 --- a/crypto/Makefile.am
 +++ b/crypto/Makefile.am
-@@ -118,6 +118,7 @@
+@@ -121,6 +121,7 @@
  libressl_crypto_la_SOURCES =
  EXTRA_libressl_crypto_la_SOURCES =
  
