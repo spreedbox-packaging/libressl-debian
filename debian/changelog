@@ -1,3 +1,9 @@
+libressl (2.5.5-1ppa1~precise1) precise; urgency=medium
+
+  * Imported Upstream version 2.5.5
+
+ -- Joachim Bauch <bauch@struktur.de>  Thu, 13 Jul 2017 08:57:56 +0200
+
 libressl (2.5.4-1ppa1~precise1) precise; urgency=medium
 
   * Imported Upstream version 2.5.4
